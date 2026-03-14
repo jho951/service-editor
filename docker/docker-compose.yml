@@ -22,7 +22,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    container_name: drawing-app
+    container_name: documents-app
     depends_on:
       mysql:
         condition: service_healthy

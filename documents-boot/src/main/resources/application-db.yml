@@ -1,0 +1,28 @@
+db:
+  url: jdbc:mysql://localhost:3306/drawingdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Seoul
+  username: root
+  password: password
+  pool:
+    max: 10
+    min: 2
+    timeout-ms: 30000
+
+spring:
+  datasource:
+    url: ${db.url}
+    username: ${db.username}
+    password: ${db.password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${db.pool.max}
+      minimum-idle: ${db.pool.min}
+      connection-timeout: ${db.pool.timeout-ms}
+      pool-name: HikariDrawing
+
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.documents.domain
+  type-handlers-package: com.documents.common
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false

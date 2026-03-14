@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: documents-app
+  profiles:
+    active: dev
+  config:
+    import:
+      - classpath:application-server.yml
+      - classpath:application-db.yml
+      - classpath:application-auth.yml
+      - classpath:application-docs.yml

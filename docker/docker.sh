@@ -10,7 +10,7 @@ case "$1" in
     docker compose -f "$COMPOSE_FILE" build --no-cache
     docker compose -f "$COMPOSE_FILE" up -d
     echo "✅ 컨테이너 기동 완료, 로그 출력 중..."
-    docker logs drawing-app --tail=200 -f
+    docker logs documents-app --tail=200 -f
     ;;
   build)
     docker compose -f "$COMPOSE_FILE" build

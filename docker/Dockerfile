@@ -7,14 +7,17 @@ COPY gradlew /workspace/gradlew
 COPY gradle /workspace/gradle
 COPY settings.gradle /workspace/settings.gradle
 COPY build.gradle /workspace/build.gradle
-COPY src /workspace/src
+COPY documents-boot /workspace/documents-boot
+COPY documents-api /workspace/documents-api
+COPY documents-core /workspace/documents-core
+COPY documents-infrastructure /workspace/documents-infrastructure
 
 RUN chmod +x ./gradlew
-RUN ./gradlew clean bootJar -x test
+RUN ./gradlew clean :documents-boot:bootJar -x test
 
 # ---- Runtime stage ----
 FROM eclipse-temurin:17-jdk
 WORKDIR /app
-COPY --from=builder /workspace/build/libs/*.jar app.jar
+COPY --from=builder /workspace/documents-boot/build/libs/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java","-jar","app.jar"]

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.documents.repository.DrawerMapper">
+
+    <resultMap id="DrawerMap" type="com.documents.domain.Drawer">
+        <id property="id"
+            column="id"
+            javaType="java.util.UUID"
+            jdbcType="CHAR"
+            typeHandler="com.documents.common.UUIDStringTypeHandler"/>
+        <result property="title" column="title"/>
+        <result property="width" column="width"/>
+        <result property="height" column="height"/>
+        <result property="vectorJson" column="vector_json"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+        <result property="version" column="version"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.documents.domain.Drawer">
+        INSERT INTO drawing (id, title, width, height, vector_json)
+        VALUES (#{id, jdbcType=CHAR}, #{title}, #{width}, #{height},
+                #{vectorJson, jdbcType=LONGVARCHAR})
+    </insert>
+
+    <select id="findById" parameterType="java.util.UUID" resultMap="DrawerMap">
+        SELECT * FROM drawing WHERE id = #{id, jdbcType=CHAR}
+    </select>
+
+    <update id="updatePartial" parameterType="com.documents.domain.Drawer">
+        UPDATE drawing
+        SET title = COALESCE(#{title}, title),
+            width = COALESCE(#{width}, width),
+            height = COALESCE(#{height}, height),
+            vector_json = COALESCE(#{vectorJson, jdbcType=LONGVARCHAR}, vector_json),
+            version = version + 1
+        WHERE id = #{id, jdbcType=CHAR}
+    </update>
+
+    <delete id="delete" parameterType="java.util.UUID">
+        DELETE FROM drawing WHERE id = #{id, jdbcType=CHAR}
+    </delete>
+
+    <select id="findPage" resultMap="DrawerMap">
+        SELECT * FROM drawing
+        ORDER BY created_at DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+</mapper>

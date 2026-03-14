@@ -1,1 +1,6 @@
 rootProject.name = 'demo'
+
+include 'documents-boot'
+include 'documents-api'
+include 'documents-core'
+include 'documents-infrastructure'

@@ -1,0 +1,6 @@
+dependencies {
+    implementation project(':documents-core')
+
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.5'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+}
