@@ -5,6 +5,20 @@ plugins {
 
 ext {
     springBootVersion = '3.4.10'
+    runtimeEnvKeys = [
+        'DB_URL',
+        'DB_USERNAME',
+        'DB_PASSWORD',
+        'SPRING_PROFILES_ACTIVE',
+        'JWT_SECRET',
+        'JWT_ACCESS_EXP',
+        'JWT_REFRESH_EXP',
+        'SWAGGER_ENABLED',
+        'CORS_ENABLED',
+        'CORS_ALLOWED_ORIGINS',
+        'SERVER_PORT',
+        'TZ'
+    ]
 }
 
 group = 'com.example'
@@ -46,5 +60,27 @@ subprojects {
 
     tasks.named('test') {
         useJUnitPlatform()
+    }
+
+    def runtimeEnv = rootProject.ext.runtimeEnvKeys
+        .findAll { rootProject.hasProperty(it) }
+        .collectEntries { [(it): rootProject.property(it).toString()] }
+
+    tasks.withType(Test).configureEach {
+        if (!runtimeEnv.isEmpty()) {
+            environment runtimeEnv
+        }
+        if (runtimeEnv.containsKey('TZ')) {
+            systemProperty 'user.timezone', runtimeEnv['TZ']
+        }
+    }
+
+    tasks.withType(JavaExec).configureEach {
+        if (!runtimeEnv.isEmpty()) {
+            environment runtimeEnv
+        }
+        if (runtimeEnv.containsKey('TZ')) {
+            systemProperty 'user.timezone', runtimeEnv['TZ']
+        }
     }
 }

@@ -2,7 +2,7 @@
 
 ## 로컬 재현 절차
 
-1. `./gradlew :documents-boot:bootRun`으로 실행한다.
+1. `./gradlew :documents-boot:bootRun`으로 실행한다. 로컬 기본 설정은 루트 `gradle.properties`에서 주입된다.
 2. `http://localhost:8080/swagger-ui`로 API 문서를 확인한다.
 3. DB 연결 문제가 있으면 `documents-boot/src/main/resources/application-dev.yml`과 환경변수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 점검한다.
 

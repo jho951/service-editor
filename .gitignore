@@ -35,3 +35,15 @@ out/
 
 ### VS Code ###
 .vscode/
+
+.env
+.env.*
+!.env.example
+gradle.properties
+application-local.yml
+application-local.yaml
+*.local
+*.secret
+*.secrets
+*.log
+.DS_Store
