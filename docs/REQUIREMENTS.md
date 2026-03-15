@@ -13,6 +13,8 @@
 - 실행 애플리케이션 식별자는 `documents-app`, 로컬/도커 기본 데이터베이스 식별자는 `documentsdb`를 사용한다.
 - 이번 구조 변경은 기능 요구사항 변경이 아니라 구현 구조 정리 목적이며, 기존 API 동작은 유지 대상으로 본다.
 - 영속 기술은 MyBatis 대신 Spring Data JPA를 기본 표준으로 사용한다.
+- Java 코드는 IntelliJ의 `Naver-coding-convention-v1.2` 프로젝트 포매터를 기준으로 작성하고 정렬한다.
+- 저장소 기준 포매터 설정은 `.idea/codeStyles/Project.xml`과 `.editorconfig`의 Java 섹션을 따른다.
 
 ---
 
@@ -82,9 +84,20 @@
 - **file-service**: 향후 첨부파일/이미지 블록 저장
 - **editor-collab-service**: 향후 실시간 협업 기능 분리 시 사용
 
+### 인증 진입 전제
+- 이 서비스는 기본적으로 로그인된 사용자만 진입할 수 있는 내부 보호 구간으로 가정한다.
+- 로그인하지 않은 사용자는 gateway 또는 상위 인증 계층에서 먼저 차단되며, 본 서비스까지 도달하지 않는다.
+- 따라서 본 서비스는 인증이 완료된 사용자 컨텍스트를 전제로 비즈니스 처리를 수행한다.
+
 ---
 
 ## 4. MVP 범위
+
+## 4.0 워크스페이스(Workspace)
+- 워크스페이스 생성
+- 워크스페이스 단건 조회
+- 문서 기능의 선행 리소스로서 workspace 존재 여부를 검증할 수 있어야 한다.
+- v1에서는 워크스페이스 멤버십, 권한 상세 정책, soft delete는 제외한다.
 
 ## 4.1 문서(Document)
 - 문서 생성
@@ -149,7 +162,26 @@ User {
 }
 ```
 
-## 6.2 Document
+## 6.2 Workspace
+
+```text
+Workspace {
+  id: string
+  name: string
+  createdBy: string | null
+  updatedBy: string | null
+  createdAt: datetime
+  updatedAt: datetime
+  version: number
+}
+```
+
+### 설명
+- `name`: 워크스페이스 표시 이름
+- Workspace는 v1에서 문서 생성의 소속 루트만 담당한다.
+- 인증 연동 전 단계에서는 `createdBy`, `updatedBy`를 `null`로 둘 수 있다.
+
+## 6.3 Document
 
 ```text
 Document {
@@ -176,7 +208,7 @@ Document {
 - `version`: 낙관적 락용 버전
 - `deletedAt`: soft delete 시각
 
-## 6.3 Block
+## 6.4 Block
 
 ```text
 Block {
@@ -206,6 +238,12 @@ Block {
 
 ## 7. 도메인 무결성 규칙
 
+## 7.0 워크스페이스 규칙
+1. 워크스페이스 이름은 비어 있을 수 없다.
+2. 워크스페이스 이름 최대 길이는 `100`이다.
+3. 문서는 반드시 존재하는 워크스페이스에 속해야 한다.
+4. v1의 Workspace는 생성과 조회만 제공하며 삭제/멤버 관리 책임은 갖지 않는다.
+
 ## 7.1 문서 규칙
 1. `parentId IS NULL`이면 루트 문서다.
 2. 하위 문서는 반드시 같은 `workspaceId` 내 부모 문서를 가져야 한다.
@@ -233,6 +271,16 @@ Block {
 ---
 
 ## 8. 기능 요구사항
+
+## 8.0 워크스페이스 생성 및 조회
+### 요구사항
+- 사용자는 새 워크스페이스를 생성할 수 있어야 한다.
+- 생성된 워크스페이스를 ID로 단건 조회할 수 있어야 한다.
+- 워크스페이스 생성 응답에는 이후 문서 생성에 사용할 식별자가 포함되어야 한다.
+
+### 결과 조건
+- 생성 직후 버전 정보가 초기화되어야 한다.
+- 이후 문서 기능은 Workspace 존재 여부 검증에 이 리소스를 사용할 수 있어야 한다.
 
 ## 8.1 문서 조회
 ### 요구사항
@@ -319,15 +367,20 @@ Block {
 ## 9.1 공통 검증
 - `documentId`, `blockId`, `workspaceId`, `userId`는 UUID 또는 서비스 표준 ID 형식이어야 한다.
 - 빈 문자열과 `null`의 허용 범위는 API별로 명확히 정의해야 한다.
+- `@Valid` 등 선언적 검증으로 이미 통과한 요청 객체에 대해 중복된 `null`/빈 문자열 보정 로직은 꼭 필요한 경우가 아니면 추가하지 않는다.
 
-## 9.2 문서 검증
+## 9.2 워크스페이스 검증
+- `name`은 필수다.
+- `name` 최대 길이: `100`
+
+## 9.3 문서 검증
 - `title` 최대 길이: `255`
 - `icon`, `cover`는 허용된 JSON 스키마만 허용
 - 부모 문서는 동일 워크스페이스 내 존재해야 함
 - 자기 자신을 부모로 둘 수 없음
 - 순환 참조 금지
 
-## 9.3 블록 검증
+## 9.4 블록 검증
 - `type`은 현재 `TEXT`만 허용
 - `text`는 문자열이어야 함
 - `text` 최대 길이: `10,000`
@@ -377,6 +430,7 @@ Block {
 
 ## 11.4 보안
 - 인증은 외부 서비스(auth-service)에서 받은 identity를 신뢰한다.
+- 비로그인 사용자는 gateway 또는 상위 인증 계층에서 차단되므로, 본 서비스는 인증 완료 요청만 처리 대상으로 본다.
 - 쓰기 요청은 edit 권한이 필요하다.
 - HTML은 저장하지 않는다.
 - 렌더링 시 XSS 방어는 프론트와 계약으로 명시한다.
@@ -393,11 +447,21 @@ Block {
 ## 12.1 인증 및 공통 규칙
 - 인증 방식: Bearer token 또는 내부 인증 헤더
 - 응답 포맷: JSON
-- 에러 응답은 표준 구조를 따른다.
+- 모든 성공/실패 응답은 `documents-api` 모듈의 공통 응답 구조(`GlobalResponse`)를 따른다.
+- 비즈니스 성공 코드는 `SuccessCode`로 관리하고, API 오류 응답 코드는 `documents-api` 모듈의 `ErrorCode`로 관리한다.
+- `GlobalException`, `ErrorCode`, `BaseResponse`, `GlobalResponse`는 HTTP 응답 계약이므로 `documents-api` 모듈에 둔다.
+- 서비스 계층의 비즈니스 예외는 `documents-core` 모듈의 `BusinessException`과 `BusinessErrorCode`로 관리한다.
+- API 계층은 `GlobalExceptionHandler`를 통해 `BusinessException`을 `ErrorCode`로 매핑하여 공통 응답으로 변환한다.
+- `BusinessErrorCode`와 API `ErrorCode`의 매핑은 enum 이름 일치 규칙을 기본으로 하며, 신규 비즈니스 오류 추가 시 같은 이름의 API 오류 코드를 함께 정의해야 한다.
+- 후속 기능(Document, Block 포함)도 동일한 응답/에러 처리 구조를 사용해야 한다.
 
 ### 성공 응답 예시
 ```json
 {
+  "httpStatus": "OK",
+  "success": true,
+  "message": "요청 응답 성공",
+  "code": 200,
   "data": {}
 }
 ```
@@ -405,13 +469,11 @@ Block {
 ### 실패 응답 예시
 ```json
 {
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "title is required",
-    "details": {
-      "field": "title"
-    }
-  }
+  "httpStatus": "BAD_REQUEST",
+  "success": false,
+  "message": "요청 필드 유효성 검사에 실패했습니다.",
+  "code": 9016,
+  "data": null
 }
 ```
 
@@ -425,6 +487,19 @@ Block {
 - `INTERNAL_ERROR`
 
 ## 12.3 문서 API
+
+### `POST /v1/workspaces`
+워크스페이스 생성.
+
+요청 예시:
+```json
+{
+  "name": "Team Workspace"
+}
+```
+
+### `GET /v1/workspaces/{workspaceId}`
+워크스페이스 단건 조회.
 
 ### `GET /v1/workspaces/{workspaceId}/documents`
 워크스페이스 내 문서 목록 조회.
@@ -562,13 +637,38 @@ TEXT 블록 생성.
 4. 하위 문서 cascade 정책 적용
 5. commit
 
+## 15.3 계층 책임 원칙
+- Controller는 요청 매핑, 인증 컨텍스트 전달, Service 호출, 공통 응답 포맷 반환만 담당해야 한다.
+- Controller는 비즈니스 검증, 리소스 존재 판단, 정합성 검증, 상태 충돌 판단을 직접 구현하지 않는다.
+- 리소스 조회 실패, 정합성 위반, 충돌 판단 등 비즈니스 예외는 Service 계층에서 `BusinessException`으로 발생시키고, API 계층은 `GlobalExceptionHandler`를 통해 공통 응답으로 변환한다.
+- 후속 API도 같은 원칙을 적용하여 Controller를 얇게 유지해야 한다.
+- `@Valid`로 보장된 요청 필드에 대해서는 Service 계층에서 불필요한 `null`/빈 값 파싱과 방어 코드를 최소화한다.
+
+## 15.4 테스트 배치 및 실행 원칙
+- 빠른 피드백을 위한 테스트 피라미드를 기본 전략으로 사용한다. 단위 테스트와 slice 테스트를 통합 테스트보다 더 많이 유지해야 한다.
+- API 통합 테스트(Controller + Spring MVC + Service + Repository + DB)는 실행 모듈인 `documents-boot`에 둔다.
+- `documents-api`는 Controller slice 테스트, 요청/응답 직렬화, `@Valid` 검증, 공통 예외 응답 검증을 위한 빠른 테스트의 기본 위치로 사용한다.
+- `documents-core`는 순수 도메인 로직과 서비스 계약 수준의 단위 테스트를 둔다.
+- `documents-infrastructure`는 JPA 저장소, 커스텀 쿼리, 영속 구현 검증 테스트와 서비스 구현의 빠른 단위 테스트를 둔다.
+- 테스트 의존성은 각 모듈의 테스트 책임에 필요한 최소 범위만 `testImplementation`으로 추가해야 하며, 프로덕션 `implementation` 의존성을 우회하기 위한 용도로 남용하지 않는다.
+- 공통 테스트 라이브러리 버전과 좌표는 루트 Gradle 설정에서 관리하고, 각 모듈은 필요한 항목만 선택해서 사용한다.
+- 테스트 실행과 의존성 해석은 저장소 루트의 Gradle Wrapper에서 수행하고, 기본 명령은 `./gradlew :대상모듈:test` 형식으로 제한한다.
+- API 개발 시 기본 검증 명령은 `./gradlew :documents-boot:test`이며, 필요 시 하위 모듈 테스트를 별도로 추가 실행한다.
+- 기능 추가 시 최소한 다음 테스트를 함께 추가해야 한다: Service 단위 테스트, API slice 테스트, 필요한 경우 Repository 테스트, 대표 시나리오 1개 이상의 boot 통합 테스트.
+- 모든 테스트 클래스와 테스트 메서드는 한글 `@DisplayName`으로 역할을 명시해야 한다.
+- `@DisplayName`은 테스트가 검증하는 행위와 기대 결과가 한눈에 드러나도록 간결하게 작성해야 한다.
+- 테스트 메서드의 `@DisplayName`은 성공 검증이면 `성공_${테스트 내용}`, 실패 검증이면 `실패_${테스트 내용}` 형식으로 고정한다.
+- `${테스트 내용}`은 문어체로 간결하게 작성하고, 입력 조건과 기대 결과가 바로 드러나야 한다.
+- `@Valid`, 경계값, 누락 필드, 잘못된 식별자 형식, 검색/필터 조건 분기, 정렬 조건, 예외 응답 구조를 빠른 테스트 우선으로 커버해야 한다.
+- 테스트 커버리지는 장기적으로 라인/브랜치 기준 `80%` 이상을 목표로 하되, 신규 기능은 변경 범위에 대해 우선적으로 높은 커버리지를 확보해야 한다.
+
 ---
 
 ## 16. 오픈 이슈
 
 다음 항목은 추후 별도 설계 확정이 필요하다.
 
-1. `workspace`, `workspace_members`, `permissions` 테이블 상세 정의
+1. `workspace_members`, `permissions` 테이블 상세 정의
 2. 문서 정렬을 위한 `documents.sortKey` 확정
 3. 사용자 소셜 로그인 식별자 모델(`providerUserId`) 확정
 4. 향후 collaborative editing 도입 시 operations / snapshots / presence 모델 정의

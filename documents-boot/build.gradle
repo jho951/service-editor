@@ -7,7 +7,9 @@ dependencies {
     implementation project(':documents-api')
     implementation project(':documents-infrastructure')
 
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation rootProject.ext.testLibraries.springBootTest
+    testImplementation rootProject.ext.testLibraries.springWeb
+    testImplementation rootProject.ext.testLibraries.springDataJpa
     testRuntimeOnly 'com.h2database:h2'
 }
 
