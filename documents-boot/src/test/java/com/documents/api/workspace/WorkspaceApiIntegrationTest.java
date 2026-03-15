@@ -83,10 +83,27 @@ class WorkspaceApiIntegrationTest {
 
         mockMvc.perform(post("/v1/workspaces")
                         .contentType("application/json")
+                        .header("X-User-Id", "user-123")
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value(9016))
                 .andExpect(jsonPath("$.message").value("요청 필드 유효성 검사에 실패했습니다."));
+    }
+
+    @Test
+    @DisplayName("실패_워크스페이스 생성 API는 인증 헤더가 없으면 인증 오류를 반환한다")
+    void createWorkspaceReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+        mockMvc.perform(post("/v1/workspaces")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "name": "Team Workspace"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value(9001))
+                .andExpect(jsonPath("$.message").value("인증 정보가 없습니다."));
     }
 }

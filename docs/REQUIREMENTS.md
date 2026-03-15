@@ -376,6 +376,10 @@ Block {
 ## 9.3 문서 검증
 - `title` 최대 길이: `255`
 - `icon`, `cover`는 허용된 JSON 스키마만 허용
+- v1에서 `icon`, `cover`는 JSON object만 허용한다.
+- v1에서 `icon`, `cover`의 최소 허용 스키마는 `{"type":"string","value":"string"}` 형태다.
+- `icon.type`, `icon.value`, `cover.type`, `cover.value`는 모두 비어 있지 않은 문자열이어야 한다.
+- 배열, 숫자, boolean, plain string, 필수 필드가 누락된 object는 허용하지 않는다.
 - 부모 문서는 동일 워크스페이스 내 존재해야 함
 - 자기 자신을 부모로 둘 수 없음
 - 순환 참조 금지
@@ -453,6 +457,8 @@ Block {
 - 서비스 계층의 비즈니스 예외는 `documents-core` 모듈의 `BusinessException`과 `BusinessErrorCode`로 관리한다.
 - API 계층은 `GlobalExceptionHandler`를 통해 `BusinessException`을 `ErrorCode`로 매핑하여 공통 응답으로 변환한다.
 - `BusinessErrorCode`와 API `ErrorCode`의 매핑은 enum 이름 일치 규칙을 기본으로 하며, 신규 비즈니스 오류 추가 시 같은 이름의 API 오류 코드를 함께 정의해야 한다.
+- `NOT_FOUND` 계열 오류는 `RESOURCE_NOT_FOUND` 같은 범용 이름보다 `WORKSPACE_NOT_FOUND`, `DOCUMENT_NOT_FOUND`, `BLOCK_NOT_FOUND`처럼 도메인별 식별이 가능한 이름을 기본으로 사용한다.
+- 오류 메시지는 어떤 도메인 리소스가 실패했는지 직접 드러내야 하며, 같은 HTTP 상태라도 도메인별 오류 코드를 분리할 수 있어야 한다.
 - 후속 기능(Document, Block 포함)도 동일한 응답/에러 처리 구조를 사용해야 한다.
 
 ### 성공 응답 예시
@@ -480,7 +486,9 @@ Block {
 ## 12.2 주요 에러 코드
 - `UNAUTHORIZED`
 - `FORBIDDEN`
-- `NOT_FOUND`
+- `WORKSPACE_NOT_FOUND`
+- `DOCUMENT_NOT_FOUND`
+- `BLOCK_NOT_FOUND`
 - `VALIDATION_ERROR`
 - `CONFLICT`
 - `RATE_LIMITED`

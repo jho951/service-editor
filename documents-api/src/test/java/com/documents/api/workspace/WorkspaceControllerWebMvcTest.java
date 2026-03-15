@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.documents.api.exception.GlobalExceptionHandler;
+import com.documents.api.support.ApiResponseAssertions;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
@@ -60,7 +61,9 @@ class WorkspaceControllerWebMvcTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.httpStatus").value("CREATED"))
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("리소스 생성 성공"))
                 .andExpect(jsonPath("$.code").value(201))
                 .andExpect(jsonPath("$.data.id").value(workspaceId.toString()))
                 .andExpect(jsonPath("$.data.name").value("Team Workspace"))
@@ -70,27 +73,27 @@ class WorkspaceControllerWebMvcTest {
     @Test
     @DisplayName("실패_워크스페이스 이름이 공백이면 유효성 검사 오류를 반환한다")
     void createWorkspaceRejectsBlankName() throws Exception {
-        mockMvc.perform(post("/v1/workspaces")
+        var result = mockMvc.perform(post("/v1/workspaces")
                         .contentType("application/json")
+                        .header("X-User-Id", "user-123")
                         .content("""
                                 {
                                   "name": " "
                                 }
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value(9016));
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
     }
 
     @Test
     @DisplayName("실패_워크스페이스 이름이 누락되면 유효성 검사 오류를 반환한다")
     void createWorkspaceRejectsMissingName() throws Exception {
-        mockMvc.perform(post("/v1/workspaces")
+        var result = mockMvc.perform(post("/v1/workspaces")
                         .contentType("application/json")
-                        .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value(9016));
+                        .header("X-User-Id", "user-123")
+                        .content("{}"));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
     }
 
     @Test
@@ -98,16 +101,30 @@ class WorkspaceControllerWebMvcTest {
     void createWorkspaceRejectsTooLongName() throws Exception {
         String overLimitName = "a".repeat(101);
 
-        mockMvc.perform(post("/v1/workspaces")
+        var result = mockMvc.perform(post("/v1/workspaces")
                         .contentType("application/json")
+                        .header("X-User-Id", "user-123")
                         .content("""
                                 {
                                   "name": "%s"
                                 }
-                                """.formatted(overLimitName)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value(9016));
+                                """.formatted(overLimitName)));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_인증 헤더가 없으면 인증 오류를 반환한다")
+    void createWorkspaceRequiresUserHeader() throws Exception {
+        var result = mockMvc.perform(post("/v1/workspaces")
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "name": "Team Workspace"
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
     }
 
     @Test
@@ -115,12 +132,11 @@ class WorkspaceControllerWebMvcTest {
     void getWorkspaceReturnsNotFoundEnvelope() throws Exception {
         UUID workspaceId = UUID.randomUUID();
         when(workspaceService.getById(workspaceId))
-                .thenThrow(new BusinessException(BusinessErrorCode.RESOURCE_NOT_FOUND));
+                .thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
 
-        mockMvc.perform(get("/v1/workspaces/{workspaceId}", workspaceId))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.code").value(9003));
+        var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}", workspaceId));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
     }
 
     private Workspace workspace(UUID id, String name, String actorId, Integer version) {

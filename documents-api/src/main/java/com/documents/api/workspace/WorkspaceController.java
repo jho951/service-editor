@@ -38,7 +38,7 @@ public class WorkspaceController {
     @PostMapping
     public ResponseEntity<GlobalResponse<WorkspaceResponse>> createWorkspace(
             @Valid @RequestBody CreateWorkspaceRequest request,
-            @RequestHeader(value = USER_ID_HEADER, required = false) String userId
+            @RequestHeader(USER_ID_HEADER) String userId
     ) {
         Workspace createdWorkspace = workspaceService.create(request.getName(), userId);
         WorkspaceResponse response = WorkspaceResponse.from(createdWorkspace);
