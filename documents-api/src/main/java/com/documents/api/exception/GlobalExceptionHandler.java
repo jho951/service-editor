@@ -1,11 +1,13 @@
 package com.documents.api.exception;
 
-import com.documents.api.code.ErrorCode;
-import com.documents.api.dto.GlobalResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.documents.api.code.ErrorCode;
+import com.documents.api.dto.GlobalResponse;
+import com.documents.exception.BusinessException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -15,6 +17,13 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = ex.getErrorCode();
         return ResponseEntity.status(errorCode.getHttpStatus())
                 .body(GlobalResponse.fail(errorCode));
+    }
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<GlobalResponse<Void>> handleBusinessException(BusinessException ex) {
+      ErrorCode errorCode = mapBusinessError(ex.getErrorCode().name());
+      return ResponseEntity.status(errorCode.getHttpStatus())
+        .body(GlobalResponse.fail(errorCode));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -33,5 +42,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<GlobalResponse<Void>> handleException(Exception ex) {
         return ResponseEntity.status(ErrorCode.FAIL.getHttpStatus())
                 .body(GlobalResponse.fail(ErrorCode.FAIL));
+    }
+
+    private ErrorCode mapBusinessError(String errorCodeName) {
+        try {
+            return ErrorCode.valueOf(errorCodeName);
+        } catch (IllegalArgumentException ex) {
+            throw new IllegalStateException("No API error mapping for business error: " + errorCodeName, ex);
+        }
     }
 }

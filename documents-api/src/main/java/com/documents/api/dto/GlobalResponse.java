@@ -1,7 +1,7 @@
 package com.documents.api.dto;
 
-import com.documents.api.code.ErrorCode;
 import com.documents.api.code.SuccessCode;
+import com.documents.api.code.ErrorCode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import org.springframework.http.HttpStatus;
