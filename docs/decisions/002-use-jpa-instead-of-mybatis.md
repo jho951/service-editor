@@ -13,7 +13,7 @@
 
 영속 계층의 기본 표준을 MyBatis에서 Spring Data JPA로 전환한다.
 
-- 도메인 모델 `Drawer`를 JPA 엔티티로 매핑한다.
+- 도메인 모델 `Document`를 JPA 엔티티로 매핑한다.
 - 공통 필드 `createdAt`, `updatedAt`, `version`은 `@MappedSuperclass`로 관리한다.
 - `documents-infrastructure`는 mapper XML 대신 `JpaRepository` 기반 저장소를 사용한다.
 - 로컬/운영 설정과 디버그 런북은 Hibernate 로그와 JPA 설정 기준으로 유지한다.

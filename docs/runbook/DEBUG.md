@@ -4,7 +4,7 @@
 
 1. `./gradlew :documents-boot:bootRun`으로 실행한다. 로컬 기본 설정은 루트 `gradle.properties`에서 주입된다.
 2. `http://localhost:8080/swagger-ui`로 API 문서를 확인한다.
-3. DB 연결 문제가 있으면 `documents-boot/src/main/resources/application-dev.yml`과 환경변수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 점검한다.
+3. DB 연결 문제가 있으면 `documents-boot/src/main/resources/application-dev.yml`과 환경변수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 점검한다. 기본 로컬 DB 이름은 `documentsdb`다.
 
 ## 확인할 로그
 
@@ -16,7 +16,7 @@
 - `NoSuchBeanDefinitionException`: 모듈 의존성 누락 또는 패키지 스캔 범위 문제
 - `Not a managed type`: 엔티티 패키지 스캔 누락 또는 `@Entity`/`@MappedSuperclass` 선언 문제
 - `Communications link failure`: MySQL 기동 전 애플리케이션 실행 또는 DB 환경변수 오설정
-- `Table "DRAWING" not found` 또는 유사 오류: 테스트/H2 또는 로컬 DB 스키마가 JPA 엔티티와 맞지 않는 상태
+- `Table "DOCUMENTS" not found` 또는 유사 스키마 오류: 마이그레이션 전 스키마/설정이 남아 있거나 로컬 DB가 최신 설정(`documentsdb`)과 맞지 않는 상태
 
 ## 복구 절차
 

@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 public class SwaggerConfig {
 
     @Bean
-    public OpenAPI drawerOpenAPI() {
+    public OpenAPI documentOpenAPI() {
         return new OpenAPI()
             .info(new Info()
                 .title("에디터 서버")
