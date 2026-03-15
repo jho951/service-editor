@@ -6,6 +6,8 @@
 2. `http://localhost:8080/swagger-ui`로 API 문서를 확인한다.
 3. DB 연결 문제가 있으면 `documents-boot/src/main/resources/application-dev.yml`과 환경변수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 점검한다. 기본 로컬 DB 이름은 `documentsdb`다.
 4. Workspace API 확인이 필요하면 `POST /v1/workspaces`로 생성 후 `GET /v1/workspaces/{workspaceId}`로 단건 조회를 재현한다.
+5. API 통합 테스트는 저장소 루트에서 `./gradlew :documents-boot:test`로 실행한다. 하위 모듈 검증이 필요하면 같은 방식으로 `:documents-api:test`, `:documents-core:test`, `:documents-infrastructure:test`를 선택 실행한다.
+6. 빠른 API 계약 확인은 `./gradlew :documents-api:test`, 영속/서비스 구현 확인은 `./gradlew :documents-infrastructure:test`를 우선 사용하고, 최종 조립 확인 시 `:documents-boot:test`를 실행한다.
 
 ## 확인할 로그
 
