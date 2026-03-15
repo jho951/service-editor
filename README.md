@@ -13,7 +13,7 @@
 이 저장소는 Gradle 멀티모듈 구조를 사용합니다.
 
 - `documents-boot`: 실행 모듈, 환경 설정, 패키징
-- `documents-api`: Controller, DTO, OpenAPI 설정
+- `documents-api`: Controller, 요청/응답 DTO, API 전용 예외/응답 코드, OpenAPI 설정
 - `documents-core`: 도메인 모델과 서비스 계약
 - `documents-infrastructure`: JPA Repository, 영속 구현
 

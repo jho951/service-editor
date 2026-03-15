@@ -14,7 +14,7 @@
 다음 4개 모듈로 프로젝트를 분리한다.
 
 - `documents-boot`: 실행 진입점, 환경 설정, 패키징
-- `documents-api`: Controller, 요청/응답 DTO, OpenAPI 설정
+- `documents-api`: Controller, 요청/응답 DTO, API 전용 예외/응답 코드, OpenAPI 설정
 - `documents-core`: 도메인 모델, 공통 엔티티, 서비스 계약
 - `documents-infrastructure`: JPA Repository, 영속 구현, 서비스 구현
 
