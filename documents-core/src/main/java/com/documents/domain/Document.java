@@ -20,8 +20,8 @@ import lombok.ToString;
 @Builder
 @ToString(callSuper = true)
 @Entity
-@Table(name = "drawing")
-public class Drawer extends BaseEntity {
+@Table(name = "documents")
+public class Document extends BaseEntity {
 
     @Id
     @Column(name = "id", nullable = false, updatable = false, columnDefinition = "char(36)")

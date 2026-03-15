@@ -1,5 +1,5 @@
 db:
-  url: jdbc:mysql://localhost:3306/drawingdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Seoul
+  url: jdbc:mysql://localhost:3306/documentsdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Seoul
   username: root
   password: password
   pool:
@@ -17,7 +17,7 @@ spring:
       maximum-pool-size: ${db.pool.max}
       minimum-idle: ${db.pool.min}
       connection-timeout: ${db.pool.timeout-ms}
-      pool-name: HikariDrawing
+      pool-name: HikariDocuments
   jpa:
     open-in-view: false
     hibernate:
