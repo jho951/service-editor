@@ -23,7 +23,7 @@ ext {
 
 group = 'com.example'
 version = '0.0.1-SNAPSHOT'
-description = 'Documents App (Spring Boot + MyBatis + MySQL + Swagger)'
+description = 'Documents App (Spring Boot + JPA + MySQL + Swagger)'
 
 allprojects {
     group = rootProject.group

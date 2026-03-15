@@ -16,4 +16,4 @@ logging:
   level:
     root: INFO
     com.documents: INFO
-    org.mybatis: INFO
+    org.hibernate.SQL: INFO

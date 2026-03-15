@@ -6,7 +6,7 @@
 
 - 문서 메타데이터와 문서 내부 블록 구조를 저장, 조회, 수정, 삭제하는 서비스를 목표로 합니다.
 - 현재는 멀티모듈 백엔드 구조와 실행 환경이 정리된 상태이며, 문서/블록 CRUD는 단계적으로 구현할 예정입니다.
-- 데이터 저장은 MySQL, 애플리케이션 실행은 Spring Boot, 영속 계층은 MyBatis를 사용합니다.
+- 데이터 저장은 MySQL, 애플리케이션 실행은 Spring Boot, 영속 계층은 Spring Data JPA를 사용합니다.
 
 ## 현재 사용되는 아키텍처
 
@@ -15,11 +15,11 @@
 - `documents-boot`: 실행 모듈, 환경 설정, 패키징
 - `documents-api`: Controller, DTO, OpenAPI 설정
 - `documents-core`: 도메인 모델과 서비스 계약
-- `documents-infrastructure`: MyBatis Mapper, 영속 구현, 타입 핸들러
+- `documents-infrastructure`: JPA Repository, 영속 구현
 
 흐름은 다음과 같습니다.
 
-`Client -> documents-api -> documents-core -> documents-infrastructure -> MySQL`
+`Client -> documents-api -> documents-core -> documents-infrastructure(JPA) -> MySQL`
 
 ## 설치/실행 방법
 
@@ -121,7 +121,7 @@ bash docker/docker.sh down
 - Java 17
 - Spring Boot 3.4.x
 - Gradle
-- MyBatis
+- Spring Data JPA
 - MySQL 8
 - Spring Validation
 - springdoc-openapi
@@ -131,7 +131,7 @@ bash docker/docker.sh down
 ## 핵심 기능
 
 - Gradle 멀티모듈 기반 문서 서비스 구조
-- MySQL 기반 문서 데이터 영속화 준비
+- MySQL 기반 JPA 영속화 준비
 - OpenAPI(Swagger) 문서화 설정
 - Docker 기반 로컬 실행 환경
 - 문서(Document)와 블록(Block) CRUD 확장 예정 구조

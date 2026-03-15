@@ -6,7 +6,8 @@ db:
 logging:
   level:
     com.documents: DEBUG
-    org.mybatis: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
 
 springdoc:
   api-docs:

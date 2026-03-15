@@ -9,8 +9,9 @@
 
 - 현재 코드는 Spring Boot Gradle 멀티모듈 구조를 사용한다.
 - 실행 모듈은 `document-boot`이다.
-- 웹 계층은 `documents-api`, 도메인 계약은 `documents-core`, MyBatis 구현은 `documents-infrastructure`에 위치한다.
+- 웹 계층은 `documents-api`, 도메인 계약은 `documents-core`, JPA 기반 영속 구현은 `documents-infrastructure`에 위치한다.
 - 이번 구조 변경은 기능 요구사항 변경이 아니라 구현 구조 정리 목적이며, 기존 API 동작은 유지 대상으로 본다.
+- 영속 기술은 MyBatis 대신 Spring Data JPA를 기본 표준으로 사용한다.
 
 ---
 

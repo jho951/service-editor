@@ -1,0 +1,103 @@
+name: Help
+description: 디버깅/설계/환경 이슈 등 도움 요청
+title: "[HELP] "
+labels: ["HELP"]
+assignees:
+  - jho951
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ✅ 작성 팁
+        - **무엇을 하려는지** + **어디까지 해봤는지** + **어디서 막혔는지**가 핵심입니다.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: "🆘 어떤 도움인가요?"
+      description: "해결하려는 작업/문제를 한 문장으로 설명해주세요."
+      placeholder: |
+        예) 어드민 로그인에서 JWT 토큰이 갱신되지 않습니다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "🔍 현재 상황 설명"
+      description: "작업 레포/브랜치/모듈, 관련 코드/클래스/파일 경로를 적어주세요."
+      placeholder: |
+        예)
+        - repo: admin-backend, branch: feature/admin-auth
+        - file/class: com.admin.security.JwtAuthenticationFilter
+        - 변경한 설정/커밋: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: "🎯 기대하는 상태 (Goal)"
+      description: "도움 후 어떤 상태가 되길 원하는지 구체적으로 적어주세요."
+      placeholder: |
+        예)
+        - 로컬에서 정상 로그인 → 토큰 발급/갱신이 되어야 함
+        - CI 파이프라인에서 테스트가 전부 통과해야 함
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: "🧪 시도해본 것들"
+      description: "해봤던 시도/검토 항목을 체크리스트 또는 서술로 남겨주세요."
+      placeholder: |
+        - [ ] 공식 문서/레퍼런스 확인 (링크 첨부)
+        - [ ] 로그/스택 트레이스 확인
+        - [ ] 관련 설정(yml/properties) 점검
+        - [ ] 다른 방식으로 우회 시도
+        - 추가로 시도한 내용:
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "🐛 에러/로그/스크린샷"
+      description: "에러 메시지, 스택 트레이스, 화면 캡처 등이 있다면 첨부해주세요."
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: env
+    attributes:
+      label: "💻 환경 정보"
+      description: "재현/분석에 필요한 정보를 적어주세요."
+      placeholder: |
+        - OS:
+        - JDK / Node / 기타 버전:
+        - 브랜치/커밋:
+        - 실행 방식(로컬/도커/CI):
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "⏱ 우선순위 / 긴급도"
+      options:
+        - "오늘 안에 해결 필요 (긴급)"
+        - "이번 스프린트 내 해결 필요"
+        - "시간 날 때 봐도 됨"
+    validations:
+      required: false
+
+  - type: input
+    id: refs
+    attributes:
+      label: "📎 참고 자료"
+      placeholder: "예: 관련 이슈 #123, 레퍼런스 링크 https://..."
+    validations:
+      required: false

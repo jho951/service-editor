@@ -8,6 +8,7 @@ dependencies {
     implementation project(':documents-infrastructure')
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'com.h2database:h2'
 }
 
 bootJar {

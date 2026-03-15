@@ -18,7 +18,8 @@ logging:
   level:
     root: INFO
     com.documents: INFO
-    org.mybatis: WARN
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
 
 springdoc:
   api-docs:

@@ -1,0 +1,52 @@
+name: Notify Discord on PR
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      REPO: ${{ github.repository }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      AUTHOR: ${{ github.event.pull_request.user.login }}
+      AVATAR: ${{ github.event.pull_request.user.avatar_url }}
+
+    steps:
+      - name: Send Rich Embed to Discord
+        if: ${{ env.DISCORD_WEBHOOK_URL != '' }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          payload = {
+            "embeds": [{
+              "title": "🔔 새로운 Pull Request가 등록되었습니다",
+              "url": os.environ["PR_URL"],
+              "color": 5814783,
+              "fields": [
+                {"name": "Repository", "value": os.environ["REPO"], "inline": True},
+                {"name": "Author", "value": os.environ["AUTHOR"], "inline": True},
+                {"name": "Title", "value": os.environ["PR_TITLE"], "inline": False},
+              ],
+              "thumbnail": {"url": os.environ["AVATAR"]},
+              "footer": {"text": "Auth Multi-Module Project CI"},
+            }]
+          }
+
+          data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+          req = urllib.request.Request(
+            os.environ["DISCORD_WEBHOOK_URL"],
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+          )
+          with urllib.request.urlopen(req) as res:
+            res.read()
+          PY

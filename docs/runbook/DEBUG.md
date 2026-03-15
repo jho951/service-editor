@@ -9,13 +9,14 @@
 ## 확인할 로그
 
 - 애플리케이션 부팅 로그에서 `com.documents` 패키지 스캔 여부를 확인한다.
-- MyBatis 매퍼 로딩 로그와 datasource 초기화 로그를 확인한다.
+- Hibernate/JPA 초기화 로그와 datasource 초기화 로그를 확인한다.
 
 ## 자주 발생하는 장애
 
 - `NoSuchBeanDefinitionException`: 모듈 의존성 누락 또는 패키지 스캔 범위 문제
-- `Invalid bound statement`: `documents-infrastructure`의 mapper XML 경로 또는 namespace 불일치
+- `Not a managed type`: 엔티티 패키지 스캔 누락 또는 `@Entity`/`@MappedSuperclass` 선언 문제
 - `Communications link failure`: MySQL 기동 전 애플리케이션 실행 또는 DB 환경변수 오설정
+- `Table "DRAWING" not found` 또는 유사 오류: 테스트/H2 또는 로컬 DB 스키마가 JPA 엔티티와 맞지 않는 상태
 
 ## 복구 절차
 

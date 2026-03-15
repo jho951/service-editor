@@ -1,0 +1,105 @@
+name: Bug
+description: 버그 제보 (재현 절차 + 기대/실제 + 환경)
+title: "[BUG] "
+labels: ["BUG"]
+assignees:
+  - jho951
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ✅ 작성 팁
+        - **재현 방법** + **기대 동작 vs 실제 동작**이 필수입니다.
+        - 가능하면 스크린샷/로그를 첨부해주세요.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "🐛 버그 요약"
+      description: "버그를 한 문장으로 설명해주세요."
+      placeholder: |
+        예) 비활성화된 사용자가 여전히 로그인할 수 있습니다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "🔁 재현 절차 (Steps to Reproduce)"
+      description: "버그를 재현하는 단계(순서대로)를 적어주세요."
+      placeholder: |
+        1. /admin/login 페이지 접속
+        2. 비활성화된 사용자 계정으로 로그인 시도
+        3. 로그인 성공 후 대시보드로 이동
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "✅ 기대 동작 (Expected Behavior)"
+      placeholder: |
+        예) 비활성화된 사용자는 로그인에 실패해야 한다. (HTTP 403)
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "🚨 실제 동작 (Actual Behavior)"
+      placeholder: |
+        예) 로그인에 성공하고, 대시보드 화면이 정상 표시됨
+    validations:
+      required: true
+
+  - type: textarea
+    id: env
+    attributes:
+      label: "💻 환경 정보"
+      description: "재현/분석에 필요한 환경 정보를 적어주세요."
+      placeholder: |
+        - 브랜치/커밋:
+        - OS / Browser:
+        - 로컬 / Dev / Stage / Prod:
+        - 버전(서버/클라이언트/DB 등):
+    validations:
+      required: false
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "📛 심각도 (Severity)"
+      options:
+        - "S1 - Blocker (서비스 사용 불가)"
+        - "S2 - Critical (핵심 기능 장애/데이터 손상 위험)"
+        - "S3 - Major (우회 가능하지만 기능 품질 저하)"
+        - "S4 - Minor (경미/UX 수준)"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "📎 로그 / 스크린샷"
+      description: "관련 로그, 에러 메시지, 스크린샷 등을 첨부해주세요."
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: workaround
+    attributes:
+      label: "🩹 임시 우회 방법 (있다면)"
+      placeholder: |
+        예) 특정 설정을 끄면 재현되지 않음 / 브라우저를 바꾸면 정상
+    validations:
+      required: false
+
+  - type: input
+    id: related
+    attributes:
+      label: "🔗 관련 이슈 / PR"
+      placeholder: "예: #123, #456"
+    validations:
+      required: false

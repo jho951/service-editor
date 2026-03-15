@@ -1,0 +1,114 @@
+name: Fix
+description: 버그 수정 작업 (원인/수정 계획/검증/리스크)
+title: "[FIX] "
+labels: ["FIX", "BUG"]
+assignees:
+  - jho951
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ✅ 작성 팁
+        - 이미 제보된 버그(#)가 있으면 먼저 연결해주세요.
+        - **수정 방향(Fix Plan)**과 **검증 방법**을 구체적으로 적어주세요.
+
+  - type: input
+    id: bug_issue
+    attributes:
+      label: "🔗 연결할 버그 이슈"
+      description: "제보 이슈가 있다면 번호를 적어주세요."
+      placeholder: "예: #123"
+    validations:
+      required: false
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "🐛 버그 요약"
+      description: "어떤 버그를 수정하나요?"
+      placeholder: |
+        예) 비활성화된 사용자가 로그인 가능한 문제 수정
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: "🔁 재현 절차 (현재)"
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_after
+    attributes:
+      label: "✅ 수정 후 기대 동작"
+      placeholder: |
+        예) 비활성화된 사용자는 로그인에 실패해야 한다. (HTTP 403)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "💻 환경 정보"
+      description: "OS, 브라우저, Java 버전, DB, 배포 환경 등"
+      placeholder: |
+        예) macOS, Java 17, Chrome 122 / Dev 환경
+    validations:
+      required: false
+
+  - type: textarea
+    id: root_cause
+    attributes:
+      label: "🧠 원인 분석 (Root Cause)"
+      description: "가능한 범위에서 원인을 정리해주세요. (추측이면 추측이라고 명시)"
+      placeholder: |
+        예) 로그인 서비스에서 user.active 체크가 빠져 있었음
+    validations:
+      required: false
+
+  - type: textarea
+    id: fix_plan
+    attributes:
+      label: "🛠 수정 방향 (Fix Plan)"
+      description: "어떻게 수정할지 간단히 적어주세요."
+      placeholder: |
+        예)
+        - 로그인 로직에서 user.active 체크 추가
+        - 서비스 레이어에 상태 체크 공통 메서드 추가
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: "⚠️ 리스크 / 영향 범위"
+      description: "영향받을 수 있는 기능/모듈과 롤백 방법이 있다면 함께 적어주세요."
+      placeholder: |
+        - 영향: 인증/인가, 세션 처리
+        - 롤백: 해당 커밋 revert 또는 feature flag off
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "📎 로그 / 스크린샷 (선택)"
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "✅ 체크리스트"
+      options:
+        - label: "동일 케이스로 재현/수정 확인"
+        - label: "주변 영향 범위(관련 기능) 테스트"
+        - label: "관련 테스트 코드 추가/수정"
+        - label: "로그/모니터링에 이상 없음 확인"
+        - label: "관련 문서 업데이트(필요 시)"
