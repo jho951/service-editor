@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.documents.domain.Workspace;
+import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.WorkspaceRepository;
 import java.util.Optional;
@@ -87,7 +88,9 @@ class WorkspaceServiceImplTest {
 
         assertThatThrownBy(() -> workspaceService.getById(workspaceId))
                 .isInstanceOf(BusinessException.class)
-                .hasMessage("요청한 리소스를 찾을 수 없습니다.");
+                .hasMessage("요청한 워크스페이스를 찾을 수 없습니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.WORKSPACE_NOT_FOUND);
     }
 
     @Test

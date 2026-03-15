@@ -2,6 +2,7 @@ package com.documents.api.exception;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -30,6 +31,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<GlobalResponse<Void>> handleValidationException(MethodArgumentNotValidException ex) {
         return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus())
                 .body(GlobalResponse.fail(ErrorCode.VALIDATION_ERROR));
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<GlobalResponse<Void>> handleMissingRequestHeaderException(MissingRequestHeaderException ex) {
+        return ResponseEntity.status(ErrorCode.UNAUTHORIZED.getHttpStatus())
+                .body(GlobalResponse.fail(ErrorCode.UNAUTHORIZED));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
