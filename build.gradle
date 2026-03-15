@@ -9,6 +9,8 @@ ext {
     resolvedProjectDescription = findProperty('projectDescription') ?: 'Documents App (Spring Boot + JPA + MySQL + Swagger)'
     resolvedJavaVersion = Integer.parseInt((findProperty('javaVersion') ?: '17').toString())
     resolvedSpringBootVersion = (findProperty('springBootVersion') ?: '3.4.10').toString()
+    resolvedSpringdocVersion = (findProperty('springdocVersion') ?: '2.8.13').toString()
+    resolvedJakartaPersistenceVersion = (findProperty('jakartaPersistenceVersion') ?: '3.1.0').toString()
     resolvedLombokVersion = (findProperty('lombokVersion') ?: '1.18.38').toString()
     resolvedJunitJupiterVersion = (findProperty('junitJupiterVersion') ?: '5.11.4').toString()
     runtimeEnvKeys = [
