@@ -4,6 +4,13 @@ plugins {
 }
 
 ext {
+    resolvedProjectGroup = findProperty('projectGroup') ?: 'com.example'
+    resolvedProjectVersion = findProperty('projectVersion') ?: '0.0.1-SNAPSHOT'
+    resolvedProjectDescription = findProperty('projectDescription') ?: 'Documents App (Spring Boot + JPA + MySQL + Swagger)'
+    resolvedJavaVersion = Integer.parseInt((findProperty('javaVersion') ?: '17').toString())
+    resolvedSpringBootVersion = (findProperty('springBootVersion') ?: '3.4.10').toString()
+    resolvedLombokVersion = (findProperty('lombokVersion') ?: '1.18.38').toString()
+    resolvedJunitJupiterVersion = (findProperty('junitJupiterVersion') ?: '5.11.4').toString()
     runtimeEnvKeys = [
         'DB_URL',
         'DB_USERNAME',
@@ -20,9 +27,9 @@ ext {
     ]
 }
 
-group = projectGroup
-version = projectVersion
-description = projectDescription
+group = ext.resolvedProjectGroup
+version = ext.resolvedProjectVersion
+description = ext.resolvedProjectDescription
 
 allprojects {
     group = rootProject.group
@@ -39,22 +46,22 @@ subprojects {
 
     dependencyManagement {
         imports {
-            mavenBom "org.springframework.boot:spring-boot-dependencies:${springBootVersion}"
+            mavenBom "org.springframework.boot:spring-boot-dependencies:${rootProject.ext.resolvedSpringBootVersion}"
         }
     }
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(Integer.parseInt(javaVersion))
+            languageVersion = JavaLanguageVersion.of(rootProject.ext.resolvedJavaVersion)
         }
     }
 
     dependencies {
-        compileOnly "org.projectlombok:lombok:${lombokVersion}"
-        annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
-        testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
-        testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
-        testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
+        compileOnly "org.projectlombok:lombok:${rootProject.ext.resolvedLombokVersion}"
+        annotationProcessor "org.projectlombok:lombok:${rootProject.ext.resolvedLombokVersion}"
+        testCompileOnly "org.projectlombok:lombok:${rootProject.ext.resolvedLombokVersion}"
+        testAnnotationProcessor "org.projectlombok:lombok:${rootProject.ext.resolvedLombokVersion}"
+        testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.ext.resolvedJunitJupiterVersion}"
     }
 
     tasks.named('test') {

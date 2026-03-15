@@ -1,7 +1,7 @@
 pluginManagement {
     plugins {
-        id 'org.springframework.boot' version settings.providers.gradleProperty('springBootVersion').get()
-        id 'io.spring.dependency-management' version settings.providers.gradleProperty('springDependencyManagementVersion').get()
+        id 'org.springframework.boot' version settings.providers.gradleProperty('springBootVersion').orElse('3.4.10').get()
+        id 'io.spring.dependency-management' version settings.providers.gradleProperty('springDependencyManagementVersion').orElse('1.1.6').get()
     }
 }
 
