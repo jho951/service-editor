@@ -52,6 +52,13 @@ closes #
 - 구현 방식, 핵심 로직, 설계 의도 등 추가 설명이 필요하면 여기에 적어주세요.
 - API 스펙 변경 시 요청/응답 포맷도 함께 적어주면 좋습니다.
 
+### 3. 프롬프트 경로
+
+- (예) [/prompts/0-initial-setup.md](https://github.com/jho951/Block-server/blob/main/prompts/0-initial-setup.md)
+
+### 4. ADR 경로 (선택)
+- (예) [/docs/decisions/000-adr-template.md](https://github.com/jho951/Block-server/blob/main/docs/decisions/000-adr-template.md)
+
 ---
 
 ## 💬 집중 리뷰 요청
@@ -109,5 +116,5 @@ UI 변경, 에러 화면, API 응답 예시 등이 있다면 이미지로 첨부
 -->
 
 - (예)
-    - Before: 
+    - Before:
     - After :
