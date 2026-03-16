@@ -2,11 +2,13 @@ package com.documents.api.document;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.documents.api.exception.GlobalExceptionHandler;
+import com.documents.api.document.support.DocumentJsonCodec;
 import com.documents.api.support.ApiResponseAssertions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.documents.domain.Document;
@@ -14,6 +16,7 @@ import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.service.DocumentService;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +42,10 @@ class DocumentControllerWebMvcTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new DocumentController(documentService, new DocumentApiMapper(new ObjectMapper())))
+        mockMvc = MockMvcBuilders.standaloneSetup(new DocumentController(
+                        documentService,
+                        new DocumentApiMapper(new DocumentJsonCodec(new ObjectMapper()))
+                ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -60,6 +66,7 @@ class DocumentControllerWebMvcTest {
                 eq("{\"type\":\"image\",\"value\":\"cover-1\"}"),
                 eq("user-123")
         )).thenReturn(document(documentId, workspaceId, parentId, "프로젝트 개요", "user-123", 0,
+                "00000000000000000003",
                 "{\"type\":\"emoji\",\"value\":\"📄\"}",
                 "{\"type\":\"image\",\"value\":\"cover-1\"}"));
 
@@ -89,9 +96,51 @@ class DocumentControllerWebMvcTest {
                 .andExpect(jsonPath("$.data.workspaceId").value(workspaceId.toString()))
                 .andExpect(jsonPath("$.data.parentId").value(parentId.toString()))
                 .andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
+                .andExpect(jsonPath("$.data.sortKey").value("00000000000000000003"))
                 .andExpect(jsonPath("$.data.icon.type").value("emoji"))
                 .andExpect(jsonPath("$.data.cover.value").value("cover-1"))
                 .andExpect(jsonPath("$.data.createdBy").value("user-123"));
+    }
+
+    @Test
+    @DisplayName("성공_워크스페이스 문서 목록 조회 요청에 대해 문서 배열 응답을 반환한다")
+    void getDocumentsReturnsEnvelope() throws Exception {
+        UUID workspaceId = UUID.randomUUID();
+        UUID rootDocumentId = UUID.randomUUID();
+        UUID childDocumentId = UUID.randomUUID();
+
+        when(documentService.getAllByWorkspaceId(workspaceId)).thenReturn(List.of(
+                document(rootDocumentId, workspaceId, null, "루트 문서", "user-123", 0,
+                        "00000000000000000001", null, null),
+                document(childDocumentId, workspaceId, rootDocumentId, "하위 문서", "user-123", 1,
+                        "00000000000000000002", null, null)
+        ));
+
+        mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspaceId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].id").value(rootDocumentId.toString()))
+                .andExpect(jsonPath("$.data[0].parentId").doesNotExist())
+                .andExpect(jsonPath("$.data[0].title").value("루트 문서"))
+                .andExpect(jsonPath("$.data[0].sortKey").value("00000000000000000001"))
+                .andExpect(jsonPath("$.data[1].id").value(childDocumentId.toString()))
+                .andExpect(jsonPath("$.data[1].parentId").value(rootDocumentId.toString()))
+                .andExpect(jsonPath("$.data[1].sortKey").value("00000000000000000002"))
+                .andExpect(jsonPath("$.data[1].version").value(1));
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 워크스페이스의 문서 목록 조회는 리소스 없음 응답을 반환한다")
+    void getDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
+        UUID workspaceId = UUID.randomUUID();
+        when(documentService.getAllByWorkspaceId(workspaceId))
+                .thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
+
+        var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspaceId));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
     }
 
     @Test
@@ -165,6 +214,43 @@ class DocumentControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("성공_문서 단건 조회 요청에 대해 문서 응답을 반환한다")
+    void getDocumentReturnsEnvelope() throws Exception {
+        UUID workspaceId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+
+        when(documentService.getById(documentId))
+                .thenReturn(document(documentId, workspaceId, null, "프로젝트 개요", "user-123", 2,
+                        "00000000000000000007",
+                        "{\"type\":\"emoji\",\"value\":\"📄\"}",
+                        null));
+
+        mockMvc.perform(get("/v1/documents/{documentId}", documentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(documentId.toString()))
+                .andExpect(jsonPath("$.data.workspaceId").value(workspaceId.toString()))
+                .andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
+                .andExpect(jsonPath("$.data.sortKey").value("00000000000000000007"))
+                .andExpect(jsonPath("$.data.icon.value").value("📄"))
+                .andExpect(jsonPath("$.data.version").value(2));
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 문서 단건 조회는 리소스 없음 응답을 반환한다")
+    void getDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+        UUID documentId = UUID.randomUUID();
+        when(documentService.getById(documentId))
+                .thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+
+        var result = mockMvc.perform(get("/v1/documents/{documentId}", documentId));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+    }
+
+    @Test
     @DisplayName("실패_icon이 객체 스키마를 따르지 않으면 유효성 검사 오류를 반환한다")
     void createDocumentRejectsInvalidIconSchema() throws Exception {
         var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
@@ -219,6 +305,7 @@ class DocumentControllerWebMvcTest {
             String title,
             String actorId,
             Integer version,
+            String sortKey,
             String iconJson,
             String coverJson
     ) {
@@ -227,6 +314,7 @@ class DocumentControllerWebMvcTest {
                 .workspaceId(workspaceId)
                 .parentId(parentId)
                 .title(title)
+                .sortKey(sortKey)
                 .iconJson(iconJson)
                 .coverJson(coverJson)
                 .createdBy(actorId)

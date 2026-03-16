@@ -3,6 +3,7 @@ package com.documents.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -11,6 +12,8 @@ import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.DocumentRepository;
+import com.documents.support.DocumentSortKeyGenerator;
+import com.documents.support.TextNormalizer;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -34,6 +37,12 @@ class DocumentServiceImplTest {
     @Mock
     private WorkspaceService workspaceService;
 
+    @Mock
+    private TextNormalizer textNormalizer;
+
+    @Mock
+    private DocumentSortKeyGenerator documentSortKeyGenerator;
+
     @InjectMocks
     private DocumentServiceImpl documentService;
 
@@ -42,6 +51,9 @@ class DocumentServiceImplTest {
     void createRootDocumentNormalizesActorAndStoresDocument() {
         UUID workspaceId = UUID.randomUUID();
         when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+        when(textNormalizer.normalizeNullable(" " + ACTOR_ID + " ")).thenReturn(ACTOR_ID);
+        when(textNormalizer.normalizeRequired("  " + ROOT_TITLE + "  ")).thenReturn(ROOT_TITLE);
+        when(documentSortKeyGenerator.genNextSortKey(workspaceId, null)).thenReturn("00000000000000000001");
         when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Document result = documentService.create(
@@ -63,6 +75,7 @@ class DocumentServiceImplTest {
         assertThat(request.getTitle()).isEqualTo(ROOT_TITLE);
         assertThat(request.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"📄\"}");
         assertThat(request.getCoverJson()).isEqualTo("{\"type\":\"image\",\"value\":\"cover-1\"}");
+        assertThat(request.getSortKey()).isEqualTo("00000000000000000001");
         assertThat(request.getCreatedBy()).isEqualTo(ACTOR_ID);
         assertThat(request.getUpdatedBy()).isEqualTo(ACTOR_ID);
         assertThat(result).isSameAs(request);
@@ -73,6 +86,9 @@ class DocumentServiceImplTest {
     void createDocumentStoresNullActorWhenHeaderIsBlank() {
         UUID workspaceId = UUID.randomUUID();
         when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+        when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
+        when(textNormalizer.normalizeRequired(ROOT_TITLE)).thenReturn(ROOT_TITLE);
+        when(documentSortKeyGenerator.genNextSortKey(workspaceId, null)).thenReturn("00000000000000000001");
         when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Document result = documentService.create(workspaceId, null, ROOT_TITLE, null, null, " ");
@@ -89,11 +105,15 @@ class DocumentServiceImplTest {
         when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
         when(documentRepository.findByIdAndDeletedAtIsNull(parentId))
                 .thenReturn(Optional.of(parentDocument(parentId, workspaceId)));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+        when(textNormalizer.normalizeRequired("하위 문서")).thenReturn("하위 문서");
+        when(documentSortKeyGenerator.genNextSortKey(workspaceId, parentId)).thenReturn("00000000000000000010");
         when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Document result = documentService.create(workspaceId, parentId, "하위 문서", null, null, ACTOR_ID);
 
         assertThat(result.getParentId()).isEqualTo(parentId);
+        assertThat(result.getSortKey()).isEqualTo("00000000000000000010");
         verify(documentRepository).findByIdAndDeletedAtIsNull(parentId);
     }
 
@@ -140,6 +160,73 @@ class DocumentServiceImplTest {
                 .hasMessage("잘못된 요청입니다.")
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("성공_워크스페이스 문서 목록 조회 시 활성 문서를 반환한다")
+    void getDocumentsByWorkspaceIdReturnsActive() {
+        UUID workspaceId = UUID.randomUUID();
+        Document rootDocument = Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .title("루트 문서")
+                .sortKey("00000000000000000001")
+                .build();
+        Document childDocument = Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .parentId(rootDocument.getId())
+                .title("하위 문서")
+                .sortKey("00000000000000000002")
+                .build();
+        when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+        when(documentRepository.findActiveByWorkspaceIdOrderBySortKey(eq(workspaceId)))
+                .thenReturn(java.util.List.of(rootDocument, childDocument));
+
+        assertThat(documentService.getAllByWorkspaceId(workspaceId))
+                .containsExactly(rootDocument, childDocument);
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 워크스페이스의 문서 목록 조회는 워크스페이스 없음 예외를 던진다")
+    void getAllByWorkspaceIdThrowsWhenWorkspaceMissing() {
+        UUID workspaceId = UUID.randomUUID();
+        when(workspaceService.getById(workspaceId))
+                .thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
+
+        assertThatThrownBy(() -> documentService.getAllByWorkspaceId(workspaceId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청한 워크스페이스를 찾을 수 없습니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.WORKSPACE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("성공_문서 단건 조회 시 활성 문서를 반환한다")
+    void getByIdReturnsActiveDocument() {
+        UUID documentId = UUID.randomUUID();
+        Document document = Document.builder()
+                .id(documentId)
+                .workspaceId(UUID.randomUUID())
+                .title("프로젝트 개요")
+                .sortKey("00000000000000000001")
+                .build();
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+        assertThat(documentService.getById(documentId)).isSameAs(document);
+    }
+
+    @Test
+    @DisplayName("실패_soft delete된 문서는 단건 조회에서 제외한다")
+    void getByIdThrowsWhenDocumentMissing() {
+        UUID documentId = UUID.randomUUID();
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentService.getById(documentId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청한 문서를 찾을 수 없습니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
     }
 
     private Workspace workspace(UUID workspaceId) {

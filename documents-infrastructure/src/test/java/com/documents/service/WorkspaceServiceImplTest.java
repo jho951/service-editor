@@ -10,6 +10,7 @@ import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.WorkspaceRepository;
+import com.documents.support.TextNormalizer;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,9 @@ class WorkspaceServiceImplTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
+    @Mock
+    private TextNormalizer textNormalizer;
+
     @InjectMocks
     private WorkspaceServiceImpl workspaceService;
 
@@ -39,6 +43,8 @@ class WorkspaceServiceImplTest {
                 .createdBy("user-123")
                 .updatedBy("user-123")
                 .build();
+        when(textNormalizer.normalizeRequired("  Team Workspace  ")).thenReturn("Team Workspace");
+        when(textNormalizer.normalizeNullable(" user-123 ")).thenReturn("user-123");
         when(workspaceRepository.save(any(Workspace.class))).thenReturn(saved);
 
         Workspace result = workspaceService.create("  Team Workspace  ", " user-123 ");
@@ -57,6 +63,8 @@ class WorkspaceServiceImplTest {
     @Test
     @DisplayName("성공_사용자 식별자 헤더가 공백이면 감사 필드를 null로 저장한다")
     void createStoresNullActorWhenHeaderIsBlank() {
+        when(textNormalizer.normalizeRequired("Team Workspace")).thenReturn("Team Workspace");
+        when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
         when(workspaceRepository.save(any(Workspace.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Workspace result = workspaceService.create("Team Workspace", " ");
