@@ -25,7 +25,7 @@ import lombok.ToString;
 public class Document extends BaseEntity {
 
     @Id
-    @Column(name = "id", nullable = false, updatable = false, columnDefinition = "char(36)")
+    @Column(name = "document_id", nullable = false, updatable = false, columnDefinition = "char(36)")
     private UUID id;
 
     @Column(name = "workspace_id", nullable = false, columnDefinition = "char(36)")
@@ -43,7 +43,7 @@ public class Document extends BaseEntity {
     @Column(name = "cover_json", columnDefinition = "longtext")
     private String coverJson;
 
-    @Column(name = "sort_key", length = 255)
+    @Column(name = "sort_key", nullable = false, length = 255)
     private String sortKey;
 
     @Column(name = "created_by", length = 64)

@@ -24,7 +24,7 @@ import lombok.ToString;
 public class Workspace extends BaseEntity {
 
     @Id
-    @Column(name = "id", nullable = false, updatable = false, columnDefinition = "char(36)")
+    @Column(name = "workspace_id", nullable = false, updatable = false, columnDefinition = "char(36)")
     private UUID id;
 
     @Column(name = "name", nullable = false, length = 100)

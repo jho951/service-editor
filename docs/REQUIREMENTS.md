@@ -162,6 +162,12 @@ User {
 }
 ```
 
+## 6.1.1 식별자 컬럼 명명 규칙
+
+- 영속 스키마의 기본 키 컬럼명은 단순 `id`를 사용하지 않고 `${도메인명}_id` 형식을 사용한다.
+- 예: `workspaces.workspace_id`, `documents.document_id`, `blocks.block_id`
+- 외래 키 컬럼도 동일한 기준으로 대상 도메인명을 드러내는 컬럼명을 사용한다.
+
 ## 6.2 Workspace
 
 ```text
@@ -178,6 +184,7 @@ Workspace {
 
 ### 설명
 - `name`: 워크스페이스 표시 이름
+- 영속 기본 키 컬럼명은 `workspace_id`를 사용한다.
 - Workspace는 v1에서 문서 생성의 소속 루트만 담당한다.
 - 인증 연동 전 단계에서는 `createdBy`, `updatedBy`를 `null`로 둘 수 있다.
 
@@ -202,6 +209,7 @@ Document {
 ```
 
 ### 설명
+- 영속 기본 키 컬럼명은 `document_id`를 사용한다.
 - `workspaceId`: 문서가 속한 워크스페이스
 - `parentId`: 상위 문서 ID. `null`이면 루트 문서
 - `sortKey`: 같은 부모 아래 문서 순서 정렬용 키
@@ -228,6 +236,7 @@ Block {
 ```
 
 ### 설명
+- 영속 기본 키 컬럼명은 `block_id`를 사용한다.
 - `documentId`: 블록이 속한 문서
 - `parentId`: 상위 블록 ID. `null`이면 문서 루트 블록
 - `sortKey`: 같은 부모 아래 블록 순서 정렬용 키
