@@ -9,9 +9,10 @@
 5. MySQL JDBC URL은 서버/스키마가 `utf8mb4`인 상태를 전제로 `connectionCollation=utf8mb4_unicode_ci`만 사용한다. `characterEncoding=utf8mb4`를 직접 넣으면 드라이버에서 부팅 실패가 날 수 있다.
 6. Workspace API 확인이 필요하면 `POST /v1/workspaces`로 생성 후 `GET /v1/workspaces/{workspaceId}`로 단건 조회를 재현한다.
 7. Document 조회 API 확인이 필요하면 `POST /v1/workspaces/{workspaceId}/documents`로 문서를 만든 뒤 `GET /v1/workspaces/{workspaceId}/documents`와 `GET /v1/documents/{documentId}`를 순서대로 호출한다.
-8. API 통합 테스트는 저장소 루트에서 `./gradlew :documents-boot:test`로 실행한다. 하위 모듈 검증이 필요하면 같은 방식으로 `:documents-api:test`, `:documents-core:test`, `:documents-infrastructure:test`를 선택 실행한다.
-9. 빠른 API 계약 확인은 `./gradlew :documents-api:test`, 영속/서비스 구현 확인은 `./gradlew :documents-infrastructure:test`를 우선 사용하고, 최종 조립 확인 시 `:documents-boot:test`를 실행한다.
-10. 스키마 명명 규칙 확인이 필요하면 H2 `INFORMATION_SCHEMA.COLUMNS` 또는 MySQL `information_schema.columns`에서 `workspaces.workspace_id`, `documents.document_id` 컬럼이 생성됐는지 확인한다.
+8. 문서 생성/정렬 이슈를 볼 때는 응답의 `sortKey`가 비어 있지 않은지, 같은 `parentId` 아래에서 증가하는지 확인한다.
+9. API 통합 테스트는 저장소 루트에서 `./gradlew :documents-boot:test`로 실행한다. 하위 모듈 검증이 필요하면 같은 방식으로 `:documents-api:test`, `:documents-core:test`, `:documents-infrastructure:test`를 선택 실행한다.
+10. 빠른 API 계약 확인은 `./gradlew :documents-api:test`, 영속/서비스 구현 확인은 `./gradlew :documents-infrastructure:test`를 우선 사용하고, 최종 조립 확인 시 `:documents-boot:test`를 실행한다.
+11. 스키마 명명 규칙 확인이 필요하면 H2 `INFORMATION_SCHEMA.COLUMNS` 또는 MySQL `information_schema.columns`에서 `workspaces.workspace_id`, `documents.document_id` 컬럼이 생성됐는지 확인한다.
 
 ## 확인할 로그
 
@@ -28,6 +29,7 @@
 - `Table "DOCUMENTS" not found` 또는 유사 스키마 오류: 마이그레이션 전 스키마/설정이 남아 있거나 로컬 DB가 최신 설정(`documentsdb`)과 맞지 않는 상태
 - `Table "WORKSPACES" not found`: Workspace 엔티티가 생성되지 않았거나 테스트/로컬 프로파일의 DDL 설정이 비활성화된 상태
 - `404` Workspace 조회 실패: 생성된 `workspaceId`가 아니거나 테스트 데이터 초기화 후 다시 조회한 경우
+- `400` Document 목록 조회 실패: 커스텀 JPA 쿼리의 named parameter 바인딩 누락 또는 soft delete 조건/정렬 쿼리 오류 여부를 확인한다.
 - 스키마 검증 실패: 엔티티 `@Column(name = ...)` 값과 실제 생성된 DDL 컬럼명이 일치하는지 확인한다. PK는 `id`가 아니라 `${domain}_id` 규칙을 따른다.
 
 ## 복구 절차

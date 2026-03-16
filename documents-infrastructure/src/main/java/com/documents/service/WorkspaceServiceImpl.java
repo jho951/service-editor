@@ -4,27 +4,28 @@ import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.WorkspaceRepository;
+import com.documents.support.TextNormalizer;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
 public class WorkspaceServiceImpl implements WorkspaceService {
 
     private final WorkspaceRepository workspaceRepository;
+    private final TextNormalizer textNormalizer;
 
     @Override
     @Transactional
     public Workspace create(String name, String actorId) {
         Workspace workspace = Workspace.builder()
                 .id(UUID.randomUUID())
-                .name(name.trim())
+                .name(textNormalizer.normalizeRequired(name))
                 .build();
 
-        String normalizedActorId = StringUtils.hasText(actorId) ? actorId.trim() : null;
+        String normalizedActorId = textNormalizer.normalizeNullable(actorId);
         workspace.setCreatedBy(normalizedActorId);
         workspace.setUpdatedBy(normalizedActorId);
 
