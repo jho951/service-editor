@@ -44,10 +44,7 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("성공_문서 생성 API는 워크스페이스 하위에 루트 문서를 저장하고 응답한다")
     void createDocumentReturnsCreatedEnvelope() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
+        Workspace workspace = workspace("Docs Root");
 
         mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
                         .contentType("application/json")
@@ -87,30 +84,10 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("성공_워크스페이스 문서 목록 조회 API는 soft delete되지 않은 문서 목록을 반환한다")
     void getDocumentsReturnsDocumentList() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-        Document rootDocument = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("루트 문서")
-                .sortKey("00000000000000000001")
-                .build());
-        documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("삭제된 문서")
-                .sortKey("00000000000000000099")
-                .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
-                .build());
-        documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .parentId(rootDocument.getId())
-                .title("하위 문서")
-                .sortKey("00000000000000000002")
-                .build());
+        Workspace workspace = workspace("Docs Root");
+        Document rootDocument = saveDocument(workspace.getId(), null, "루트 문서", "00000000000000000001");
+        saveDeletedDocument(workspace.getId(), "삭제된 문서", "00000000000000000099");
+        saveDocument(workspace.getId(), rootDocument.getId(), "하위 문서", "00000000000000000002");
 
         mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspace.getId()))
                 .andExpect(status().isOk())
@@ -180,10 +157,7 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("실패_icon JSON 스키마가 잘못되면 유효성 검사 오류를 반환한다")
     void createDocumentReturnsValidationErrorWhenIconSchemaInvalid() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
+        Workspace workspace = workspace("Docs Root");
 
         var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
                         .contentType("application/json")
@@ -201,10 +175,7 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("실패_cover JSON 스키마가 잘못되면 유효성 검사 오류를 반환한다")
     void createDocumentReturnsValidationErrorWhenCoverSchemaInvalid() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
+        Workspace workspace = workspace("Docs Root");
 
         var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
                         .contentType("application/json")
@@ -224,10 +195,7 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("실패_인증 헤더가 없으면 문서 생성 API는 인증 오류를 반환한다")
     void createDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
+        Workspace workspace = workspace("Docs Root");
 
         var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
                         .contentType("application/json")
@@ -243,19 +211,9 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("성공_문서 단건 조회 API는 저장된 문서 메타데이터를 반환한다")
     void getDocumentReturnsDocumentEnvelope() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-        Document document = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("프로젝트 개요")
-                .sortKey("00000000000000000001")
-                .iconJson("{\"type\":\"emoji\",\"value\":\"📄\"}")
-                .createdBy("user-123")
-                .updatedBy("user-123")
-                .build());
+        Workspace workspace = workspace("Docs Root");
+        Document document = saveDocument(workspace.getId(), null, "프로젝트 개요", "00000000000000000001",
+                "{\"type\":\"emoji\",\"value\":\"📄\"}", null, "user-123", "user-123");
 
         mockMvc.perform(get("/v1/documents/{documentId}", document.getId()))
                 .andExpect(status().isOk())
@@ -272,17 +230,8 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("실패_soft delete된 문서 단건 조회는 리소스 없음 응답을 반환한다")
     void getDocumentReturnsNotFoundWhenDeleted() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-        Document document = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("삭제된 문서")
-                .sortKey("00000000000000000001")
-                .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
-                .build());
+        Workspace workspace = workspace("Docs Root");
+        Document document = saveDeletedDocument(workspace.getId(), "삭제된 문서", "00000000000000000001");
 
         var result = mockMvc.perform(get("/v1/documents/{documentId}", document.getId()));
 
@@ -292,25 +241,10 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("성공_문서 수정 API는 제목 trim, 부모 변경, updatedBy 갱신을 반영한다")
     void updateDocumentPersistsServiceLogic() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-        Document parentDocument = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("부모 문서")
-                .sortKey("00000000000000000001")
-                .build());
-        Document document = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("기존 제목")
-                .sortKey("00000000000000000002")
-                .iconJson("{\"type\":\"emoji\",\"value\":\"😀\"}")
-                .coverJson("{\"type\":\"image\",\"value\":\"cover-1\"}")
-                .updatedBy("user-123")
-                .build());
+        Workspace workspace = workspace("Docs Root");
+        Document parentDocument = saveDocument(workspace.getId(), null, "부모 문서", "00000000000000000001");
+        Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000002",
+                "{\"type\":\"emoji\",\"value\":\"😀\"}", "{\"type\":\"image\",\"value\":\"cover-1\"}", null, "user-123");
 
         mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
                         .contentType("application/json")
@@ -342,16 +276,8 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("실패_빈 제목으로 문서를 수정하면 유효성 검사 오류를 반환한다")
     void updateDocumentReturnsValidationErrorWhenTitleBlank() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-        Document document = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("기존 제목")
-                .sortKey("00000000000000000001")
-                .build());
+        Workspace workspace = workspace("Docs Root");
+        Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
 
         var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
                         .contentType("application/json")
@@ -383,26 +309,10 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("실패_다른 워크스페이스 부모 문서를 지정하면 잘못된 요청 응답을 반환한다")
     void updateDocumentReturnsBadRequestWhenParentBelongsToOtherWorkspace() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-        Workspace otherWorkspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Other Workspace")
-                .build());
-        Document document = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("기존 제목")
-                .sortKey("00000000000000000001")
-                .build());
-        Document otherWorkspaceParent = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(otherWorkspace.getId())
-                .title("다른 워크스페이스 문서")
-                .sortKey("00000000000000000001")
-                .build());
+        Workspace workspace = workspace("Docs Root");
+        Workspace otherWorkspace = workspace("Other Workspace");
+        Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
+        Document otherWorkspaceParent = saveDocument(otherWorkspace.getId(), null, "다른 워크스페이스 문서", "00000000000000000001");
 
         var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
                         .contentType("application/json")
@@ -419,16 +329,8 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 응답을 반환한다")
     void updateDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-        Document document = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("기존 제목")
-                .sortKey("00000000000000000001")
-                .build());
+        Workspace workspace = workspace("Docs Root");
+        Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
 
         var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
                         .contentType("application/json")
@@ -445,23 +347,9 @@ class DocumentApiIntegrationTest {
     @Test
     @DisplayName("실패_하위 문서를 부모로 올려 순환 참조가 생기면 잘못된 요청 오류를 반환한다")
     void updateDocumentReturnsBadRequestWhenCycleDetected() throws Exception {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-        Document rootDocument = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .title("루트 문서")
-                .sortKey("00000000000000000001")
-                .build());
-        Document childDocument = documentRepository.save(Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
-                .parentId(rootDocument.getId())
-                .title("하위 문서")
-                .sortKey("00000000000000000002")
-                .build());
+        Workspace workspace = workspace("Docs Root");
+        Document rootDocument = saveDocument(workspace.getId(), null, "루트 문서", "00000000000000000001");
+        Document childDocument = saveDocument(workspace.getId(), rootDocument.getId(), "하위 문서", "00000000000000000002");
 
         var result = mockMvc.perform(patch("/v1/documents/{documentId}", rootDocument.getId())
                         .contentType("application/json")
@@ -482,5 +370,49 @@ class DocumentApiIntegrationTest {
                 .andExpect(jsonPath("$.message").value(message))
                 .andExpect(jsonPath("$.code").value(code))
                 .andExpect(jsonPath("$.data").doesNotExist());
+    }
+
+    private Workspace workspace(String name) {
+        return workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name(name)
+                .build());
+    }
+
+    private Document saveDocument(UUID workspaceId, UUID parentId, String title, String sortKey) {
+        return saveDocument(workspaceId, parentId, title, sortKey, null, null, null, null);
+    }
+
+    private Document saveDocument(
+            UUID workspaceId,
+            UUID parentId,
+            String title,
+            String sortKey,
+            String iconJson,
+            String coverJson,
+            String createdBy,
+            String updatedBy
+    ) {
+        return documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .parentId(parentId)
+                .title(title)
+                .sortKey(sortKey)
+                .iconJson(iconJson)
+                .coverJson(coverJson)
+                .createdBy(createdBy)
+                .updatedBy(updatedBy)
+                .build());
+    }
+
+    private Document saveDeletedDocument(UUID workspaceId, String title, String sortKey) {
+        return documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .title(title)
+                .sortKey(sortKey)
+                .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
+                .build());
     }
 }

@@ -166,19 +166,8 @@ class DocumentServiceImplTest {
     @DisplayName("성공_워크스페이스 문서 목록 조회 시 활성 문서를 반환한다")
     void getDocumentsByWorkspaceIdReturnsActive() {
         UUID workspaceId = UUID.randomUUID();
-        Document rootDocument = Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspaceId)
-                .title("루트 문서")
-                .sortKey("00000000000000000001")
-                .build();
-        Document childDocument = Document.builder()
-                .id(UUID.randomUUID())
-                .workspaceId(workspaceId)
-                .parentId(rootDocument.getId())
-                .title("하위 문서")
-                .sortKey("00000000000000000002")
-                .build();
+        Document rootDocument = document(workspaceId, null, "루트 문서", "00000000000000000001");
+        Document childDocument = document(workspaceId, rootDocument.getId(), "하위 문서", "00000000000000000002");
         when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
         when(documentRepository.findActiveByWorkspaceIdOrderBySortKey(eq(workspaceId)))
                 .thenReturn(java.util.List.of(rootDocument, childDocument));
@@ -205,12 +194,7 @@ class DocumentServiceImplTest {
     @DisplayName("성공_문서 단건 조회 시 활성 문서를 반환한다")
     void getByIdReturnsActiveDocument() {
         UUID documentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(UUID.randomUUID())
-                .title("프로젝트 개요")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, UUID.randomUUID(), null, "프로젝트 개요", "00000000000000000001");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 
         assertThat(documentService.getById(documentId)).isSameAs(document);
@@ -235,16 +219,10 @@ class DocumentServiceImplTest {
         UUID workspaceId = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(workspaceId)
-                .parentId(null)
-                .title("기존 제목")
-                .iconJson("{\"type\":\"emoji\",\"value\":\"😀\"}")
-                .coverJson("{\"type\":\"image\",\"value\":\"cover-1\"}")
-                .updatedBy("old-user")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+        document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
+        document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
+        document.setUpdatedBy("old-user");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
         when(documentRepository.findByIdAndDeletedAtIsNull(parentId))
                 .thenReturn(Optional.of(parentDocument(parentId, workspaceId)));
@@ -274,16 +252,10 @@ class DocumentServiceImplTest {
     void updateDocumentUpdatesOnlyTitle() {
         UUID workspaceId = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(workspaceId)
-                .parentId(null)
-                .title("기존 제목")
-                .iconJson("{\"type\":\"emoji\",\"value\":\"😀\"}")
-                .coverJson("{\"type\":\"image\",\"value\":\"cover-1\"}")
-                .updatedBy("old-user")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+        document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
+        document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
+        document.setUpdatedBy("old-user");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
         when(textNormalizer.normalizeRequired("  새 제목  ")).thenReturn("새 제목");
         when(textNormalizer.normalizeNullable("{\"type\":\"emoji\",\"value\":\"😀\"}"))
@@ -313,16 +285,10 @@ class DocumentServiceImplTest {
     void updateDocumentKeepsTitleWhenNullAndMovesToRoot() {
         UUID workspaceId = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(workspaceId)
-                .parentId(UUID.randomUUID())
-                .title("기존 제목")
-                .iconJson("{\"type\":\"emoji\",\"value\":\"😀\"}")
-                .coverJson("{\"type\":\"image\",\"value\":\"cover-1\"}")
-                .updatedBy("old-user")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, workspaceId, UUID.randomUUID(), "기존 제목", "00000000000000000001");
+        document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
+        document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
+        document.setUpdatedBy("old-user");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
         when(textNormalizer.normalizeNullable((String) null)).thenReturn(null);
         when(textNormalizer.normalizeNullable("{\"type\":\"emoji\",\"value\":\"📄\"}"))
@@ -342,15 +308,10 @@ class DocumentServiceImplTest {
     @DisplayName("성공_actorId가 공백이면 updatedBy를 null로 저장한다")
     void updateDocumentStoresNullUpdatedByWhenActorBlank() {
         UUID documentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(UUID.randomUUID())
-                .title("기존 제목")
-                .iconJson("{\"type\":\"emoji\",\"value\":\"😀\"}")
-                .coverJson("{\"type\":\"image\",\"value\":\"cover-1\"}")
-                .updatedBy("old-user")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
+        document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
+        document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
+        document.setUpdatedBy("old-user");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
         when(textNormalizer.normalizeRequired("수정된 제목")).thenReturn("수정된 제목");
         when(textNormalizer.normalizeNullable("{\"type\":\"emoji\",\"value\":\"😀\"}"))
@@ -376,12 +337,7 @@ class DocumentServiceImplTest {
     @DisplayName("실패_빈 제목으로 수정하면 유효성 검사 예외를 던진다")
     void updateDocumentThrowsValidationExceptionWhenTitleBlank() {
         UUID documentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(UUID.randomUUID())
-                .title("기존 제목")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
         when(textNormalizer.normalizeRequired("   ")).thenReturn("");
 
@@ -395,12 +351,7 @@ class DocumentServiceImplTest {
     @DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 예외를 던진다")
     void updateDocumentThrowsWhenParentIsSelf() {
         UUID documentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(UUID.randomUUID())
-                .title("기존 제목")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 
         assertThatThrownBy(() -> documentService.update(documentId, null, null, null, documentId, ACTOR_ID))
@@ -414,12 +365,7 @@ class DocumentServiceImplTest {
     void updateDocumentThrowsWhenParentBelongsToOtherWorkspace() {
         UUID documentId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(UUID.randomUUID())
-                .title("기존 제목")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
         when(documentRepository.findByIdAndDeletedAtIsNull(parentId))
                 .thenReturn(Optional.of(parentDocument(parentId, UUID.randomUUID())));
@@ -435,12 +381,7 @@ class DocumentServiceImplTest {
     void updateDocumentThrowsWhenParentMissing() {
         UUID documentId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(UUID.randomUUID())
-                .title("기존 제목")
-                .sortKey("00000000000000000001")
-                .build();
+        Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
         when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
 
@@ -456,19 +397,8 @@ class DocumentServiceImplTest {
         UUID workspaceId = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
         UUID childId = UUID.randomUUID();
-        Document document = Document.builder()
-                .id(documentId)
-                .workspaceId(workspaceId)
-                .title("루트 문서")
-                .sortKey("00000000000000000001")
-                .build();
-        Document childDocument = Document.builder()
-                .id(childId)
-                .workspaceId(workspaceId)
-                .parentId(documentId)
-                .title("하위 문서")
-                .sortKey("00000000000000000002")
-                .build();
+        Document document = document(documentId, workspaceId, null, "루트 문서", "00000000000000000001");
+        Document childDocument = document(childId, workspaceId, documentId, "하위 문서", "00000000000000000002");
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
         when(documentRepository.findByIdAndDeletedAtIsNull(childId)).thenReturn(Optional.of(childDocument));
 
@@ -485,11 +415,21 @@ class DocumentServiceImplTest {
                 .build();
     }
 
-    private Document parentDocument(UUID documentId, UUID workspaceId) {
+    private Document document(UUID workspaceId, UUID parentId, String title, String sortKey) {
+        return document(UUID.randomUUID(), workspaceId, parentId, title, sortKey);
+    }
+
+    private Document document(UUID documentId, UUID workspaceId, UUID parentId, String title, String sortKey) {
         return Document.builder()
                 .id(documentId)
                 .workspaceId(workspaceId)
-                .title("부모 문서")
+                .parentId(parentId)
+                .title(title)
+                .sortKey(sortKey)
                 .build();
+    }
+
+    private Document parentDocument(UUID documentId, UUID workspaceId) {
+        return document(documentId, workspaceId, null, "부모 문서", "00000000000000000001");
     }
 }
