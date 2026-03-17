@@ -10,9 +10,13 @@
 6. Workspace API 확인이 필요하면 `POST /v1/workspaces`로 생성 후 `GET /v1/workspaces/{workspaceId}`로 단건 조회를 재현한다.
 7. Document 조회 API 확인이 필요하면 `POST /v1/workspaces/{workspaceId}/documents`로 문서를 만든 뒤 `GET /v1/workspaces/{workspaceId}/documents`와 `GET /v1/documents/{documentId}`를 순서대로 호출한다.
 8. 문서 생성/정렬 이슈를 볼 때는 응답의 `sortKey`가 비어 있지 않은지, 같은 `parentId` 아래에서 증가하는지 확인한다.
-9. API 통합 테스트는 저장소 루트에서 `./gradlew :documents-boot:test`로 실행한다. 하위 모듈 검증이 필요하면 같은 방식으로 `:documents-api:test`, `:documents-core:test`, `:documents-infrastructure:test`를 선택 실행한다.
-10. 빠른 API 계약 확인은 `./gradlew :documents-api:test`, 영속/서비스 구현 확인은 `./gradlew :documents-infrastructure:test`를 우선 사용하고, 최종 조립 확인 시 `:documents-boot:test`를 실행한다.
-11. 스키마 명명 규칙 확인이 필요하면 H2 `INFORMATION_SCHEMA.COLUMNS` 또는 MySQL `information_schema.columns`에서 `workspaces.workspace_id`, `documents.document_id` 컬럼이 생성됐는지 확인한다.
+9. Block 생성 API 확인이 필요하면 `POST /v1/documents/{documentId}/blocks`로 `TEXT` 블록을 만든다. 첫 생성은 기본 stride로 떨어진 `sortKey`가 발급되고, 중간 삽입은 앞/뒤 key 사이의 gap key가 발급되는지 확인한다.
+10. Block 정렬 디버깅 시 `sortKey`는 대문자 base36 고정폭 문자열이며, 같은 부모 아래 `ORDER BY sort_key ASC` 결과가 화면 순서와 일치해야 한다.
+11. 반복 삽입으로 gap이 없어지면 `SORT_KEY_REBALANCE_REQUIRED(409)`가 반환될 수 있다. 이 경우 즉시 전체 재정렬을 수행하지 않고 후속 reorder/rebalance 작업이 필요하다.
+12. Block 생성 실패를 재현할 때는 `parentId`를 다른 문서의 블록으로 보내거나, 존재하지 않는 `afterBlockId`를 보내서 `400` 또는 `404` 응답이 요구사항대로 나오는지 확인한다.
+13. API 통합 테스트는 저장소 루트에서 `./gradlew :documents-boot:test`로 실행한다. 하위 모듈 검증이 필요하면 같은 방식으로 `:documents-api:test`, `:documents-core:test`, `:documents-infrastructure:test`를 선택 실행한다.
+14. 빠른 API 계약 확인은 `./gradlew :documents-api:test`, 영속/서비스 구현 확인은 `./gradlew :documents-infrastructure:test`를 우선 사용하고, 최종 조립 확인 시 `:documents-boot:test`를 실행한다.
+15. 스키마 명명 규칙 확인이 필요하면 H2 `INFORMATION_SCHEMA.COLUMNS` 또는 MySQL `information_schema.columns`에서 `workspaces.workspace_id`, `documents.document_id`, `blocks.block_id` 컬럼이 생성됐는지 확인한다.
 
 ## 확인할 로그
 
@@ -30,6 +34,9 @@
 - `Table "WORKSPACES" not found`: Workspace 엔티티가 생성되지 않았거나 테스트/로컬 프로파일의 DDL 설정이 비활성화된 상태
 - `404` Workspace 조회 실패: 생성된 `workspaceId`가 아니거나 테스트 데이터 초기화 후 다시 조회한 경우
 - `400` Document 목록 조회 실패: 커스텀 JPA 쿼리의 named parameter 바인딩 누락 또는 soft delete 조건/정렬 쿼리 오류 여부를 확인한다.
+- `404` Block 생성 실패: `parentId`가 soft delete되었거나 다른 문서의 블록을 부모로 지정한 경우인지 확인한다.
+- `400` Block 생성 실패: `afterBlockId`/`beforeBlockId`가 같은 sibling gap을 가리키는지, 요청 `parentId`와 같은 형제 집합인지 확인한다.
+- `409` sort key 충돌: 같은 gap에 삽입이 누적되어 재균형이 필요한 상태인지 확인한다.
 - 스키마 검증 실패: 엔티티 `@Column(name = ...)` 값과 실제 생성된 DDL 컬럼명이 일치하는지 확인한다. PK는 `id`가 아니라 `${domain}_id` 규칙을 따른다.
 
 ## 복구 절차
