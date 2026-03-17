@@ -18,6 +18,20 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
             select b
             from Block b
             where b.documentId = :documentId
+              and b.deletedAt is null
+            order by
+              b.sortKey asc,
+              b.createdAt asc,
+              b.id asc
+            """)
+    List<Block> findActiveByDocumentIdOrderBySortKey(
+            @Param("documentId") UUID documentId
+    );
+
+    @Query("""
+            select b
+            from Block b
+            where b.documentId = :documentId
               and (
                 (:parentId is null and b.parentId is null)
                 or b.parentId = :parentId

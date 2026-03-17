@@ -32,6 +32,13 @@ public class BlockServiceImpl implements BlockService {
     private final OrderedSortKeyGenerator orderedSortKeyGenerator;
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Block> getAllByDocumentId(UUID documentId) {
+        documentService.getById(documentId);
+        return blockRepository.findActiveByDocumentIdOrderBySortKey(documentId);
+    }
+
+    @Override
     @Transactional
     public Block create(
             UUID documentId,
