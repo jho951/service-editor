@@ -23,6 +23,8 @@
 - 요구사항/가정이 바뀌면 어떤 이유로 바뀌었는지 설명하고 `docs/REQUIREMENTS.md` 갱신 여부를 묻고, 수락 시 `docs/REQUIREMENTS.md`를 함께 갱신합니다.
 - 중요한 기술적 결정(트레이드오프, 정책 변경, 되돌리기 어려운 선택)은 ADR로 남깁니다.
 - 모든 AI 작업은 `prompts/`에 최소 1개 이상 로그를 남깁니다.
+- 코드 주석은 꼭 필요한 경우에만 추가하고, 기본 문체는 명사형/단답형으로 유지합니다.
+- 에러 메시지와 예외 메시지는 특별한 사유가 없으면 기본적으로 한글로 작성합니다.
 
 ## Lightweight Flow
 
@@ -42,6 +44,16 @@
 - Decisions (ADR): `docs/decisions/`
 - Prompt logs: `prompts/`
 - Debug runbook: `docs/runbook/DEBUG.md`
+- Technical explainers: `prompts/explainers/`
+
+## Technical Explainers Policy
+
+- 알고리즘, 정렬 정책, 캐시 전략, 동시성 제어, 계층 모델처럼 코드만 보고 빠르게 파악하기 어려운 핵심 기술 구조는 `prompts/explainers/`에 설명 문서로 유지한다.
+- 설명 문서는 날짜형 이름 대신 주제 중심의 고정 파일명으로 관리한다.
+- 사용자가 알고리즘 설명, 설계 배경, 내부 동작 흐름, 메서드별 역할 정리를 요청하면 관련 explainer가 있는지 먼저 확인하고, 필요할 때만 해당 경로를 읽는다.
+- 관련 코드 변경으로 explainer 내용이 달라졌다면 같은 작업에서 explainer도 함께 갱신한다.
+- 모든 작업에서 `prompts/explainers/`를 자동으로 읽을 필요는 없고, 설명이 필요하거나 구조 변경 영향이 있는 경우에만 읽는다.
+- 작업 로그(`prompts/*.md`)에서 중요한 기술 정책을 다뤘다면 관련 explainer 경로를 함께 남기는 것을 권장한다.
 
 ## Repository Context
 
