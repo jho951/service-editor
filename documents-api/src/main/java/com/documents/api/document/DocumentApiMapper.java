@@ -1,6 +1,7 @@
 package com.documents.api.document;
 
 import com.documents.api.document.dto.CreateDocumentRequest;
+import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.document.dto.DocumentResponse;
 import com.documents.api.document.support.DocumentJsonCodec;
 import com.documents.domain.Document;
@@ -18,6 +19,14 @@ public class DocumentApiMapper {
     }
 
     public String serializeCover(CreateDocumentRequest request) {
+        return documentJsonCodec.write(request.getCover());
+    }
+
+    public String serializeIcon(UpdateDocumentRequest request) {
+        return documentJsonCodec.write(request.getIcon());
+    }
+
+    public String serializeCover(UpdateDocumentRequest request) {
         return documentJsonCodec.write(request.getCover());
     }
 

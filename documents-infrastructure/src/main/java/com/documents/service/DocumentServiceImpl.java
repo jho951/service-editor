@@ -70,4 +70,11 @@ public class DocumentServiceImpl implements DocumentService {
         return documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
     }
+
+    @Override
+    @Transactional
+    public Document update(UUID documentId, String title, String iconJson, String coverJson, UUID parentId, String actorId) {
+        return documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+    }
 }
