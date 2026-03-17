@@ -54,6 +54,21 @@ class BlockServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_문서 블록 목록 조회 시 활성 블록 전체를 반환한다")
+    void getAllByDocumentIdReturnsActiveBlocks() {
+        UUID documentId = UUID.randomUUID();
+        Block rootBlock = block(documentId, null, "000000000001000000000000");
+        Block childBlock = block(documentId, rootBlock.getId(), "000000000001I00000000000");
+
+        when(documentService.getById(documentId)).thenReturn(document(documentId));
+        when(blockRepository.findActiveByDocumentIdOrderBySortKey(documentId))
+                .thenReturn(java.util.List.of(rootBlock, childBlock));
+
+        assertThat(blockService.getAllByDocumentId(documentId))
+                .containsExactly(rootBlock, childBlock);
+    }
+
+    @Test
     @DisplayName("성공_루트 텍스트 블록 생성 시 gap 기반 sortKey 전략으로 저장한다")
     void createRootBlockAppendsToDocumentRoot() {
         UUID documentId = UUID.randomUUID();

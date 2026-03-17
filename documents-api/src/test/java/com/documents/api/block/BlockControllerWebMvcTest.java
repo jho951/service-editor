@@ -2,6 +2,7 @@ package com.documents.api.block;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -14,6 +15,7 @@ import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.service.BlockService;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +48,29 @@ class BlockControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("성공_문서 블록 목록 조회 요청에 대해 활성 블록 전체를 반환한다")
+    void getBlocksReturnsAllActiveBlocks() throws Exception {
+        UUID documentId = UUID.randomUUID();
+        UUID rootBlockId = UUID.randomUUID();
+        UUID childBlockId = UUID.randomUUID();
+
+        when(blockService.getAllByDocumentId(documentId)).thenReturn(List.of(
+                block(rootBlockId, documentId, null, "000000000001000000000000", 0, "루트 블록"),
+                block(childBlockId, documentId, rootBlockId, "000000000001I00000000000", 1, "자식 블록")
+        ));
+
+        mockMvc.perform(get("/v1/documents/{documentId}/blocks", documentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(rootBlockId.toString()))
+                .andExpect(jsonPath("$.data[1].parentId").value(rootBlockId.toString()))
+                .andExpect(jsonPath("$.data[1].text").value("자식 블록"));
+    }
+
+    @Test
     @DisplayName("성공_블록 생성 요청에 대해 gap 기반 sortKey 전략의 생성 응답을 반환한다")
     void createBlockReturnsCreatedEnvelope() throws Exception {
         UUID documentId = UUID.randomUUID();
@@ -65,7 +90,8 @@ class BlockControllerWebMvcTest {
                 documentId,
                 parentId,
                 "000000000001000000000000",
-                0
+                0,
+                "새 블록"
         ));
 
         mockMvc.perform(post("/v1/documents/{documentId}/blocks", documentId)
@@ -152,13 +178,13 @@ class BlockControllerWebMvcTest {
         ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
     }
 
-    private Block block(UUID blockId, UUID documentId, UUID parentId, String sortKey, int version) {
+    private Block block(UUID blockId, UUID documentId, UUID parentId, String sortKey, int version, String text) {
         Block block = Block.builder()
                 .id(blockId)
                 .documentId(documentId)
                 .parentId(parentId)
                 .type(BlockType.TEXT)
-                .text("새 블록")
+                .text(text)
                 .sortKey(sortKey)
                 .createdBy("user-123")
                 .updatedBy("user-123")

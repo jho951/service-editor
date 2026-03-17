@@ -1,6 +1,7 @@
 package com.documents.api.block;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,6 +44,59 @@ class BlockApiIntegrationTest {
         blockRepository.deleteAll();
         documentRepository.deleteAll();
         workspaceRepository.deleteAll();
+    }
+
+    @Test
+    @DisplayName("성공_문서 블록 목록 조회 API는 활성 블록 전체를 정렬 순서대로 반환한다")
+    void getBlocksReturnsAllActiveBlocks() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block rootBlock = blockRepository.save(Block.builder()
+                .id(UUID.randomUUID())
+                .documentId(document.getId())
+                .type(BlockType.TEXT)
+                .text("루트 블록")
+                .sortKey("000000000001000000000000")
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .build());
+        blockRepository.save(Block.builder()
+                .id(UUID.randomUUID())
+                .documentId(document.getId())
+                .parentId(rootBlock.getId())
+                .type(BlockType.TEXT)
+                .text("자식 블록")
+                .sortKey("000000000001I00000000000")
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .build());
+        blockRepository.save(Block.builder()
+                .id(UUID.randomUUID())
+                .documentId(document.getId())
+                .type(BlockType.TEXT)
+                .text("삭제된 블록")
+                .sortKey("000000000002000000000000")
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .deletedAt(java.time.LocalDateTime.of(2026, 3, 16, 0, 0))
+                .build());
+
+        mockMvc.perform(get("/v1/documents/{documentId}/blocks", document.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].text").value("루트 블록"))
+                .andExpect(jsonPath("$.data[1].text").value("자식 블록"));
     }
 
     @Test
@@ -158,4 +212,5 @@ class BlockApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value(9004))
                 .andExpect(jsonPath("$.message").value("요청한 문서를 찾을 수 없습니다."));
     }
+
 }
