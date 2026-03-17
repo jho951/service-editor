@@ -374,4 +374,127 @@ class DocumentControllerWebMvcTest {
 			.andExpect(jsonPath("$.data.version").value(3));
 	}
 
+	@Test
+	@DisplayName("실패_존재하지 않는 문서를 수정하면 문서 없음 응답을 반환한다")
+	void updateDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		when(documentService.update(
+			eq(documentId),
+			eq("수정된 프로젝트 개요"),
+			eq(null),
+			eq(null),
+			eq(null),
+			eq("user-123")
+		)).thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "title": "수정된 프로젝트 개요"
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_parentId가 자기 자신이면 잘못된 요청 응답을 반환한다")
+	void updateDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		when(documentService.update(
+			eq(documentId),
+			eq("수정된 프로젝트 개요"),
+			eq(null),
+			eq(null),
+			eq(documentId),
+			eq("user-123")
+		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "title": "수정된 프로젝트 개요",
+				  "parentId": "%s"
+				}
+				""".formatted(documentId)));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+	}
+
+	@Test
+	@DisplayName("실패_다른 워크스페이스 부모 문서를 지정하면 잘못된 요청 응답을 반환한다")
+	void updateDocumentReturnsBadRequestWhenParentIsOutOfWorkspace() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID parentId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+
+		when(documentService.update(
+			eq(documentId),
+			eq("수정된 프로젝트 개요"),
+			eq(null),
+			eq(null),
+			eq(parentId),
+			eq("user-123")
+		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "title": "수정된 프로젝트 개요",
+				  "parentId": "11111111-1111-1111-1111-111111111111"
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+	}
+
+	@Test
+	@DisplayName("실패_문서 수정 제목이 공백이면 유효성 검사 오류를 반환한다")
+	void updateDocumentRejectsBlankTitle() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		when(documentService.update(
+			eq(documentId),
+			eq(" "),
+			eq(null),
+			eq(null),
+			eq(null),
+			eq("user-123")
+		)).thenThrow(new BusinessException(BusinessErrorCode.VALIDATION_ERROR));
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "title": " "
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_문서 수정 요청에 인증 헤더가 없으면 인증 오류를 반환한다")
+	void updateDocumentRequiresUserHeader() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+			.contentType("application/json")
+			.content("""
+				{
+				  "title": "수정된 프로젝트 개요"
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+	}
+
 }
