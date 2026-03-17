@@ -1,6 +1,7 @@
 package com.documents.service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -74,7 +75,59 @@ public class DocumentServiceImpl implements DocumentService {
     @Override
     @Transactional
     public Document update(UUID documentId, String title, String iconJson, String coverJson, UUID parentId, String actorId) {
-        return documentRepository.findByIdAndDeletedAtIsNull(documentId)
+        Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+
+        if (Objects.equals(documentId, parentId)) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
+        if (parentId != null) {
+            Document parentDocument = documentRepository.findByIdAndDeletedAtIsNull(parentId)
+                    .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+
+            if (!document.getWorkspaceId().equals(parentDocument.getWorkspaceId())) {
+                throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+            }
+
+            validateNoCycle(documentId, parentDocument);
+        }
+
+        if (title != null) {
+            String normalizedTitle = textNormalizer.normalizeRequired(title);
+            if (normalizedTitle.isEmpty()) {
+                throw new BusinessException(BusinessErrorCode.VALIDATION_ERROR);
+            }
+            document.setTitle(normalizedTitle);
+        }
+
+        document.setParentId(parentId);
+        document.setIconJson(normalizeNullableMetaJson(iconJson));
+        document.setCoverJson(normalizeNullableMetaJson(coverJson));
+        document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
+
+        return document;
+    }
+
+    private void validateNoCycle(UUID documentId, Document parentDocument) {
+        Document current = parentDocument;
+        while (current != null) {
+            if (documentId.equals(current.getId())) {
+                throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+            }
+
+            UUID nextParentId = current.getParentId();
+            if (nextParentId == null) {
+                return;
+            }
+
+            current = documentRepository.findByIdAndDeletedAtIsNull(nextParentId)
+                    .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+        }
+    }
+
+    private String normalizeNullableMetaJson(String value) {
+        String normalizedValue = textNormalizer.normalizeNullable(value);
+        return "null".equals(normalizedValue) ? null : normalizedValue;
     }
 }

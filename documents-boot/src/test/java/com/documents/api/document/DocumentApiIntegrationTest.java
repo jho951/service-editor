@@ -289,6 +289,115 @@ class DocumentApiIntegrationTest {
         assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
     }
 
+    @Test
+    @DisplayName("성공_문서 수정 API는 제목 trim, 부모 변경, updatedBy 갱신을 반영한다")
+    void updateDocumentPersistsServiceLogic() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document parentDocument = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("부모 문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("기존 제목")
+                .sortKey("00000000000000000002")
+                .iconJson("{\"type\":\"emoji\",\"value\":\"😀\"}")
+                .coverJson("{\"type\":\"image\",\"value\":\"cover-1\"}")
+                .updatedBy("user-123")
+                .build());
+
+        mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "title": "  수정된 제목  ",
+                                  "parentId": "%s",
+                                  "icon": null,
+                                  "cover": null
+                                }
+                                """.formatted(parentDocument.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("수정된 제목"))
+                .andExpect(jsonPath("$.data.parentId").value(parentDocument.getId().toString()))
+                .andExpect(jsonPath("$.data.icon").doesNotExist())
+                .andExpect(jsonPath("$.data.cover").doesNotExist())
+                .andExpect(jsonPath("$.data.updatedBy").value("user-456"))
+                .andExpect(jsonPath("$.data.version").value(1));
+
+        Document updatedDocument = documentRepository.findById(document.getId()).orElseThrow();
+        assertThat(updatedDocument.getTitle()).isEqualTo("수정된 제목");
+        assertThat(updatedDocument.getParentId()).isEqualTo(parentDocument.getId());
+        assertThat(updatedDocument.getIconJson()).isNull();
+        assertThat(updatedDocument.getCoverJson()).isNull();
+        assertThat(updatedDocument.getUpdatedBy()).isEqualTo("user-456");
+    }
+
+    @Test
+    @DisplayName("실패_빈 제목으로 문서를 수정하면 유효성 검사 오류를 반환한다")
+    void updateDocumentReturnsValidationErrorWhenTitleBlank() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("기존 제목")
+                .sortKey("00000000000000000001")
+                .build());
+
+        var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "title": "   "
+                                }
+                                """));
+
+        assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_하위 문서를 부모로 올려 순환 참조가 생기면 잘못된 요청 오류를 반환한다")
+    void updateDocumentReturnsBadRequestWhenCycleDetected() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document rootDocument = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("루트 문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Document childDocument = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .parentId(rootDocument.getId())
+                .title("하위 문서")
+                .sortKey("00000000000000000002")
+                .build());
+
+        var result = mockMvc.perform(patch("/v1/documents/{documentId}", rootDocument.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s"
+                                }
+                                """.formatted(childDocument.getId())));
+
+        assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+    }
+
     private void assertErrorEnvelope(ResultActions result, String httpStatus, int code, String message) throws Exception {
         result.andExpect(status().is(org.springframework.http.HttpStatus.valueOf(httpStatus).value()))
                 .andExpect(jsonPath("$.httpStatus").value(httpStatus))
