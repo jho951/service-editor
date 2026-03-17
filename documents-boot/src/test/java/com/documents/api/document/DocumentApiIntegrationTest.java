@@ -1,15 +1,12 @@
 package com.documents.api.document;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import com.documents.domain.Document;
-import com.documents.domain.Workspace;
-import com.documents.repository.DocumentRepository;
-import com.documents.repository.WorkspaceRepository;
+import java.time.LocalDateTime;
 import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +14,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+
+import com.documents.domain.Document;
+import com.documents.domain.Workspace;
+import com.documents.repository.DocumentRepository;
+import com.documents.repository.WorkspaceRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -66,6 +69,7 @@ class DocumentApiIntegrationTest {
                 .andExpect(jsonPath("$.data.workspaceId").value(workspace.getId().toString()))
                 .andExpect(jsonPath("$.data.parentId").doesNotExist())
                 .andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
+                .andExpect(jsonPath("$.data.sortKey").value("00000000000000000001"))
                 .andExpect(jsonPath("$.data.icon.type").value("emoji"))
                 .andExpect(jsonPath("$.data.createdBy").value("user-123"))
                 .andExpect(jsonPath("$.data.version").value(0));
@@ -75,8 +79,55 @@ class DocumentApiIntegrationTest {
         assertThat(savedDocument.getWorkspaceId()).isEqualTo(workspace.getId());
         assertThat(savedDocument.getParentId()).isNull();
         assertThat(savedDocument.getTitle()).isEqualTo("프로젝트 개요");
+        assertThat(savedDocument.getSortKey()).isEqualTo("00000000000000000001");
         assertThat(savedDocument.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"📄\"}");
         assertThat(savedDocument.getCreatedBy()).isEqualTo("user-123");
+    }
+
+    @Test
+    @DisplayName("성공_워크스페이스 문서 목록 조회 API는 soft delete되지 않은 문서 목록을 반환한다")
+    void getDocumentsReturnsDocumentList() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document rootDocument = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("루트 문서")
+                .sortKey("00000000000000000001")
+                .build());
+        documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("삭제된 문서")
+                .sortKey("00000000000000000099")
+                .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
+                .build());
+        documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .parentId(rootDocument.getId())
+                .title("하위 문서")
+                .sortKey("00000000000000000002")
+                .build());
+
+        mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspace.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].title").value("루트 문서"))
+                .andExpect(jsonPath("$.data[1].title").value("하위 문서"));
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 워크스페이스의 문서 목록 조회는 리소스 없음 응답을 반환한다")
+    void getDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
+        var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID()));
+
+        assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
     }
 
     @Test
@@ -110,6 +161,7 @@ class DocumentApiIntegrationTest {
                 .id(UUID.randomUUID())
                 .workspaceId(otherWorkspace.getId())
                 .title("다른 워크스페이스 문서")
+                .sortKey("00000000000000000001")
                 .build());
 
         var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", rootWorkspace.getId())
@@ -188,7 +240,56 @@ class DocumentApiIntegrationTest {
         assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
     }
 
-    private void assertErrorEnvelope(org.springframework.test.web.servlet.ResultActions result, String httpStatus, int code, String message) throws Exception {
+    @Test
+    @DisplayName("성공_문서 단건 조회 API는 저장된 문서 메타데이터를 반환한다")
+    void getDocumentReturnsDocumentEnvelope() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("프로젝트 개요")
+                .sortKey("00000000000000000001")
+                .iconJson("{\"type\":\"emoji\",\"value\":\"📄\"}")
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .build());
+
+        mockMvc.perform(get("/v1/documents/{documentId}", document.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(document.getId().toString()))
+                .andExpect(jsonPath("$.data.workspaceId").value(workspace.getId().toString()))
+                .andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
+                .andExpect(jsonPath("$.data.icon.type").value("emoji"))
+                .andExpect(jsonPath("$.data.createdBy").value("user-123"));
+    }
+
+    @Test
+    @DisplayName("실패_soft delete된 문서 단건 조회는 리소스 없음 응답을 반환한다")
+    void getDocumentReturnsNotFoundWhenDeleted() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("삭제된 문서")
+                .sortKey("00000000000000000001")
+                .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
+                .build());
+
+        var result = mockMvc.perform(get("/v1/documents/{documentId}", document.getId()));
+
+        assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+    }
+
+    private void assertErrorEnvelope(ResultActions result, String httpStatus, int code, String message) throws Exception {
         result.andExpect(status().is(org.springframework.http.HttpStatus.valueOf(httpStatus).value()))
                 .andExpect(jsonPath("$.httpStatus").value(httpStatus))
                 .andExpect(jsonPath("$.success").value(false))

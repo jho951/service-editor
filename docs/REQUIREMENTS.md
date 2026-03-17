@@ -162,6 +162,12 @@ User {
 }
 ```
 
+## 6.1.1 식별자 컬럼 명명 규칙
+
+- 영속 스키마의 기본 키 컬럼명은 단순 `id`를 사용하지 않고 `${도메인명}_id` 형식을 사용한다.
+- 예: `workspaces.workspace_id`, `documents.document_id`, `blocks.block_id`
+- 외래 키 컬럼도 동일한 기준으로 대상 도메인명을 드러내는 컬럼명을 사용한다.
+
 ## 6.2 Workspace
 
 ```text
@@ -178,6 +184,7 @@ Workspace {
 
 ### 설명
 - `name`: 워크스페이스 표시 이름
+- 영속 기본 키 컬럼명은 `workspace_id`를 사용한다.
 - Workspace는 v1에서 문서 생성의 소속 루트만 담당한다.
 - 인증 연동 전 단계에서는 `createdBy`, `updatedBy`를 `null`로 둘 수 있다.
 
@@ -191,7 +198,7 @@ Document {
   title: string
   icon: json | null
   cover: json | null
-  sortKey: string | null
+  sortKey: string
   version: number
   createdBy: string | null
   updatedBy: string | null
@@ -202,9 +209,10 @@ Document {
 ```
 
 ### 설명
+- 영속 기본 키 컬럼명은 `document_id`를 사용한다.
 - `workspaceId`: 문서가 속한 워크스페이스
 - `parentId`: 상위 문서 ID. `null`이면 루트 문서
-- `sortKey`: 같은 부모 아래 문서 순서 정렬용 키
+- `sortKey`: 같은 부모 아래 문서 순서 정렬용 필수 키
 - `version`: 낙관적 락용 버전
 - `deletedAt`: soft delete 시각
 
@@ -228,6 +236,7 @@ Block {
 ```
 
 ### 설명
+- 영속 기본 키 컬럼명은 `block_id`를 사용한다.
 - `documentId`: 블록이 속한 문서
 - `parentId`: 상위 블록 ID. `null`이면 문서 루트 블록
 - `sortKey`: 같은 부모 아래 블록 순서 정렬용 키
@@ -252,6 +261,7 @@ Block {
 5. 하위 문서 cascade delete 여부는 제품 정책으로 확정해야 하나, v1에서는 **하위 문서까지 soft delete**를 권장한다.
 6. 자기 자신을 부모 문서로 둘 수 없다.
 7. 순환 참조(cycle)는 허용하지 않는다.
+8. 같은 형제 집합(sibling scope) 내 활성 문서의 `sortKey`는 유일해야 한다.
 
 ## 7.2 블록 규칙
 1. `parentId IS NULL`이면 문서 루트 블록이다.
@@ -615,6 +625,7 @@ TEXT 블록 생성.
 - 문서 및 블록 정렬은 `sortKey`를 기본으로 한다.
 - 중간 삽입이 자주 발생하는 경우 fractional indexing 또는 lexicographic rank 전략을 사용할 수 있다.
 - 초기 구현은 단순 정수 기반 sort 전략으로 시작할 수 있다.
+- 문서 생성 시 `sortKey`는 같은 부모 아래 현재 최대값 다음 순번으로 발급하며, 문자열 비교 정렬을 위해 고정폭 숫자 문자열을 사용한다.
 
 ---
 
@@ -651,6 +662,10 @@ TEXT 블록 생성.
 - 리소스 조회 실패, 정합성 위반, 충돌 판단 등 비즈니스 예외는 Service 계층에서 `BusinessException`으로 발생시키고, API 계층은 `GlobalExceptionHandler`를 통해 공통 응답으로 변환한다.
 - 후속 API도 같은 원칙을 적용하여 Controller를 얇게 유지해야 한다.
 - `@Valid`로 보장된 요청 필드에 대해서는 Service 계층에서 불필요한 `null`/빈 값 파싱과 방어 코드를 최소화한다.
+- Service는 유스케이스 오케스트레이션, 트랜잭션 경계, 도메인 규칙 검증에 집중해야 한다.
+- 문자열 정규화, 포맷 변환, 직렬화/역직렬화, 정렬 키 포맷 계산처럼 재사용 가능한 기술성 로직은 별도 지원 컴포넌트로 분리해야 한다.
+- 현재 구조에서는 과도한 포트/어댑터 추상화보다, 기존 계층 구조를 유지한 채 모듈 내부 유틸/지원 클래스로 분리하는 단순한 설계를 우선한다.
+- Mapper는 입출력 모델 변환만 담당하고, JSON codec 등 파싱 세부사항은 별도 지원 객체에 위임해야 한다.
 
 ## 15.4 테스트 배치 및 실행 원칙
 - 빠른 피드백을 위한 테스트 피라미드를 기본 전략으로 사용한다. 단위 테스트와 slice 테스트를 통합 테스트보다 더 많이 유지해야 한다.
@@ -677,7 +692,7 @@ TEXT 블록 생성.
 다음 항목은 추후 별도 설계 확정이 필요하다.
 
 1. `workspace_members`, `permissions` 테이블 상세 정의
-2. 문서 정렬을 위한 `documents.sortKey` 확정
+2. 문서 reorder/move 시 fractional indexing 전환 여부 검토
 3. 사용자 소셜 로그인 식별자 모델(`providerUserId`) 확정
 4. 향후 collaborative editing 도입 시 operations / snapshots / presence 모델 정의
 5. 검색 기능이 필요할 경우 별도 인덱싱 전략 수립
