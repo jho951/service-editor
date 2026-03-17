@@ -366,6 +366,83 @@ class DocumentApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("실패_존재하지 않는 문서를 수정하면 리소스 없음 응답을 반환한다")
+    void updateDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+        var result = mockMvc.perform(patch("/v1/documents/{documentId}", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "title": "수정된 제목"
+                                }
+                                """));
+
+        assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_다른 워크스페이스 부모 문서를 지정하면 잘못된 요청 응답을 반환한다")
+    void updateDocumentReturnsBadRequestWhenParentBelongsToOtherWorkspace() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Workspace otherWorkspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Other Workspace")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("기존 제목")
+                .sortKey("00000000000000000001")
+                .build());
+        Document otherWorkspaceParent = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(otherWorkspace.getId())
+                .title("다른 워크스페이스 문서")
+                .sortKey("00000000000000000001")
+                .build());
+
+        var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s"
+                                }
+                                """.formatted(otherWorkspaceParent.getId())));
+
+        assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+    }
+
+    @Test
+    @DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 응답을 반환한다")
+    void updateDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspace.getId())
+                .title("기존 제목")
+                .sortKey("00000000000000000001")
+                .build());
+
+        var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s"
+                                }
+                                """.formatted(document.getId())));
+
+        assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+    }
+
+    @Test
     @DisplayName("실패_하위 문서를 부모로 올려 순환 참조가 생기면 잘못된 요청 오류를 반환한다")
     void updateDocumentReturnsBadRequestWhenCycleDetected() throws Exception {
         Workspace workspace = workspaceRepository.save(Workspace.builder()

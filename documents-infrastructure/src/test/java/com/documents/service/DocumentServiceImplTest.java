@@ -270,6 +270,45 @@ class DocumentServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_title만 수정하면 다른 필드는 유지한다")
+    void updateDocumentUpdatesOnlyTitle() {
+        UUID workspaceId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        Document document = Document.builder()
+                .id(documentId)
+                .workspaceId(workspaceId)
+                .parentId(null)
+                .title("기존 제목")
+                .iconJson("{\"type\":\"emoji\",\"value\":\"😀\"}")
+                .coverJson("{\"type\":\"image\",\"value\":\"cover-1\"}")
+                .updatedBy("old-user")
+                .sortKey("00000000000000000001")
+                .build();
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+        when(textNormalizer.normalizeRequired("  새 제목  ")).thenReturn("새 제목");
+        when(textNormalizer.normalizeNullable("{\"type\":\"emoji\",\"value\":\"😀\"}"))
+                .thenReturn("{\"type\":\"emoji\",\"value\":\"😀\"}");
+        when(textNormalizer.normalizeNullable("{\"type\":\"image\",\"value\":\"cover-1\"}"))
+                .thenReturn("{\"type\":\"image\",\"value\":\"cover-1\"}");
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+        Document result = documentService.update(
+                documentId,
+                "  새 제목  ",
+                "{\"type\":\"emoji\",\"value\":\"😀\"}",
+                "{\"type\":\"image\",\"value\":\"cover-1\"}",
+                null,
+                ACTOR_ID
+        );
+
+        assertThat(result.getTitle()).isEqualTo("새 제목");
+        assertThat(result.getParentId()).isNull();
+        assertThat(result.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"😀\"}");
+        assertThat(result.getCoverJson()).isEqualTo("{\"type\":\"image\",\"value\":\"cover-1\"}");
+        assertThat(result.getUpdatedBy()).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
     @DisplayName("성공_title이 null이면 기존 제목을 유지하고 parentId가 null이면 루트로 변경한다")
     void updateDocumentKeepsTitleWhenNullAndMovesToRoot() {
         UUID workspaceId = UUID.randomUUID();
@@ -297,6 +336,40 @@ class DocumentServiceImplTest {
         assertThat(result.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"📄\"}");
         assertThat(result.getCoverJson()).isNull();
         assertThat(result.getUpdatedBy()).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_actorId가 공백이면 updatedBy를 null로 저장한다")
+    void updateDocumentStoresNullUpdatedByWhenActorBlank() {
+        UUID documentId = UUID.randomUUID();
+        Document document = Document.builder()
+                .id(documentId)
+                .workspaceId(UUID.randomUUID())
+                .title("기존 제목")
+                .iconJson("{\"type\":\"emoji\",\"value\":\"😀\"}")
+                .coverJson("{\"type\":\"image\",\"value\":\"cover-1\"}")
+                .updatedBy("old-user")
+                .sortKey("00000000000000000001")
+                .build();
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+        when(textNormalizer.normalizeRequired("수정된 제목")).thenReturn("수정된 제목");
+        when(textNormalizer.normalizeNullable("{\"type\":\"emoji\",\"value\":\"😀\"}"))
+                .thenReturn("{\"type\":\"emoji\",\"value\":\"😀\"}");
+        when(textNormalizer.normalizeNullable("{\"type\":\"image\",\"value\":\"cover-1\"}"))
+                .thenReturn("{\"type\":\"image\",\"value\":\"cover-1\"}");
+        when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
+
+        Document result = documentService.update(
+                documentId,
+                "수정된 제목",
+                "{\"type\":\"emoji\",\"value\":\"😀\"}",
+                "{\"type\":\"image\",\"value\":\"cover-1\"}",
+                null,
+                " "
+        );
+
+        assertThat(result.getUpdatedBy()).isNull();
+        assertThat(result.getTitle()).isEqualTo("수정된 제목");
     }
 
     @Test
@@ -355,6 +428,26 @@ class DocumentServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 부모 문서를 지정하면 문서 없음 예외를 던진다")
+    void updateDocumentThrowsWhenParentMissing() {
+        UUID documentId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        Document document = Document.builder()
+                .id(documentId)
+                .workspaceId(UUID.randomUUID())
+                .title("기존 제목")
+                .sortKey("00000000000000000001")
+                .build();
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+        when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> documentService.update(documentId, null, null, null, parentId, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
     }
 
     @Test
