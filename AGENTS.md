@@ -1,6 +1,9 @@
 # AGENTS 가이드
 
-- `docs/REQUIREMENTS.md`, `docs/decisions`, `prompts`를 항상 함께 갱신합니다.
+- 작업 성격에 맞게 `docs/discussions/`, `docs/decisions/`, `docs/REQUIREMENTS.md`, `prompts/`를 함께 갱신합니다.
+- 채택 전 전략 검토, 회의 메모, 비교 문서는 `docs/discussions/`에 남깁니다.
+- 채택된 기술 결정은 `docs/decisions/` ADR로 기록합니다.
+- 현재 유효한 제품 요구사항과 채택된 정책은 `docs/REQUIREMENTS.md`에 반영합니다.
 - 중요한 기술 선택은 ADR로 기록합니다.
 - 재현 가능한 디버깅 절차를 `docs/runbook/DEBUG.md`에 유지합니다.
 
@@ -21,6 +24,7 @@
 
 - 기존 제품 코드(`app/`, `components/`, `libs/` 등)의 동작을 바꾸는 변경은 목적, 근거, 영향 범위를 PR에 꼭 명시합니다.
 - 요구사항/가정이 바뀌면 어떤 이유로 바뀌었는지 설명하고 `docs/REQUIREMENTS.md` 갱신 여부를 묻고, 수락 시 `docs/REQUIREMENTS.md`를 함께 갱신합니다.
+- 채택 전 설계 검토, 전략 비교, 회의 메모는 `docs/discussions/`에 남기고, 실제 채택된 결정만 `docs/decisions/` ADR로 승격합니다.
 - 중요한 기술적 결정(트레이드오프, 정책 변경, 되돌리기 어려운 선택)은 ADR로 남깁니다.
 - 모든 AI 작업은 `prompts/`에 최소 1개 이상 로그를 남깁니다.
 - 코드 주석은 꼭 필요한 경우에만 추가하고, 기본 문체는 명사형/단답형으로 유지합니다.
@@ -32,6 +36,9 @@
 - 기존 요구사항 범위 안의 버그 수정은 `docs/REQUIREMENTS.md` 갱신 없이 진행할 수 있습니다. 다만 PR에는 기존 요구사항 범위 안의 수정임을 간단히 명시합니다.
 - 탐색, 디버깅, 프로토타이핑, 실험 단계에서는 ADR 없이 빠르게 진행할 수 있습니다. 다만 최종적으로 채택되는 결정이 생기면 그 시점에 ADR을 작성합니다.
 - 프롬프트 로그는 작은 작업일 경우 날짜, 작업 목적, 핵심 변경만 적은 3~5줄 요약 형식으로 남겨도 충분합니다.
+- 전략 조사, 선택지 비교, 회의 정리 문서는 `docs/discussions/000-strategy-review-template.md` 구조를 기본으로 사용합니다.
+- `review`, `strategy`, `meeting`처럼 이름이 달라도 discussion 문서는 같은 템플릿 계열로 맞춥니다.
+- 전략 설명, 비교, 추천에는 이해를 돕기 위한 시나리오를 반드시 포함합니다.
 
 ## ADR Trigger
 
@@ -41,6 +48,7 @@
 ## Required Artifacts
 
 - Requirements: `docs/REQUIREMENTS.md`
+- Discussions: `docs/discussions/`
 - Decisions (ADR): `docs/decisions/`
 - Prompt logs: `prompts/`
 - Debug runbook: `docs/runbook/DEBUG.md`
