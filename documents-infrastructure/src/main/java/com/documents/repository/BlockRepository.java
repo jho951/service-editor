@@ -12,12 +12,18 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
 
     Optional<Block> findByIdAndDeletedAtIsNull(UUID id);
 
-    long countByDocumentIdAndDeletedAtIsNull(UUID documentId);
+    @Query("""
+            select count(b)
+            from Block b
+            where b.document.id = :documentId
+              and b.deletedAt is null
+            """)
+    long countActiveByDocumentId(@Param("documentId") UUID documentId);
 
     @Query("""
             select b
             from Block b
-            where b.documentId = :documentId
+            where b.document.id = :documentId
               and b.deletedAt is null
             order by
               b.sortKey asc,
@@ -31,10 +37,10 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
     @Query("""
             select b
             from Block b
-            where b.documentId = :documentId
+            where b.document.id = :documentId
               and (
-                (:parentId is null and b.parentId is null)
-                or b.parentId = :parentId
+                (:parentId is null and b.parent is null)
+                or b.parent.id = :parentId
               )
               and b.deletedAt is null
             order by

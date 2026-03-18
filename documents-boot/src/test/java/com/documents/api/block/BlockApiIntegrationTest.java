@@ -55,13 +55,13 @@ class BlockApiIntegrationTest {
                 .build());
         Document document = documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
+                .workspace(workspace)
                 .title("문서")
                 .sortKey("00000000000000000001")
                 .build());
         Block rootBlock = blockRepository.save(Block.builder()
                 .id(UUID.randomUUID())
-                .documentId(document.getId())
+                .document(document)
                 .type(BlockType.TEXT)
                 .text("루트 블록")
                 .sortKey("000000000001000000000000")
@@ -70,8 +70,8 @@ class BlockApiIntegrationTest {
                 .build());
         blockRepository.save(Block.builder()
                 .id(UUID.randomUUID())
-                .documentId(document.getId())
-                .parentId(rootBlock.getId())
+                .document(document)
+                .parent(rootBlock)
                 .type(BlockType.TEXT)
                 .text("자식 블록")
                 .sortKey("000000000001I00000000000")
@@ -80,7 +80,7 @@ class BlockApiIntegrationTest {
                 .build());
         blockRepository.save(Block.builder()
                 .id(UUID.randomUUID())
-                .documentId(document.getId())
+                .document(document)
                 .type(BlockType.TEXT)
                 .text("삭제된 블록")
                 .sortKey("000000000002000000000000")
@@ -108,7 +108,7 @@ class BlockApiIntegrationTest {
                 .build());
         Document document = documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
+                .workspace(workspace)
                 .title("문서")
                 .sortKey("00000000000000000001")
                 .build());
@@ -154,13 +154,13 @@ class BlockApiIntegrationTest {
                 .build());
         Document document = documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
+                .workspace(workspace)
                 .title("문서")
                 .sortKey("00000000000000000001")
                 .build());
         Block first = blockRepository.save(Block.builder()
                 .id(UUID.randomUUID())
-                .documentId(document.getId())
+                .document(document)
                 .type(BlockType.TEXT)
                 .text("첫 블록")
                 .sortKey("000000000001000000000000")
@@ -169,7 +169,7 @@ class BlockApiIntegrationTest {
                 .build());
         Block second = blockRepository.save(Block.builder()
                 .id(UUID.randomUUID())
-                .documentId(document.getId())
+                .document(document)
                 .type(BlockType.TEXT)
                 .text("둘째 블록")
                 .sortKey("000000000002000000000000")

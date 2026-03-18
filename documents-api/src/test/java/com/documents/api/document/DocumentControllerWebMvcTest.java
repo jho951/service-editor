@@ -23,6 +23,7 @@ import com.documents.api.document.support.DocumentJsonCodec;
 import com.documents.api.exception.GlobalExceptionHandler;
 import com.documents.api.support.ApiResponseAssertions;
 import com.documents.domain.Document;
+import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.service.DocumentService;
@@ -311,8 +312,8 @@ class DocumentControllerWebMvcTest {
 	) {
 		Document document = Document.builder()
 			.id(id)
-			.workspaceId(workspaceId)
-			.parentId(parentId)
+			.workspace(workspace(workspaceId))
+			.parent(parentId == null ? null : parentDocument(parentId, workspaceId))
 			.title(title)
 			.sortKey(sortKey)
 			.iconJson(iconJson)
@@ -324,6 +325,22 @@ class DocumentControllerWebMvcTest {
 		document.setUpdatedAt(LocalDateTime.of(2026, 3, 16, 0, 0));
 		document.setVersion(version);
 		return document;
+	}
+
+	private Workspace workspace(UUID workspaceId) {
+		return Workspace.builder()
+			.id(workspaceId)
+			.name("Docs Root")
+			.build();
+	}
+
+	private Document parentDocument(UUID documentId, UUID workspaceId) {
+		return Document.builder()
+			.id(documentId)
+			.workspace(workspace(workspaceId))
+			.title("부모 문서")
+			.sortKey("00000000000000000001")
+			.build();
 	}
 
 	@Test

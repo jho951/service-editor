@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
+import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.BlockRepository;
@@ -49,7 +50,7 @@ public class BlockServiceImpl implements BlockService {
             UUID beforeBlockId,
             String actorId
     ) {
-        documentService.getById(documentId);
+        Document document = documentService.getById(documentId);
         validateSupportedType(type);
         validateBlockLimit(documentId);
 
@@ -66,8 +67,8 @@ public class BlockServiceImpl implements BlockService {
 
         Block newBlock = Block.builder()
                 .id(UUID.randomUUID())
-                .documentId(documentId)
-                .parentId(parentId)
+                .document(document)
+                .parent(parentBlock)
                 .type(type)
                 .text(text)
                 .sortKey(sortKey)
@@ -85,7 +86,7 @@ public class BlockServiceImpl implements BlockService {
     }
 
     private void validateBlockLimit(UUID documentId) {
-        if (blockRepository.countByDocumentIdAndDeletedAtIsNull(documentId) >= MAX_BLOCK_COUNT_PER_DOCUMENT) {
+        if (blockRepository.countActiveByDocumentId(documentId) >= MAX_BLOCK_COUNT_PER_DOCUMENT) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
         }
     }
@@ -113,8 +114,7 @@ public class BlockServiceImpl implements BlockService {
             if (depth > MAX_BLOCK_DEPTH) {
                 throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
             }
-            UUID nextParentId = current.getParentId();
-            current = nextParentId == null ? null : blockRepository.findByIdAndDeletedAtIsNull(nextParentId)
+            current = current.getParentId() == null ? null : blockRepository.findByIdAndDeletedAtIsNull(current.getParentId())
                     .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
         }
     }
