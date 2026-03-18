@@ -15,10 +15,10 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Query("""
             select max(d.sortKey)
             from Document d
-            where d.workspaceId = :workspaceId
+            where d.workspace.id = :workspaceId
               and (
-                (:parentId is null and d.parentId is null)
-                or d.parentId = :parentId
+                (:parentId is null and d.parent is null)
+                or d.parent.id = :parentId
               )
               and d.deletedAt is null
             """)
@@ -30,7 +30,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
     @Query("""
             select d
             from Document d
-            where d.workspaceId = :workspaceId
+            where d.workspace.id = :workspaceId
               and d.deletedAt is null
             order by
               d.sortKey asc,

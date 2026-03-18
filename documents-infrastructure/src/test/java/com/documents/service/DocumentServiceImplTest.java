@@ -408,8 +408,8 @@ class DocumentServiceImplTest {
     private Document document(UUID documentId, UUID workspaceId, UUID parentId, String title, String sortKey) {
         return Document.builder()
                 .id(documentId)
-                .workspaceId(workspaceId)
-                .parentId(parentId)
+                .workspace(workspace(workspaceId))
+                .parent(parentId == null ? null : parentDocument(parentId, workspaceId))
                 .title(title)
                 .sortKey(sortKey)
                 .build();

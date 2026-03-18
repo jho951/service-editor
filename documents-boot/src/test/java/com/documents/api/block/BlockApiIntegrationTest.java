@@ -55,7 +55,7 @@ class BlockApiIntegrationTest {
                 .build());
         Document document = documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
+                .workspace(workspace)
                 .title("문서")
                 .sortKey("00000000000000000001")
                 .build());
@@ -108,7 +108,7 @@ class BlockApiIntegrationTest {
                 .build());
         Document document = documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
+                .workspace(workspace)
                 .title("문서")
                 .sortKey("00000000000000000001")
                 .build());
@@ -154,7 +154,7 @@ class BlockApiIntegrationTest {
                 .build());
         Document document = documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspace.getId())
+                .workspace(workspace)
                 .title("문서")
                 .sortKey("00000000000000000001")
                 .build());

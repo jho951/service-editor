@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.documents.domain.Document;
+import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.DocumentRepository;
@@ -29,16 +30,8 @@ public class DocumentServiceImpl implements DocumentService {
 	@Transactional
 	public Document create(UUID workspaceId, UUID parentId, String title, String iconJson, String coverJson,
 		String actorId) {
-		workspaceService.getById(workspaceId);
-
-		if (parentId != null) {
-			Document parentDocument = documentRepository.findByIdAndDeletedAtIsNull(parentId)
-				.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
-
-			if (!workspaceId.equals(parentDocument.getWorkspaceId())) {
-				throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
-			}
-		}
+		Workspace workspace = workspaceService.getById(workspaceId);
+		Document parentDocument = validateParentForWorkspace(workspaceId, parentId);
 
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
 		String normalizedTitle = textNormalizer.normalizeRequired(title);
@@ -46,8 +39,8 @@ public class DocumentServiceImpl implements DocumentService {
 
 		Document document = Document.builder()
 			.id(UUID.randomUUID())
-			.workspaceId(workspaceId)
-			.parentId(parentId)
+			.workspace(workspace)
+			.parent(parentDocument)
 			.title(normalizedTitle)
 			.iconJson(iconJson)
 			.coverJson(coverJson)
@@ -80,32 +73,44 @@ public class DocumentServiceImpl implements DocumentService {
 		Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
 			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
-		validateParentForUpdate(document, documentId, parentId);
+		Document parentDocument = validateParentForUpdate(document, documentId, parentId);
 		applyTitle(document, title);
 		applyMetadata(document, iconJson, coverJson);
-		document.setParentId(parentId);
+		document.setParent(parentDocument);
 		document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
 
 		return document;
 	}
 
-	private void validateParentForUpdate(Document document, UUID documentId, UUID parentId) {
+	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
+		if (parentId == null) {
+			return null;
+		}
+
+		Document parentDocument = findActiveDocument(parentId);
+		if (!workspaceId.equals(parentDocument.getWorkspaceId())) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+		return parentDocument;
+	}
+
+	private Document validateParentForUpdate(Document document, UUID documentId, UUID parentId) {
 		if (Objects.equals(documentId, parentId)) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
 		}
 
 		if (parentId == null) {
-			return;
+			return null;
 		}
 
-		Document parentDocument = documentRepository.findByIdAndDeletedAtIsNull(parentId)
-			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+		Document parentDocument = findActiveDocument(parentId);
 
 		if (!document.getWorkspaceId().equals(parentDocument.getWorkspaceId())) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
 		}
 
 		validateNoCycle(documentId, parentDocument);
+		return parentDocument;
 	}
 
 	private void applyTitle(Document document, String title) {
@@ -128,14 +133,13 @@ public class DocumentServiceImpl implements DocumentService {
 				throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
 			}
 
-			UUID nextParentId = current.getParentId();
-			if (nextParentId == null) {
-				return;
-			}
-
-			current = documentRepository.findByIdAndDeletedAtIsNull(nextParentId)
-				.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+			current = current.getParentId() == null ? null : findActiveDocument(current.getParentId());
 		}
+	}
+
+	private Document findActiveDocument(UUID documentId) {
+		return documentRepository.findByIdAndDeletedAtIsNull(documentId)
+			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 	}
 
 	private String normalizeNullableMetaJson(String value) {

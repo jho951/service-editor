@@ -136,7 +136,7 @@ class DocumentApiIntegrationTest {
 
         Document parentDocument = documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(otherWorkspace.getId())
+                .workspace(otherWorkspace)
                 .title("다른 워크스페이스 문서")
                 .sortKey("00000000000000000001")
                 .build());
@@ -416,8 +416,8 @@ class DocumentApiIntegrationTest {
     ) {
         return documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspaceId)
-                .parentId(parentId)
+                .workspace(workspaceRepository.getReferenceById(workspaceId))
+                .parent(parentId == null ? null : documentRepository.getReferenceById(parentId))
                 .title(title)
                 .sortKey(sortKey)
                 .iconJson(iconJson)
@@ -430,7 +430,7 @@ class DocumentApiIntegrationTest {
     private Document saveDeletedDocument(UUID workspaceId, String title, String sortKey) {
         return documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspaceId(workspaceId)
+                .workspace(workspaceRepository.getReferenceById(workspaceId))
                 .title(title)
                 .sortKey(sortKey)
                 .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
