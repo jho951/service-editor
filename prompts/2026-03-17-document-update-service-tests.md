@@ -1,0 +1,5 @@
+- 작업 목적: 문서 수정 서비스 로직 단위 테스트 보강
+- 테스트 변경: `DocumentServiceImplTest`에 title만 수정, 루트 이동, 부모 없음, 다른 workspace 부모, 자기 자신 부모, 순환 참조, actorId 공백 처리 케이스를 보강했다.
+- 구현 변경: 없음. 기존 서비스 동작을 테스트로 검증했다.
+- 검증 범위: `DocumentServiceImpl#update`의 필드 갱신과 부모/순환/감사 필드 검증
+- 요구사항 변경: 없음.

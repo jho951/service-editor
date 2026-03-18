@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.documents.api.code.SuccessCode;
 import com.documents.api.document.dto.CreateDocumentRequest;
 import com.documents.api.document.dto.DocumentResponse;
+import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Document;
 import com.documents.service.DocumentService;
@@ -74,5 +76,23 @@ public class DocumentController {
     ) {
         Document document = documentService.getById(documentId);
         return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(document)));
+    }
+
+    @Operation(summary = "문서 수정")
+    @PatchMapping("/documents/{documentId}")
+    public ResponseEntity<GlobalResponse<DocumentResponse>> updateDocument(
+            @PathVariable("documentId") UUID documentId,
+            @Valid @RequestBody UpdateDocumentRequest request,
+            @RequestHeader(USER_ID_HEADER) String userId
+    ) {
+        Document updatedDocument = documentService.update(
+                documentId,
+                request.getTitle(),
+                documentApiMapper.serializeIcon(request),
+                documentApiMapper.serializeCover(request),
+                request.getParentId(),
+                userId
+        );
+        return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));
     }
 }
