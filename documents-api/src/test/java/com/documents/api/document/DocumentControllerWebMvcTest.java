@@ -33,10 +33,68 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @DisplayName("Document 컨트롤러 빠른 검증")
 class DocumentControllerWebMvcTest {
 
+	private static final String USER_ID_HEADER = "X-User-Id";
+	private static final String ACTOR_ID = "user-123";
+	private static final String ROOT_WORKSPACE_NAME = "Docs Root";
+	private static final String PROJECT_OVERVIEW_TITLE = "프로젝트 개요";
+	private static final String UPDATED_PROJECT_OVERVIEW_TITLE = "수정된 프로젝트 개요";
+	private static final String ROOT_DOCUMENT_TITLE = "루트 문서";
+	private static final String CHILD_DOCUMENT_TITLE = "하위 문서";
+	private static final String PARENT_DOCUMENT_TITLE = "부모 문서";
+	private static final String ICON_DOC_JSON = "{\"type\":\"emoji\",\"value\":\"📄\"}";
+	private static final String ICON_SMILE_JSON = "{\"type\":\"emoji\",\"value\":\"😀\"}";
+	private static final String COVER_1_JSON = "{\"type\":\"image\",\"value\":\"cover-1\"}";
+	private static final String COVER_2_JSON = "{\"type\":\"image\",\"value\":\"cover-2\"}";
+	private static final LocalDateTime FIXTURE_TIME = LocalDateTime.of(2026, 3, 16, 0, 0);
+
 	@Mock
 	private DocumentService documentService;
 
 	private MockMvc mockMvc;
+
+	private Document document(
+		UUID id,
+		UUID workspaceId,
+		UUID parentId,
+		String title,
+		String actorId,
+		Integer version,
+		String sortKey,
+		String iconJson,
+		String coverJson
+	) {
+		Document document = Document.builder()
+			.id(id)
+			.workspace(workspace(workspaceId))
+			.parent(parentId == null ? null : parentDocument(parentId, workspaceId))
+			.title(title)
+			.sortKey(sortKey)
+			.iconJson(iconJson)
+			.coverJson(coverJson)
+			.createdBy(actorId)
+			.updatedBy(actorId)
+			.build();
+		document.setCreatedAt(FIXTURE_TIME);
+		document.setUpdatedAt(FIXTURE_TIME);
+		document.setVersion(version);
+		return document;
+	}
+
+	private Workspace workspace(UUID workspaceId) {
+		return Workspace.builder()
+			.id(workspaceId)
+			.name(ROOT_WORKSPACE_NAME)
+			.build();
+	}
+
+	private Document parentDocument(UUID documentId, UUID workspaceId) {
+		return Document.builder()
+			.id(documentId)
+			.workspace(workspace(workspaceId))
+			.title(PARENT_DOCUMENT_TITLE)
+			.sortKey("00000000000000000001")
+			.build();
+	}
 
 	@BeforeEach
 	void setUp() {
@@ -62,18 +120,18 @@ class DocumentControllerWebMvcTest {
 		when(documentService.create(
 			eq(workspaceId),
 			eq(parentId),
-			eq("프로젝트 개요"),
-			eq("{\"type\":\"emoji\",\"value\":\"📄\"}"),
-			eq("{\"type\":\"image\",\"value\":\"cover-1\"}"),
-			eq("user-123")
-		)).thenReturn(document(documentId, workspaceId, parentId, "프로젝트 개요", "user-123", 0,
+			eq(PROJECT_OVERVIEW_TITLE),
+			eq(ICON_DOC_JSON),
+			eq(COVER_1_JSON),
+			eq(ACTOR_ID)
+		)).thenReturn(document(documentId, workspaceId, parentId, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 0,
 			"00000000000000000003",
-			"{\"type\":\"emoji\",\"value\":\"📄\"}",
-			"{\"type\":\"image\",\"value\":\"cover-1\"}"));
+			ICON_DOC_JSON,
+			COVER_1_JSON));
 
 		mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspaceId)
 				.contentType("application/json")
-				.header("X-User-Id", "user-123")
+				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
 					{
 					  "parentId": "%s",
@@ -96,11 +154,11 @@ class DocumentControllerWebMvcTest {
 			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
 			.andExpect(jsonPath("$.data.workspaceId").value(workspaceId.toString()))
 			.andExpect(jsonPath("$.data.parentId").value(parentId.toString()))
-			.andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
+			.andExpect(jsonPath("$.data.title").value(PROJECT_OVERVIEW_TITLE))
 			.andExpect(jsonPath("$.data.sortKey").value("00000000000000000003"))
 			.andExpect(jsonPath("$.data.icon.type").value("emoji"))
 			.andExpect(jsonPath("$.data.cover.value").value("cover-1"))
-			.andExpect(jsonPath("$.data.createdBy").value("user-123"));
+			.andExpect(jsonPath("$.data.createdBy").value(ACTOR_ID));
 	}
 
 	@Test
@@ -111,9 +169,9 @@ class DocumentControllerWebMvcTest {
 		UUID childDocumentId = UUID.randomUUID();
 
 		when(documentService.getAllByWorkspaceId(workspaceId)).thenReturn(List.of(
-			document(rootDocumentId, workspaceId, null, "루트 문서", "user-123", 0,
+			document(rootDocumentId, workspaceId, null, ROOT_DOCUMENT_TITLE, ACTOR_ID, 0,
 				"00000000000000000001", null, null),
-			document(childDocumentId, workspaceId, rootDocumentId, "하위 문서", "user-123", 1,
+			document(childDocumentId, workspaceId, rootDocumentId, CHILD_DOCUMENT_TITLE, ACTOR_ID, 1,
 				"00000000000000000002", null, null)
 		));
 
@@ -124,7 +182,7 @@ class DocumentControllerWebMvcTest {
 			.andExpect(jsonPath("$.code").value(200))
 			.andExpect(jsonPath("$.data[0].id").value(rootDocumentId.toString()))
 			.andExpect(jsonPath("$.data[0].parentId").doesNotExist())
-			.andExpect(jsonPath("$.data[0].title").value("루트 문서"))
+			.andExpect(jsonPath("$.data[0].title").value(ROOT_DOCUMENT_TITLE))
 			.andExpect(jsonPath("$.data[0].sortKey").value("00000000000000000001"))
 			.andExpect(jsonPath("$.data[1].id").value(childDocumentId.toString()))
 			.andExpect(jsonPath("$.data[1].parentId").value(rootDocumentId.toString()))
@@ -149,7 +207,7 @@ class DocumentControllerWebMvcTest {
 	void createDocumentRejectsBlankTitle() throws Exception {
 		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
 			.contentType("application/json")
-			.header("X-User-Id", "user-123")
+			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
 				  "title": " "
@@ -167,15 +225,15 @@ class DocumentControllerWebMvcTest {
 		when(documentService.create(
 			eq(workspaceId),
 			eq(UUID.fromString("11111111-1111-1111-1111-111111111111")),
-			eq("프로젝트 개요"),
+			eq(PROJECT_OVERVIEW_TITLE),
 			eq(null),
 			eq(null),
-			eq("user-123")
+			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
 
 		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspaceId)
 			.contentType("application/json")
-			.header("X-User-Id", "user-123")
+			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
 				  "parentId": "11111111-1111-1111-1111-111111111111",
@@ -195,15 +253,15 @@ class DocumentControllerWebMvcTest {
 		when(documentService.create(
 			eq(workspaceId),
 			eq(parentId),
-			eq("프로젝트 개요"),
+			eq(PROJECT_OVERVIEW_TITLE),
 			eq(null),
 			eq(null),
-			eq("user-123")
+			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
 		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspaceId)
 			.contentType("application/json")
-			.header("X-User-Id", "user-123")
+			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
 				  "parentId": "11111111-1111-1111-1111-111111111111",
@@ -221,9 +279,9 @@ class DocumentControllerWebMvcTest {
 		UUID documentId = UUID.randomUUID();
 
 		when(documentService.getById(documentId))
-			.thenReturn(document(documentId, workspaceId, null, "프로젝트 개요", "user-123", 2,
+			.thenReturn(document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 2,
 				"00000000000000000007",
-				"{\"type\":\"emoji\",\"value\":\"📄\"}",
+				ICON_DOC_JSON,
 				null));
 
 		mockMvc.perform(get("/v1/documents/{documentId}", documentId))
@@ -233,7 +291,7 @@ class DocumentControllerWebMvcTest {
 			.andExpect(jsonPath("$.code").value(200))
 			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
 			.andExpect(jsonPath("$.data.workspaceId").value(workspaceId.toString()))
-			.andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
+			.andExpect(jsonPath("$.data.title").value(PROJECT_OVERVIEW_TITLE))
 			.andExpect(jsonPath("$.data.sortKey").value("00000000000000000007"))
 			.andExpect(jsonPath("$.data.icon.value").value("📄"))
 			.andExpect(jsonPath("$.data.version").value(2));
@@ -299,50 +357,6 @@ class DocumentControllerWebMvcTest {
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
 	}
 
-	private Document document(
-		UUID id,
-		UUID workspaceId,
-		UUID parentId,
-		String title,
-		String actorId,
-		Integer version,
-		String sortKey,
-		String iconJson,
-		String coverJson
-	) {
-		Document document = Document.builder()
-			.id(id)
-			.workspace(workspace(workspaceId))
-			.parent(parentId == null ? null : parentDocument(parentId, workspaceId))
-			.title(title)
-			.sortKey(sortKey)
-			.iconJson(iconJson)
-			.coverJson(coverJson)
-			.createdBy(actorId)
-			.updatedBy(actorId)
-			.build();
-		document.setCreatedAt(LocalDateTime.of(2026, 3, 16, 0, 0));
-		document.setUpdatedAt(LocalDateTime.of(2026, 3, 16, 0, 0));
-		document.setVersion(version);
-		return document;
-	}
-
-	private Workspace workspace(UUID workspaceId) {
-		return Workspace.builder()
-			.id(workspaceId)
-			.name("Docs Root")
-			.build();
-	}
-
-	private Document parentDocument(UUID documentId, UUID workspaceId) {
-		return Document.builder()
-			.id(documentId)
-			.workspace(workspace(workspaceId))
-			.title("부모 문서")
-			.sortKey("00000000000000000001")
-			.build();
-	}
-
 	@Test
 	@DisplayName("성공_문서 수정 요청에 대해 수정 응답을 반환한다")
 	void updateDocumentReturnsEnvelope() throws Exception {
@@ -352,19 +366,19 @@ class DocumentControllerWebMvcTest {
 
 		when(documentService.update(
 			eq(documentId),
-			eq("수정된 프로젝트 개요"),
-			eq("{\"type\":\"emoji\",\"value\":\"📄\"}"),
-			eq("{\"type\":\"image\",\"value\":\"cover-2\"}"),
+			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
+			eq(ICON_DOC_JSON),
+			eq(COVER_2_JSON),
 			eq(parentId),
-			eq("user-123")
-		)).thenReturn(document(documentId, workspaceId, parentId, "수정된 프로젝트 개요", "user-123", 3,
+			eq(ACTOR_ID)
+		)).thenReturn(document(documentId, workspaceId, parentId, UPDATED_PROJECT_OVERVIEW_TITLE, ACTOR_ID, 3,
 			"00000000000000000007",
-			"{\"type\":\"emoji\",\"value\":\"📄\"}",
-			"{\"type\":\"image\",\"value\":\"cover-2\"}"));
+			ICON_DOC_JSON,
+			COVER_2_JSON));
 
 		mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
 				.contentType("application/json")
-				.header("X-User-Id", "user-123")
+				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
 					{
 					  "title": "수정된 프로젝트 개요",
@@ -386,7 +400,7 @@ class DocumentControllerWebMvcTest {
 			.andExpect(jsonPath("$.message").value("요청 응답 성공"))
 			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
 			.andExpect(jsonPath("$.data.parentId").value(parentId.toString()))
-			.andExpect(jsonPath("$.data.title").value("수정된 프로젝트 개요"))
+			.andExpect(jsonPath("$.data.title").value(UPDATED_PROJECT_OVERVIEW_TITLE))
 			.andExpect(jsonPath("$.data.cover.value").value("cover-2"))
 			.andExpect(jsonPath("$.data.version").value(3));
 	}
@@ -398,16 +412,16 @@ class DocumentControllerWebMvcTest {
 
 		when(documentService.update(
 			eq(documentId),
-			eq("수정된 프로젝트 개요"),
+			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
 			eq(null),
 			eq(null),
 			eq(null),
-			eq("user-123")
+			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
 		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
 			.contentType("application/json")
-			.header("X-User-Id", "user-123")
+			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
 				  "title": "수정된 프로젝트 개요"
@@ -424,16 +438,16 @@ class DocumentControllerWebMvcTest {
 
 		when(documentService.update(
 			eq(documentId),
-			eq("수정된 프로젝트 개요"),
+			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
 			eq(null),
 			eq(null),
 			eq(documentId),
-			eq("user-123")
+			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
 
 		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
 			.contentType("application/json")
-			.header("X-User-Id", "user-123")
+			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
 				  "title": "수정된 프로젝트 개요",
@@ -452,16 +466,16 @@ class DocumentControllerWebMvcTest {
 
 		when(documentService.update(
 			eq(documentId),
-			eq("수정된 프로젝트 개요"),
+			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
 			eq(null),
 			eq(null),
 			eq(parentId),
-			eq("user-123")
+			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
 
 		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
 			.contentType("application/json")
-			.header("X-User-Id", "user-123")
+			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
 				  "title": "수정된 프로젝트 개요",
@@ -479,7 +493,7 @@ class DocumentControllerWebMvcTest {
 
 		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
 			.contentType("application/json")
-			.header("X-User-Id", "user-123")
+			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
 				  "parentId": null
@@ -524,4 +538,57 @@ class DocumentControllerWebMvcTest {
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
 	}
 
+	@Test
+	@DisplayName("성공_정상 삭제 요청 시 성공 응답을 반환한다")
+	void deleteDocumentReturnsSuccessEnvelope() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doNothing().when(documentService).delete(documentId, ACTOR_ID);
+
+		mockMvc.perform(delete("/v1/documents/{documentId}", documentId)
+				.header(USER_ID_HEADER, ACTOR_ID))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.message").value("요청 응답 성공"))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data").doesNotExist());
+
+		verify(documentService).delete(documentId, ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서 삭제 시 문서 없음 응답을 반환한다")
+	void deleteDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).delete(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(delete("/v1/documents/{documentId}", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_이미 soft delete된 문서 삭제 시 문서 없음 응답을 반환한다")
+	void deleteDocumentReturnsNotFoundWhenDocumentAlreadyDeleted() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).delete(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(delete("/v1/documents/{documentId}", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_X-User-Id 헤더가 없으면 인증 오류를 반환한다")
+	void deleteDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(delete("/v1/documents/{documentId}", documentId));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+	}
 }
