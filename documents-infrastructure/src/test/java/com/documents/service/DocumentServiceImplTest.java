@@ -442,6 +442,81 @@ class DocumentServiceImplTest {
 			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
 	}
 
+	@Test
+	@DisplayName("성공_활성 문서 삭제 시 문서 벌크 삭제 메서드를 정상 호출한다")
+	void deleteActiveDocumentCallsDocumentSoftDelete() {
+		UUID documentId = UUID.randomUUID();
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+		when(documentRepository.softDeleteActiveById(eq(documentId), eq(ACTOR_ID), any()))
+			.thenReturn(1);
+
+		documentService.delete(documentId, ACTOR_ID);
+
+		verify(documentRepository).softDeleteActiveById(eq(documentId), eq(ACTOR_ID), any());
+	}
+
+	@Test
+	@DisplayName("성공_문서 삭제 시 해당 문서의 활성 블록 soft delete 메서드도 함께 호출한다")
+	void deleteDocumentCallsBlockSoftDelete() {
+		UUID documentId = UUID.randomUUID();
+		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
+		when(documentRepository.softDeleteActiveById(eq(documentId), eq("user-456"), any()))
+			.thenReturn(1);
+
+		documentService.delete(documentId, " user-456 ");
+
+		verify(blockService).softDeleteAllByDocumentId(eq(documentId), eq("user-456"), any());
+	}
+
+	@Test
+	@DisplayName("성공_문서 삭제와 블록 삭제는 같은 사용자 식별자와 같은 삭제 시각으로 처리한다")
+	void deleteDocumentUsesSameActorAndDeletedAtForDocumentAndBlocks() {
+		UUID documentId = UUID.randomUUID();
+		when(textNormalizer.normalizeNullable(" user-789 ")).thenReturn("user-789");
+		when(documentRepository.softDeleteActiveById(eq(documentId), eq("user-789"), any()))
+			.thenReturn(1);
+
+		documentService.delete(documentId, " user-789 ");
+
+		ArgumentCaptor<java.time.LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(java.time.LocalDateTime.class);
+		verify(documentRepository).softDeleteActiveById(eq(documentId), eq("user-789"), deletedAtCaptor.capture());
+		verify(blockService).softDeleteAllByDocumentId(eq(documentId), eq("user-789"), eq(deletedAtCaptor.getValue()));
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서 삭제 시 문서 없음 예외를 던진다")
+	void deleteThrowsWhenDocumentDoesNotExist() {
+		UUID documentId = UUID.randomUUID();
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+		when(documentRepository.softDeleteActiveById(eq(documentId), eq(ACTOR_ID), any()))
+			.thenReturn(0);
+
+		assertThatThrownBy(() -> documentService.delete(documentId, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청한 문서를 찾을 수 없습니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+
+		verify(blockService, never()).softDeleteAllByDocumentId(any(), any(), any());
+	}
+
+	@Test
+	@DisplayName("실패_이미 삭제된 문서 삭제 시 문서 없음 예외를 던진다")
+	void deleteThrowsWhenDocumentAlreadyDeleted() {
+		UUID documentId = UUID.randomUUID();
+		when(textNormalizer.normalizeNullable(" deleted-user ")).thenReturn("deleted-user");
+		when(documentRepository.softDeleteActiveById(eq(documentId), eq("deleted-user"), any()))
+			.thenReturn(0);
+
+		assertThatThrownBy(() -> documentService.delete(documentId, " deleted-user "))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청한 문서를 찾을 수 없습니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+
+		verify(blockService, never()).softDeleteAllByDocumentId(any(), any(), any());
+	}
+
 	private Workspace workspace(UUID workspaceId) {
 		return Workspace.builder()
 			.id(workspaceId)
