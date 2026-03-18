@@ -333,7 +333,6 @@ Block {
 ## 8.5 블록 조회
 ### 요구사항
 - 특정 문서의 블록 전체를 조회할 수 있어야 한다.
-- 특정 부모 블록 하위의 자식 블록만 조회할 수 있어야 한다.
 - 블록은 정렬 순서가 보장되어야 한다.
 - 문서 콘텐츠 전체 조회 시 트리 구조로 반환할 수 있어야 한다.
 
@@ -499,6 +498,7 @@ Block {
 - `WORKSPACE_NOT_FOUND`
 - `DOCUMENT_NOT_FOUND`
 - `BLOCK_NOT_FOUND`
+- `SORT_KEY_REBALANCE_REQUIRED`
 - `VALIDATION_ERROR`
 - `CONFLICT`
 - `RATE_LIMITED`
@@ -544,6 +544,7 @@ Block {
 
 ### `GET /v1/documents/{documentId}/blocks`
 문서 내 블록 목록 조회.
+- 조회 결과는 soft delete되지 않은 블록만 포함하며 정렬 순서를 보장해야 한다.
 
 ### `POST /v1/documents/{documentId}/blocks`
 TEXT 블록 생성.
@@ -623,9 +624,15 @@ TEXT 블록 생성.
 
 ## 14.3 정렬 정책
 - 문서 및 블록 정렬은 `sortKey`를 기본으로 한다.
-- 중간 삽입이 자주 발생하는 경우 fractional indexing 또는 lexicographic rank 전략을 사용할 수 있다.
-- 초기 구현은 단순 정수 기반 sort 전략으로 시작할 수 있다.
-- 문서 생성 시 `sortKey`는 같은 부모 아래 현재 최대값 다음 순번으로 발급하며, 문자열 비교 정렬을 위해 고정폭 숫자 문자열을 사용한다.
+- ordered sibling 집합의 `sortKey` 정책은 lexicographic gap key를 기본으로 한다.
+- `sortKey`는 대문자 영숫자(base36)만 사용하는 고정폭 문자열로 저장한다.
+- 같은 부모 아래 정렬은 `sortKey ASC` 기준 문자열 정렬로 해석 가능해야 한다.
+- 새 항목 생성 시 기본적으로 기존 sibling의 `sortKey`를 일괄 재배치하지 않고, 삽입 위치에 맞는 새 `sortKey`만 발급한다.
+- 맨 뒤 추가는 마지막 키에 기본 stride를 더해 발급하고, 사이 삽입은 앞/뒤 키 사이 gap의 중간값을 사용한다.
+- 맨 앞 추가는 첫 키에서 기본 stride를 빼고, 여유가 없으면 앞 경계와 첫 키 사이 gap을 사용한다.
+- 앞/뒤 gap이 더 이상 없으면 즉시 재정렬을 수행하지 않고 `SORT_KEY_REBALANCE_REQUIRED` 충돌로 처리한다.
+- 재정렬(rebalance/compaction)은 별도 관리 작업 또는 후속 reorder API에서 수행한다.
+- Block 생성 기능이 이 정책을 먼저 사용하며, Document 정렬도 같은 정책으로 순차 이관한다.
 
 ---
 
@@ -644,7 +651,7 @@ TEXT 블록 생성.
 1. document 존재 여부 확인
 2. parentId가 있으면 같은 document의 block인지 확인
 3. afterBlockId / beforeBlockId 정합성 확인
-4. 새 sortKey 계산
+4. 정책에 따라 새 sortKey 계산
 5. block insert
 6. document.updatedAt 및 version 정책 반영
 7. commit
