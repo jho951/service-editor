@@ -1,5 +1,6 @@
 package com.documents.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
 
+	private final BlockService blockService;
 	private final DocumentRepository documentRepository;
 	private final WorkspaceService workspaceService;
 	private final TextNormalizer textNormalizer;
@@ -85,8 +87,13 @@ public class DocumentServiceImpl implements DocumentService {
 	@Override
 	@Transactional
 	public void delete(UUID documentId, String actorId) {
-		findActiveDocument(documentId);
-		textNormalizer.normalizeNullable(actorId);
+		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+		LocalDateTime deletedAt = LocalDateTime.now();
+		int affectedRowCount = documentRepository.softDeleteActiveById(documentId, normalizedActorId, deletedAt);
+		if (affectedRowCount == 0) {
+			throw new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+		}
+		blockService.softDeleteAllByDocumentId(documentId, normalizedActorId, deletedAt);
 	}
 
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {

@@ -1,10 +1,12 @@
 package com.documents.repository;
 
 import com.documents.domain.Document;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -38,4 +40,18 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
               d.id asc
             """)
     List<Document> findActiveByWorkspaceIdOrderBySortKey(@Param("workspaceId") UUID workspaceId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Document d
+            set d.deletedAt = :deletedAt,
+                d.updatedBy = :actorId
+            where d.id = :documentId
+              and d.deletedAt is null
+            """)
+    int softDeleteActiveById(
+            @Param("documentId") UUID documentId,
+            @Param("actorId") String actorId,
+            @Param("deletedAt") LocalDateTime deletedAt
+    );
 }
