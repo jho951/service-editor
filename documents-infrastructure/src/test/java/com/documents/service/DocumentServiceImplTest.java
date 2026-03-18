@@ -334,20 +334,6 @@ class DocumentServiceImplTest {
     }
 
     @Test
-    @DisplayName("실패_빈 제목으로 수정하면 유효성 검사 예외를 던진다")
-    void updateDocumentThrowsValidationExceptionWhenTitleBlank() {
-        UUID documentId = UUID.randomUUID();
-        Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-        when(textNormalizer.normalizeRequired("   ")).thenReturn("");
-
-        assertThatThrownBy(() -> documentService.update(documentId, "   ", null, null, null, ACTOR_ID))
-                .isInstanceOf(BusinessException.class)
-                .extracting("errorCode")
-                .isEqualTo(BusinessErrorCode.VALIDATION_ERROR);
-    }
-
-    @Test
     @DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 예외를 던진다")
     void updateDocumentThrowsWhenParentIsSelf() {
         UUID documentId = UUID.randomUUID();

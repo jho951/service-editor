@@ -319,6 +319,7 @@ class DocumentApiIntegrationTest {
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
+                                  "title": "수정된 제목",
                                   "parentId": "%s"
                                 }
                                 """.formatted(otherWorkspaceParent.getId())));
@@ -337,6 +338,7 @@ class DocumentApiIntegrationTest {
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
+                                  "title": "수정된 제목",
                                   "parentId": "%s"
                                 }
                                 """.formatted(document.getId())));
@@ -356,11 +358,30 @@ class DocumentApiIntegrationTest {
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
+                                  "title": "수정된 제목",
                                   "parentId": "%s"
                                 }
                                 """.formatted(childDocument.getId())));
 
         assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+    }
+
+    @Test
+    @DisplayName("실패_문서 수정 요청에 제목이 없으면 유효성 검사 오류를 반환한다")
+    void updateDocumentReturnsValidationErrorWhenTitleMissing() throws Exception {
+        Workspace workspace = workspace("Docs Root");
+        Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
+
+        var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": null
+                                }
+                                """));
+
+        assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
     }
 
     private void assertErrorEnvelope(ResultActions result, String httpStatus, int code, String message) throws Exception {

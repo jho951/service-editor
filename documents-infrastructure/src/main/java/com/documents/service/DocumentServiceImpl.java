@@ -113,12 +113,7 @@ public class DocumentServiceImpl implements DocumentService {
 			return;
 		}
 
-		String normalizedTitle = textNormalizer.normalizeRequired(title);
-		if (normalizedTitle.isEmpty()) {
-			throw new BusinessException(BusinessErrorCode.VALIDATION_ERROR);
-		}
-
-		document.setTitle(normalizedTitle);
+		document.setTitle(textNormalizer.normalizeRequired(title));
 	}
 
 	private void applyMetadata(Document document, String iconJson, String coverJson) {

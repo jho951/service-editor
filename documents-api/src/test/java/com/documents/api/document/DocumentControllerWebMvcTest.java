@@ -456,18 +456,27 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("실패_문서 수정 요청에 제목이 없으면 유효성 검사 오류를 반환한다")
+	void updateDocumentRejectsMissingTitle() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "parentId": null
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+		verifyNoInteractions(documentService);
+	}
+
+	@Test
 	@DisplayName("실패_문서 수정 제목이 공백이면 유효성 검사 오류를 반환한다")
 	void updateDocumentRejectsBlankTitle() throws Exception {
 		UUID documentId = UUID.randomUUID();
-
-		when(documentService.update(
-			eq(documentId),
-			eq(" "),
-			eq(null),
-			eq(null),
-			eq(null),
-			eq("user-123")
-		)).thenThrow(new BusinessException(BusinessErrorCode.VALIDATION_ERROR));
 
 		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
 			.contentType("application/json")
@@ -479,6 +488,7 @@ class DocumentControllerWebMvcTest {
 				"""));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+		verifyNoInteractions(documentService);
 	}
 
 	@Test
