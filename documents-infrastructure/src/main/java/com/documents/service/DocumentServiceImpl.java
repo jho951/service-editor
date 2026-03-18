@@ -82,6 +82,13 @@ public class DocumentServiceImpl implements DocumentService {
 		return document;
 	}
 
+	@Override
+	@Transactional
+	public void delete(UUID documentId, String actorId) {
+		findActiveDocument(documentId);
+		textNormalizer.normalizeNullable(actorId);
+	}
+
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
 		if (parentId == null) {
 			return null;

@@ -9,4 +9,5 @@ public interface DocumentService {
     List<Document> getAllByWorkspaceId(UUID workspaceId);
     Document getById(UUID documentId);
     Document update(UUID documentId, String title, String iconJson, String coverJson, UUID parentId, String actorId);
+    void delete(UUID documentId, String actorId);
 }
