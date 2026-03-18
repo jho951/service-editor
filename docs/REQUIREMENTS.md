@@ -238,11 +238,12 @@ Block {
 
 ### 설명
 - 영속 기본 키 컬럼명은 `block_id`를 사용한다.
-- `documentId`: 블록이 속한 문서
-- `parentId`: 상위 블록 ID. `null`이면 문서 루트 블록
+- `documentId`: 블록이 속한 문서 ID. 영속 구현에서는 `document_id` FK로 `Document`를 참조한다.
+- `parentId`: 상위 블록 ID. `null`이면 문서 루트 블록. 영속 구현에서는 `parent_id` self FK로 상위 `Block`을 참조한다.
 - `sortKey`: 같은 부모 아래 블록 순서 정렬용 키
 - `text`: TEXT 블록의 본문. plain string only
 - `version`: 낙관적 락용 버전
+- 물리 스키마의 `document_id`, `parent_id` FK는 hard delete 시 dangling block이 남지 않도록 `ON DELETE CASCADE`를 사용한다. 비즈니스 삭제 정책 자체는 soft delete를 우선한다.
 
 ---
 
@@ -274,6 +275,7 @@ Block {
 6. 자기 자신을 부모 블록으로 둘 수 없다.
 7. 순환 참조(cycle)는 허용하지 않는다.
 8. 다른 문서의 블록을 부모로 둘 수 없다.
+9. 물리 삭제가 필요한 운영/테스트 정리 상황에서는 상위 블록 또는 소속 문서 hard delete 시 하위 블록 FK가 함께 정리되어 dangling reference가 남지 않아야 한다.
 
 ## 7.3 사용자 참조 규칙
 1. 쓰기 작업은 인증된 사용자만 수행할 수 있다.

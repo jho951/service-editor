@@ -18,6 +18,7 @@
 14. 빠른 API 계약 확인은 `./gradlew :documents-api:test`, 영속/서비스 구현 확인은 `./gradlew :documents-infrastructure:test`를 우선 사용하고, 최종 조립 확인 시 `:documents-boot:test`를 실행한다.
 15. 스키마 명명 규칙 확인이 필요하면 H2 `INFORMATION_SCHEMA.COLUMNS` 또는 MySQL `information_schema.columns`에서 `workspaces.workspace_id`, `documents.document_id`, `blocks.block_id` 컬럼이 생성됐는지 확인한다.
 16. 문서 계층 삭제 이슈를 확인할 때는 `information_schema.table_constraints`, `information_schema.referential_constraints`에서 `FK_DOCUMENTS_PARENT`가 존재하는지와 `DELETE_RULE = CASCADE`인지 함께 확인한다.
+17. 블록 계층 삭제 이슈를 확인할 때는 `FK_BLOCKS_DOCUMENT`, `FK_BLOCKS_PARENT`가 존재하는지와 두 FK 모두 `DELETE_RULE = CASCADE`인지 함께 확인한다.
 
 ## 확인할 로그
 

@@ -49,6 +49,15 @@ class PersistenceSchemaIntegrationTest {
         assertThat(deleteRule("FK_DOCUMENTS_PARENT")).isEqualTo("CASCADE");
     }
 
+    @Test
+    @DisplayName("블록 연관관계 FK는 document 참조와 parent cascade delete 규칙을 생성한다")
+    void blockForeignKeysUseExpectedDeleteRules() {
+        assertThat(countForeignKey("BLOCKS", "FK_BLOCKS_DOCUMENT")).isEqualTo(1);
+        assertThat(countForeignKey("BLOCKS", "FK_BLOCKS_PARENT")).isEqualTo(1);
+        assertThat(deleteRule("FK_BLOCKS_DOCUMENT")).isEqualTo("CASCADE");
+        assertThat(deleteRule("FK_BLOCKS_PARENT")).isEqualTo("CASCADE");
+    }
+
     private int countColumn(String tableName, String columnName) {
         Integer count = jdbcTemplate.queryForObject(
                 """

@@ -74,7 +74,7 @@ class BlockServiceImplTest {
     void createRootBlockAppendsToDocumentRoot() {
         UUID documentId = UUID.randomUUID();
         when(documentService.getById(documentId)).thenReturn(document(documentId));
-        when(blockRepository.countByDocumentIdAndDeletedAtIsNull(documentId)).thenReturn(0L);
+        when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, null))
                 .thenReturn(new ArrayList<>());
@@ -105,7 +105,7 @@ class BlockServiceImplTest {
         Block second = block(documentId, parentId, "000000000002000000000000");
 
         when(documentService.getById(documentId)).thenReturn(document(documentId));
-        when(blockRepository.countByDocumentIdAndDeletedAtIsNull(documentId)).thenReturn(2L);
+        when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(2L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(
                 block(documentId, null, "000000000001000000000000")
@@ -127,7 +127,7 @@ class BlockServiceImplTest {
         UUID parentId = UUID.randomUUID();
 
         when(documentService.getById(documentId)).thenReturn(document(documentId));
-        when(blockRepository.countByDocumentIdAndDeletedAtIsNull(documentId)).thenReturn(0L);
+        when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(parentId))
                 .thenReturn(Optional.of(block(
@@ -149,7 +149,7 @@ class BlockServiceImplTest {
         UUID documentId = UUID.randomUUID();
 
         when(documentService.getById(documentId)).thenReturn(document(documentId));
-        when(blockRepository.countByDocumentIdAndDeletedAtIsNull(documentId)).thenReturn(0L);
+        when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, null))
                 .thenReturn(new ArrayList<>());
@@ -176,7 +176,7 @@ class BlockServiceImplTest {
         UUID parentId = UUID.randomUUID();
 
         when(documentService.getById(documentId)).thenReturn(document(documentId));
-        when(blockRepository.countByDocumentIdAndDeletedAtIsNull(documentId)).thenReturn(0L);
+        when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
 
@@ -202,11 +202,21 @@ class BlockServiceImplTest {
     private Block block(UUID documentId, UUID parentId, String sortKey) {
         return Block.builder()
                 .id(UUID.randomUUID())
-                .documentId(documentId)
-                .parentId(parentId)
+                .document(document(documentId))
+                .parent(parentId == null ? null : parentBlock(parentId, documentId))
                 .type(BlockType.TEXT)
                 .text("기존 블록")
                 .sortKey(sortKey)
+                .build();
+    }
+
+    private Block parentBlock(UUID blockId, UUID documentId) {
+        return Block.builder()
+                .id(blockId)
+                .document(document(documentId))
+                .type(BlockType.TEXT)
+                .text("부모 블록")
+                .sortKey("000000000001000000000000")
                 .build();
     }
 }

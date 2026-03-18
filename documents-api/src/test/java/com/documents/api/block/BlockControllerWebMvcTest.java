@@ -11,6 +11,8 @@ import com.documents.api.exception.GlobalExceptionHandler;
 import com.documents.api.support.ApiResponseAssertions;
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
+import com.documents.domain.Document;
+import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.service.BlockService;
@@ -181,8 +183,8 @@ class BlockControllerWebMvcTest {
     private Block block(UUID blockId, UUID documentId, UUID parentId, String sortKey, int version, String text) {
         Block block = Block.builder()
                 .id(blockId)
-                .documentId(documentId)
-                .parentId(parentId)
+                .document(document(documentId))
+                .parent(parentId == null ? null : parentBlock(parentId, documentId))
                 .type(BlockType.TEXT)
                 .text(text)
                 .sortKey(sortKey)
@@ -193,5 +195,27 @@ class BlockControllerWebMvcTest {
         block.setCreatedAt(LocalDateTime.of(2026, 3, 17, 0, 0));
         block.setUpdatedAt(LocalDateTime.of(2026, 3, 17, 0, 0));
         return block;
+    }
+
+    private Document document(UUID documentId) {
+        return Document.builder()
+                .id(documentId)
+                .workspace(Workspace.builder()
+                        .id(UUID.randomUUID())
+                        .name("Docs Root")
+                        .build())
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build();
+    }
+
+    private Block parentBlock(UUID blockId, UUID documentId) {
+        return Block.builder()
+                .id(blockId)
+                .document(document(documentId))
+                .type(BlockType.TEXT)
+                .text("부모 블록")
+                .sortKey("000000000001000000000000")
+                .build();
     }
 }
