@@ -1,12 +1,23 @@
 package com.documents.api.block;
 
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import com.documents.api.block.support.BlockJsonCodec;
 import com.documents.api.exception.GlobalExceptionHandler;
@@ -19,18 +30,6 @@ import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.service.BlockService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Block 컨트롤러 빠른 검증")
@@ -38,6 +37,8 @@ class BlockControllerWebMvcTest {
 
     private static final String SIMPLE_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}";
     private static final String UPDATED_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"수정된 블록\",\"marks\":[]}]}";
+    private static final String ROOT_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"루트 블록\",\"marks\":[]}]}";
+    private static final String CHILD_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"자식 블록\",\"marks\":[]}]}";
 
     @Mock
     private BlockService blockService;
@@ -79,8 +80,11 @@ class BlockControllerWebMvcTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].id").value(rootBlockId.toString()))
+                .andExpect(jsonPath("$.data[0].content.format").value("rich_text"))
+                .andExpect(jsonPath("$.data[0].content.segments[0].text").value("루트 블록"))
                 .andExpect(jsonPath("$.data[1].parentId").value(rootBlockId.toString()))
-                .andExpect(jsonPath("$.data[1].text").value("자식 블록"));
+                .andExpect(jsonPath("$.data[1].content.format").value("rich_text"))
+                .andExpect(jsonPath("$.data[1].content.segments[0].text").value("자식 블록"));
     }
 
     @Test
@@ -510,7 +514,7 @@ class BlockControllerWebMvcTest {
                 .document(document(documentId))
                 .parent(parentId == null ? null : parentBlock(parentId, documentId))
                 .type(BlockType.TEXT)
-                .text(text)
+                .content(toContent(text))
                 .sortKey(sortKey)
                 .createdBy("user-123")
                 .updatedBy("user-123")
@@ -538,8 +542,12 @@ class BlockControllerWebMvcTest {
                 .id(blockId)
                 .document(document(documentId))
                 .type(BlockType.TEXT)
-                .text("부모 블록")
+                .content(toContent("부모 블록"))
                 .sortKey("000000000001000000000000")
                 .build();
+    }
+
+    private String toContent(String text) {
+        return "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"%s\",\"marks\":[]}]}".formatted(text);
     }
 }

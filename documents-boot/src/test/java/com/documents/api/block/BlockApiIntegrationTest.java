@@ -67,7 +67,7 @@ class BlockApiIntegrationTest {
                 .id(UUID.randomUUID())
                 .document(document)
                 .type(BlockType.TEXT)
-                .text("루트 블록")
+                .content(toContent("루트 블록"))
                 .sortKey("000000000001000000000000")
                 .createdBy("user-123")
                 .updatedBy("user-123")
@@ -77,7 +77,7 @@ class BlockApiIntegrationTest {
                 .document(document)
                 .parent(rootBlock)
                 .type(BlockType.TEXT)
-                .text("자식 블록")
+                .content(toContent("자식 블록"))
                 .sortKey("000000000001I00000000000")
                 .createdBy("user-123")
                 .updatedBy("user-123")
@@ -86,7 +86,7 @@ class BlockApiIntegrationTest {
                 .id(UUID.randomUUID())
                 .document(document)
                 .type(BlockType.TEXT)
-                .text("삭제된 블록")
+                .content(toContent("삭제된 블록"))
                 .sortKey("000000000002000000000000")
                 .createdBy("user-123")
                 .updatedBy("user-123")
@@ -99,8 +99,10 @@ class BlockApiIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].text").value("루트 블록"))
-                .andExpect(jsonPath("$.data[1].text").value("자식 블록"));
+                .andExpect(jsonPath("$.data[0].content.format").value("rich_text"))
+                .andExpect(jsonPath("$.data[0].content.segments[0].text").value("루트 블록"))
+                .andExpect(jsonPath("$.data[1].content.format").value("rich_text"))
+                .andExpect(jsonPath("$.data[1].content.segments[0].text").value("자식 블록"));
     }
 
     @Test
@@ -397,4 +399,7 @@ class BlockApiIntegrationTest {
                 .andExpect(jsonPath("$.message").value("요청 필드 유효성 검사에 실패했습니다."));
     }
 
+    private String toContent(String text) {
+        return "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"%s\",\"marks\":[]}]}".formatted(text);
+    }
 }

@@ -62,3 +62,10 @@
 - `BlockService.update(...)`와 구현체를 `content` 기준으로 변경하고, 저장 필드도 `block.content`를 직접 갱신하도록 바꿨다.
 - 수정 관련 WebMvc/서비스/통합 테스트를 `content` 응답 및 저장 검증 기준으로 갱신했다.
 - 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-infrastructure:test --tests com.documents.service.BlockServiceImplTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`
+
+## Step 8. 블록 조회 리팩토링 마무리
+
+- 블록 목록 조회 테스트 픽스처를 plain text 대신 structured `content` JSON 저장 기준으로 바꿨다.
+- WebMvc 테스트와 Boot 통합 테스트에서 조회 응답의 `content.format`, `content.segments[].text`를 직접 검증하도록 수정했다.
+- 이로써 생성, 수정, 조회 핵심 경로가 모두 `content` 기반 계약으로 연결되었다.
+- 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-infrastructure:test --tests com.documents.service.BlockServiceImplTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`
