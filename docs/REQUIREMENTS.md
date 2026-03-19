@@ -353,6 +353,8 @@ Block {
 - `text`는 plain string이어야 한다.
 - HTML, JSON 구조, 파일 객체는 허용하지 않는다.
 - 낡은 버전으로 저장 시 `409 Conflict`를 반환해야 한다.
+- 블록 수정은 블록 자신의 내용 또는 메타데이터 변경만 담당한다.
+- 블록 이동, 부모 변경, 순서 변경은 블록 수정과 분리된 별도 API에서 처리한다.
 
 ## 8.8 블록 삭제
 ### 요구사항
@@ -366,12 +368,26 @@ Block {
 - 부모를 변경하여 계층 이동이 가능해야 한다.
 - 이동 후 트리 무결성이 깨지면 안 된다.
 - 이동 및 재정렬은 트랜잭션으로 처리해야 한다.
+- 단일 블록 이동은 drag and drop의 drop 시점에 1회 요청으로 처리할 수 있어야 한다.
+- 이동 요청은 `parentId`, `afterBlockId`, `beforeBlockId`, `version`을 기준으로 위치를 해석한다.
+- 블록 이동 시 `sortKey`, `updatedBy`, `updatedAt`, `version`을 함께 갱신해야 한다.
 
 ## 8.10 버전 관리
 ### 요구사항
 - 문서와 블록은 각각 `version` 필드를 가져야 한다.
 - 수정 시 버전이 증가해야 한다.
 - stale version 요청은 `409 Conflict`를 반환해야 한다.
+- 충돌 검출이 필요한 저장 또는 구조 변경 요청은 클라이언트가 기준으로 삼은 `version`을 함께 전달해야 한다.
+- 서버는 요청의 `version`과 현재 저장된 `version`을 비교해 stale update를 검출할 수 있어야 한다.
+
+### 버전 충돌 예시 시나리오
+1. 현재 DB의 block version이 `5`이고 text는 `"오늘 회의"`다.
+2. 사용자 A와 사용자 B가 같은 블록을 조회하고, 둘 다 version `5` 상태의 화면을 보고 잠시 편집만 한 채 저장하지 않는다.
+3. 사용자 A는 text를 `"오늘 회의 3시"`로 바꿔 먼저 저장한다.
+4. DB의 block text는 `"오늘 회의 3시"`가 되고 version은 `6`이 된다.
+5. 사용자 B는 여전히 예전 화면 `"오늘 회의"`를 보고 text를 `"오늘 회의 취소"`로 바꾼 뒤 몇 초 후 저장한다.
+6. 사용자 B가 version 없이 저장하면 서버는 최신 row를 다시 읽어 `"오늘 회의 취소"`를 덮어쓸 수 있고, 사용자 A의 `"3시"` 수정이 조용히 사라질 수 있다.
+7. 사용자 B가 충돌 검출용 request에 version `5`를 함께 보내면 서버는 현재 DB version `6`과 비교해 stale update로 판단하고 `409 Conflict`를 반환할 수 있다.
 
 ---
 
@@ -565,7 +581,7 @@ TEXT 블록 생성.
 ```
 
 ### `PATCH /v1/blocks/{blockId}`
-블록 내용 수정 또는 이동.
+블록 내용 또는 블록 자체 메타데이터 수정.
 
 내용 수정 예시:
 ```json
@@ -574,6 +590,9 @@ TEXT 블록 생성.
   "version": 3
 }
 ```
+
+### `POST /v1/blocks/{blockId}/move`
+단일 블록 이동.
 
 위치 변경 예시:
 ```json
@@ -584,9 +603,6 @@ TEXT 블록 생성.
   "version": 3
 }
 ```
-
-### `POST /v1/documents/{documentId}/blocks/reorder`
-여러 블록 reorder 전용 API.
 
 ### `DELETE /v1/blocks/{blockId}`
 블록 soft delete.
@@ -646,11 +662,18 @@ TEXT 블록 생성.
 - 문서 삭제 + 하위 블록 soft delete
 - 문서 복구
 - 블록 이동
-- 블록 reorder
 - 문서 부모 변경
 - 블록 복구
 
 ## 15.2 저장 흐름 권장안
+### 블록 수정
+1. block 존재 여부 확인
+2. 수정 가능한 필드만 검증
+3. version 정합성 확인
+4. block.text 또는 메타데이터 갱신
+5. block.updatedAt 및 version 갱신
+6. commit
+
 ### 블록 생성
 1. document 존재 여부 확인
 2. parentId가 있으면 같은 document의 block인지 확인
@@ -659,6 +682,14 @@ TEXT 블록 생성.
 5. block insert
 6. document.updatedAt 및 version 정책 반영
 7. commit
+
+### 블록 이동
+1. block 존재 여부 확인
+2. target parentId가 있으면 같은 document의 block인지 확인
+3. afterBlockId / beforeBlockId 정합성 확인
+4. 정책에 따라 새 sortKey 계산
+5. block.parentId, sortKey, updatedAt, version 갱신
+6. commit
 
 ### 문서 삭제
 1. document 존재 여부 확인

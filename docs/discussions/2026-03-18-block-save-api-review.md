@@ -118,6 +118,8 @@
   - 문서 메타데이터 일반 수정
 - `PATCH /v1/blocks/{blockId}`
   - 블록 단건 수정
+- `POST /v1/blocks/{blockId}/move`
+  - drag and drop drop 시점의 단일 블록 이동
 
 ## 추천 시나리오
 
@@ -125,7 +127,8 @@
 2. 프론트는 즉시 화면만 갱신하고 pending operation을 큐에 쌓는다.
 3. autosave 시점에 `POST /v1/documents/{documentId}/transactions`로 한 번에 저장한다.
 4. 같은 화면에서 제목만 바꾸면 `PATCH /v1/documents/{documentId}`로 별도 처리한다.
-5. 운영자가 백오피스에서 특정 블록만 고치면 `PATCH /v1/blocks/{blockId}`를 사용한다.
+5. 사용자가 블록을 drag and drop으로 옮기면 `POST /v1/blocks/{blockId}/move`를 호출한다.
+6. 운영자가 백오피스에서 특정 블록만 고치면 `PATCH /v1/blocks/{blockId}`를 사용한다.
 
 이 흐름이 사용자 편집과 운영성 요구를 가장 자연스럽게 함께 수용한다.
 
@@ -143,6 +146,7 @@
 2. 문서 제목 수정은 저장 큐에 포함할지, 별도 문서 PATCH로 분리할지
 3. transaction 실패 시 partial apply를 허용할지, 전부 rollback할지
 4. 장기적으로 revision history를 snapshot 중심으로 둘지, journal 중심으로 둘지
+5. 다중 블록 reorder가 실제로 필요해질 때 별도 API를 둘지, transaction으로 흡수할지
 
 ## 다음 액션 제안
 

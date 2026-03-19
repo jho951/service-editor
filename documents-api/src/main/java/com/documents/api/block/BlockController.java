@@ -2,6 +2,7 @@ package com.documents.api.block;
 
 import com.documents.api.block.dto.BlockResponse;
 import com.documents.api.block.dto.CreateBlockRequest;
+import com.documents.api.block.dto.UpdateBlockRequest;
 import com.documents.api.code.SuccessCode;
 import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Block;
@@ -14,6 +15,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -62,5 +64,16 @@ public class BlockController {
 
         return ResponseEntity.status(SuccessCode.CREATED.getHttpStatus())
                 .body(GlobalResponse.ok(SuccessCode.CREATED, blockApiMapper.toResponse(createdBlock)));
+    }
+
+    @Operation(summary = "블록 수정")
+    @PatchMapping("/blocks/{blockId}")
+    public ResponseEntity<GlobalResponse<BlockResponse>> updateBlock(
+            @PathVariable("blockId") UUID blockId,
+            @Valid @RequestBody UpdateBlockRequest request,
+            @RequestHeader(USER_ID_HEADER) String userId
+    ) {
+        Block updatedBlock = blockService.update(blockId, request.getText(), request.getVersion(), userId);
+        return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, blockApiMapper.toResponse(updatedBlock)));
     }
 }

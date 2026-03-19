@@ -17,4 +17,6 @@ public interface BlockService {
             UUID beforeBlockId,
             String actorId
     );
+
+    Block update(UUID blockId, String text, Integer version, String actorId);
 }

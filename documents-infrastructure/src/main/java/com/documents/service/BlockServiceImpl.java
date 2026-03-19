@@ -79,6 +79,25 @@ public class BlockServiceImpl implements BlockService {
         return blockRepository.save(newBlock);
     }
 
+    @Override
+    @Transactional
+    public Block update(UUID blockId, String text, Integer version, String actorId) {
+        Block block = blockRepository.findByIdAndDeletedAtIsNull(blockId)
+                .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
+
+        String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+        if (normalizedActorId == null) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+        if (!block.getVersion().equals(version)) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+
+        block.setText(text);
+        block.setUpdatedBy(normalizedActorId);
+        return block;
+    }
+
     private void validateSupportedType(BlockType type) {
         if (type != BlockType.TEXT) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
