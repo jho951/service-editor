@@ -106,9 +106,7 @@ public class BlockServiceImpl implements BlockService {
     public void delete(UUID blockId, String actorId) {
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
         LocalDateTime deletedAt = LocalDateTime.now();
-
-        List<UUID> blockIdsToDelete = new ArrayList<>();
-        collectActiveDescendantBlockIdsForSoftDelete(findActiveBlock(blockId), blockIdsToDelete);
+        List<UUID> blockIdsToDelete = collectActiveDescendantBlockIdsForSoftDelete(findActiveBlock(blockId));
 
         blockRepository.softDeleteActiveByIds(blockIdsToDelete, normalizedActorId, deletedAt);
     }
@@ -165,13 +163,14 @@ public class BlockServiceImpl implements BlockService {
     private void validateDepth(Block parentBlock) {
         int depth = 1;
         Block current = parentBlock;
+
         while (current != null) {
             depth++;
             if (depth > MAX_BLOCK_DEPTH) {
                 throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
             }
-            current = current.getParentId() == null ? null : blockRepository.findByIdAndDeletedAtIsNull(current.getParentId())
-                    .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
+
+            current = current.getParentId() == null ? null : findActiveBlock(current.getParentId());
         }
     }
 
@@ -191,12 +190,15 @@ public class BlockServiceImpl implements BlockService {
         }
     }
 
-    private void collectActiveDescendantBlockIdsForSoftDelete(Block block, List<UUID> blockIds) {
-        blockIds.add(block.getId());
+    private List<UUID> collectActiveDescendantBlockIdsForSoftDelete(Block rootBlock) {
+        List<UUID> blockIds = new ArrayList<>();
+        blockIds.add(rootBlock.getId());
 
-        List<Block> children = blockRepository.findActiveChildrenByParentIdOrderBySortKey(block.getId());
+        List<Block> children = blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootBlock.getId());
         for (Block child : children) {
-            collectActiveDescendantBlockIdsForSoftDelete(child, blockIds);
+            blockIds.addAll(collectActiveDescendantBlockIdsForSoftDelete(child));
         }
+
+        return blockIds;
     }
 }

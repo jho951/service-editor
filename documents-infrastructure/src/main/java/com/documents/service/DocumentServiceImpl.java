@@ -91,7 +91,9 @@ public class DocumentServiceImpl implements DocumentService {
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
 		LocalDateTime deletedAt = LocalDateTime.now();
 		List<UUID> documentIdsToDelete = collectActiveDocumentTreeIds(findActiveDocument(documentId));
+
 		documentRepository.softDeleteActiveByIds(documentIdsToDelete, normalizedActorId, deletedAt);
+
 		for (UUID currentDocumentId : documentIdsToDelete) {
 			blockService.softDeleteAllByDocumentId(currentDocumentId, normalizedActorId, deletedAt);
 		}
@@ -108,6 +110,7 @@ public class DocumentServiceImpl implements DocumentService {
 		List<UUID> documentIdsToRestore = collectDeletedDocumentTreeIds(deletedDocument);
 
 		documentRepository.restoreDeletedByIds(documentIdsToRestore, normalizedActorId, restoredAt);
+
 		for (UUID currentDocumentId : documentIdsToRestore) {
 			blockService.restoreAllByDocumentId(currentDocumentId, normalizedActorId, restoredAt);
 		}
@@ -122,6 +125,7 @@ public class DocumentServiceImpl implements DocumentService {
 		if (!workspaceId.equals(parentDocument.getWorkspaceId())) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
 		}
+
 		return parentDocument;
 	}
 
@@ -159,6 +163,7 @@ public class DocumentServiceImpl implements DocumentService {
 
 	private void validateNoCycle(UUID documentId, Document parentDocument) {
 		Document current = parentDocument;
+
 		while (current != null) {
 			if (documentId.equals(current.getId())) {
 				throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
@@ -199,32 +204,26 @@ public class DocumentServiceImpl implements DocumentService {
 
 	private List<UUID> collectActiveDocumentTreeIds(Document rootDocument) {
 		List<UUID> documentIds = new ArrayList<>();
-		collectActiveDocumentTreeIds(rootDocument, documentIds);
-		return documentIds;
-	}
+		documentIds.add(rootDocument.getId());
 
-	private void collectActiveDocumentTreeIds(Document document, List<UUID> documentIds) {
-		documentIds.add(document.getId());
-
-		List<Document> children = documentRepository.findActiveChildrenByParentIdOrderBySortKey(document.getId());
+		List<Document> children = documentRepository.findActiveChildrenByParentIdOrderBySortKey(rootDocument.getId());
 		for (Document child : children) {
-			collectActiveDocumentTreeIds(child, documentIds);
+			documentIds.addAll(collectActiveDocumentTreeIds(child));
 		}
+
+		return documentIds;
 	}
 
 	private List<UUID> collectDeletedDocumentTreeIds(Document rootDocument) {
 		List<UUID> documentIds = new ArrayList<>();
-		collectDeletedDocumentTreeIds(rootDocument, documentIds);
-		return documentIds;
-	}
+		documentIds.add(rootDocument.getId());
 
-	private void collectDeletedDocumentTreeIds(Document document, List<UUID> documentIds) {
-		documentIds.add(document.getId());
-
-		List<Document> children = documentRepository.findDeletedChildrenByParentIdOrderBySortKey(document.getId());
+		List<Document> children = documentRepository.findDeletedChildrenByParentIdOrderBySortKey(rootDocument.getId());
 		for (Document child : children) {
-			collectDeletedDocumentTreeIds(child, documentIds);
+			documentIds.addAll(collectDeletedDocumentTreeIds(child));
 		}
+
+		return documentIds;
 	}
 
 	private String normalizeNullableMetaJson(String value) {
