@@ -3,6 +3,7 @@ package com.documents.api.block;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -121,6 +122,40 @@ class BlockControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("성공_블록 수정 요청에 대해 수정 응답을 반환한다")
+    void updateBlockReturnsUpdatedEnvelope() throws Exception {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+
+        when(blockService.update(eq(blockId), eq("수정된 블록"), eq(0), eq("user-123")))
+                .thenReturn(block(
+                        blockId,
+                        documentId,
+                        null,
+                        "000000000001000000000000",
+                        1,
+                        "수정된 블록"
+                ));
+
+        mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "text": "수정된 블록",
+                                  "version": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(blockId.toString()))
+                .andExpect(jsonPath("$.data.text").value("수정된 블록"))
+                .andExpect(jsonPath("$.data.version").value(1));
+    }
+
+    @Test
     @DisplayName("실패_type이 없으면 유효성 검사 오류를 반환한다")
     void createBlockRejectsMissingType() throws Exception {
         var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
@@ -178,6 +213,94 @@ class BlockControllerWebMvcTest {
                                 """));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_text가 비어 있으면 유효성 검사 오류를 반환한다")
+    void updateBlockRejectsBlankText() throws Exception {
+        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "text": " ",
+                                  "version": 0
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 블록이면 블록 없음 응답을 반환한다")
+    void updateBlockReturnsNotFoundWhenBlockMissing() throws Exception {
+        UUID blockId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+
+        when(blockService.update(eq(blockId), eq("수정된 블록"), eq(0), eq("user-123")))
+                .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
+
+        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "text": "수정된 블록",
+                                  "version": 0
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_인증 헤더가 없으면 블록 수정 API는 인증 오류를 반환한다")
+    void updateBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", UUID.randomUUID())
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "text": "수정된 블록",
+                                  "version": 0
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_version이 없으면 유효성 검사 오류를 반환한다")
+    void updateBlockRejectsMissingVersion() throws Exception {
+        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "text": "수정된 블록"
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_version이 현재 블록 상태와 충돌하면 충돌 응답을 반환한다")
+    void updateBlockReturnsConflictWhenVersionMismatched() throws Exception {
+        UUID blockId = UUID.randomUUID();
+
+        when(blockService.update(eq(blockId), eq("수정된 블록"), eq(0), eq("user-123")))
+                .thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
+
+        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "text": "수정된 블록",
+                                  "version": 0
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
     }
 
     private Block block(UUID blockId, UUID documentId, UUID parentId, String sortKey, int version, String text) {

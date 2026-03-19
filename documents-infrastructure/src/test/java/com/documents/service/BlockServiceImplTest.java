@@ -187,6 +187,80 @@ class BlockServiceImplTest {
                 .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
     }
 
+    @Test
+    @DisplayName("성공_블록 수정 시 text와 updatedBy를 갱신한다")
+    void updateBlockUpdatesTextAndActor() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setUpdatedBy("old-user");
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+        block.setVersion(0);
+
+        Block updated = blockService.update(blockId, "수정된 블록", 0, ACTOR_ID);
+
+        assertThat(updated).isSameAs(block);
+        assertThat(block.getText()).isEqualTo("수정된 블록");
+        assertThat(block.getUpdatedBy()).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("실패_수정 대상 블록이 없으면 블록 없음 예외를 던진다")
+    void updateBlockThrowsWhenBlockMissing() {
+        UUID blockId = UUID.randomUUID();
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청한 블록을 찾을 수 없습니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("실패_수정자 식별자가 비어 있으면 잘못된 요청 예외를 던진다")
+    void updateBlockThrowsWhenActorInvalid() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(null);
+
+        block.setVersion(0);
+
+        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("잘못된 요청입니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_요청 version이 현재 블록 version과 다르면 충돌 예외를 던진다")
+    void updateBlockThrowsWhenVersionMismatched() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.CONFLICT);
+    }
+
     private Document document(UUID documentId) {
         return Document.builder()
                 .id(documentId)
@@ -219,4 +293,5 @@ class BlockServiceImplTest {
                 .sortKey("000000000001000000000000")
                 .build();
     }
+
 }

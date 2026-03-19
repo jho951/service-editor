@@ -2,6 +2,7 @@ package com.documents.api.block;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -143,6 +144,93 @@ class BlockApiIntegrationTest {
         assertThat(saved.getText()).isEqualTo("새 블록");
         assertThat(saved.getSortKey()).isEqualTo("000000000001000000000000");
         assertThat(saved.getCreatedBy()).isEqualTo("user-123");
+    }
+
+    @Test
+    @DisplayName("성공_블록 수정 API는 블록 본문과 수정자를 갱신한다")
+    void updateBlockUpdatesTextAndActor() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block block = blockRepository.save(Block.builder()
+                .id(UUID.randomUUID())
+                .document(document)
+                .type(BlockType.TEXT)
+                .text("기존 블록")
+                .sortKey("000000000001000000000000")
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .build());
+
+        mockMvc.perform(patch("/v1/blocks/{blockId}", block.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "text": "수정된 블록",
+                                  "version": 0
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.id").value(block.getId().toString()))
+                .andExpect(jsonPath("$.data.text").value("수정된 블록"))
+                .andExpect(jsonPath("$.data.updatedBy").value("user-456"))
+                .andExpect(jsonPath("$.data.version").value(1));
+
+        Block updated = blockRepository.findById(block.getId()).orElseThrow();
+        assertThat(updated.getText()).isEqualTo("수정된 블록");
+        assertThat(updated.getUpdatedBy()).isEqualTo("user-456");
+        assertThat(updated.getVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("실패_블록 수정 API에 낡은 version이 오면 충돌 응답을 반환한다")
+    void updateBlockReturnsConflictWhenVersionMismatched() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block block = blockRepository.save(Block.builder()
+                .id(UUID.randomUUID())
+                .document(document)
+                .type(BlockType.TEXT)
+                .text("기존 블록")
+                .sortKey("000000000001000000000000")
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .build());
+        block.setText("다른 사용자 수정");
+        blockRepository.save(block);
+
+        mockMvc.perform(patch("/v1/blocks/{blockId}", block.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "text": "수정된 블록",
+                                  "version": 0
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
+                .andExpect(jsonPath("$.code").value(9005))
+                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."));
     }
 
     @Test
