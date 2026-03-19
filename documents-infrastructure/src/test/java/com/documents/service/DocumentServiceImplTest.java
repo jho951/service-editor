@@ -527,6 +527,25 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("실패_삭제된 부모 밑 삭제 자식 문서 복구 실패 시 블록 복구도 호출하지 않는다")
+	void restoreDoesNotDelegateBlockRestoreWhenParentIsDeleted() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID parentId = UUID.randomUUID();
+		UUID childId = UUID.randomUUID();
+		Document deletedChild = deletedDocument(childId, workspaceId, parentId, "삭제 자식", "00000000000000000002");
+		Document deletedParent = deletedDocument(parentId, workspaceId, null, "삭제 부모", "00000000000000000001");
+		when(documentRepository.findById(childId)).thenReturn(Optional.of(deletedChild));
+		when(documentRepository.findById(parentId)).thenReturn(Optional.of(deletedParent));
+
+		assertThatThrownBy(() -> documentService.restore(childId, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+
+		verify(blockService, never()).restoreAllByDocumentId(any(), any(), any());
+	}
+
+	@Test
 	@DisplayName("실패_활성 문서 복구 요청은 문서 없음 예외를 던진다")
 	void restoreThrowsWhenDocumentIsAlreadyActive() {
 		UUID documentId = UUID.randomUUID();
@@ -538,6 +557,49 @@ class DocumentServiceImplTest {
 			.hasMessage("요청한 문서를 찾을 수 없습니다.")
 			.extracting("errorCode")
 			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+	}
+
+	@Test
+	@DisplayName("성공_하위 문서까지 함께 복구될 때 각 문서의 블록 복구도 함께 호출한다")
+	void restoreDelegatesBlockRestoreForDescendantDocuments() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID rootId = UUID.randomUUID();
+		UUID childId = UUID.randomUUID();
+		Document deletedRoot = deletedDocument(rootId, workspaceId, null, "삭제 루트", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, workspaceId, rootId, "삭제 자식", "00000000000000000002");
+		when(documentRepository.findById(rootId)).thenReturn(Optional.of(deletedRoot));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(rootId)).thenReturn(java.util.List.of(deletedChild));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(childId)).thenReturn(java.util.List.of());
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.restore(rootId, ACTOR_ID);
+
+		ArgumentCaptor<java.time.LocalDateTime> restoredAtCaptor = ArgumentCaptor.forClass(java.time.LocalDateTime.class);
+		verify(documentRepository).restoreDeletedByIds(eq(java.util.List.of(rootId, childId)), eq(ACTOR_ID),
+			restoredAtCaptor.capture());
+		verify(blockService).restoreAllByDocumentId(eq(rootId), eq(ACTOR_ID), eq(restoredAtCaptor.getValue()));
+		verify(blockService).restoreAllByDocumentId(eq(childId), eq(ACTOR_ID), eq(restoredAtCaptor.getValue()));
+	}
+
+	@Test
+	@DisplayName("성공_복구 대상이 아닌 다른 문서 블록은 복구 대상에 포함하지 않는다")
+	void restoreDoesNotDelegateBlockRestoreForOtherDocument() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID rootId = UUID.randomUUID();
+		UUID childId = UUID.randomUUID();
+		UUID otherDocumentId = UUID.randomUUID();
+		Document deletedRoot = deletedDocument(rootId, workspaceId, null, "삭제 루트", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, workspaceId, rootId, "삭제 자식", "00000000000000000002");
+		when(documentRepository.findById(rootId)).thenReturn(Optional.of(deletedRoot));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(rootId)).thenReturn(java.util.List.of(deletedChild));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(childId)).thenReturn(java.util.List.of());
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.restore(rootId, ACTOR_ID);
+
+		verify(blockService).restoreAllByDocumentId(eq(rootId), eq(ACTOR_ID), any(java.time.LocalDateTime.class));
+		verify(blockService).restoreAllByDocumentId(eq(childId), eq(ACTOR_ID), any(java.time.LocalDateTime.class));
+		verify(blockService, never()).restoreAllByDocumentId(eq(otherDocumentId), any(), any());
 	}
 
 	private Workspace workspace(UUID workspaceId) {
