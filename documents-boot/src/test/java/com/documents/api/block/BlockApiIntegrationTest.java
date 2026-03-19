@@ -114,13 +114,22 @@ class BlockApiIntegrationTest {
                 .sortKey("00000000000000000001")
                 .build());
 
-        mockMvc.perform(post("/v1/documents/{documentId}/blocks", document.getId())
+                mockMvc.perform(post("/v1/documents/{documentId}/blocks", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
                                   "type": "TEXT",
-                                  "text": "새 블록"
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -131,7 +140,10 @@ class BlockApiIntegrationTest {
                 .andExpect(jsonPath("$.data.documentId").value(document.getId().toString()))
                 .andExpect(jsonPath("$.data.parentId").doesNotExist())
                 .andExpect(jsonPath("$.data.type").value("TEXT"))
-                .andExpect(jsonPath("$.data.text").value("새 블록"))
+                .andExpect(jsonPath("$.data.content.format").value("rich_text"))
+                .andExpect(jsonPath("$.data.content.schemaVersion").value(1))
+                .andExpect(jsonPath("$.data.content.segments[0].text").value("새 블록"))
+                .andExpect(jsonPath("$.data.content.segments[0].marks").isArray())
                 .andExpect(jsonPath("$.data.sortKey").value("000000000001000000000000"))
                 .andExpect(jsonPath("$.data.createdBy").value("user-123"))
                 .andExpect(jsonPath("$.data.version").value(0));
@@ -141,7 +153,7 @@ class BlockApiIntegrationTest {
         assertThat(saved.getDocumentId()).isEqualTo(document.getId());
         assertThat(saved.getParentId()).isNull();
         assertThat(saved.getType()).isEqualTo(BlockType.TEXT);
-        assertThat(saved.getText()).isEqualTo("새 블록");
+        assertThat(saved.getContent()).isEqualTo("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}");
         assertThat(saved.getSortKey()).isEqualTo("000000000001000000000000");
         assertThat(saved.getCreatedBy()).isEqualTo("user-123");
     }
@@ -271,7 +283,16 @@ class BlockApiIntegrationTest {
                         .content("""
                                 {
                                   "type": "TEXT",
-                                  "text": "중간 블록",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "중간 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  },
                                   "afterBlockId": "%s"
                                 }
                                 """.formatted(first.getId())))
@@ -291,7 +312,16 @@ class BlockApiIntegrationTest {
                         .content("""
                                 {
                                   "type": "TEXT",
-                                  "text": "새 블록"
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
                                 }
                                 """));
 
@@ -299,6 +329,49 @@ class BlockApiIntegrationTest {
                 .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
                 .andExpect(jsonPath("$.code").value(9004))
                 .andExpect(jsonPath("$.message").value("요청한 문서를 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("실패_블록 생성 API에 허용되지 않은 mark가 오면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsUnsupportedMarkType() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+
+        mockMvc.perform(post("/v1/documents/{documentId}/blocks", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": [
+                                          {
+                                            "type": "link",
+                                            "value": "https://example.com"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9016))
+                .andExpect(jsonPath("$.message").value("요청 필드 유효성 검사에 실패했습니다."));
     }
 
 }

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.documents.api.block.support.BlockJsonCodec;
 import com.documents.api.exception.GlobalExceptionHandler;
 import com.documents.api.support.ApiResponseAssertions;
 import com.documents.domain.Block;
@@ -17,6 +18,7 @@ import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.service.BlockService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -43,8 +45,13 @@ class BlockControllerWebMvcTest {
     void setUp() {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
+        BlockJsonCodec blockJsonCodec = new BlockJsonCodec(new ObjectMapper());
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new BlockController(blockService, new BlockApiMapper()))
+        mockMvc = MockMvcBuilders.standaloneSetup(new BlockController(
+                        blockService,
+                        new BlockApiMapper(blockJsonCodec),
+                        blockJsonCodec
+                ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
@@ -80,22 +87,25 @@ class BlockControllerWebMvcTest {
         UUID parentId = UUID.randomUUID();
         UUID blockId = UUID.randomUUID();
 
-        when(blockService.create(
-                eq(documentId),
-                eq(parentId),
-                eq(BlockType.TEXT),
-                eq("새 블록"),
-                eq(null),
-                eq(null),
-                eq("user-123")
-        )).thenReturn(block(
+        Block createdBlock = block(
                 blockId,
                 documentId,
                 parentId,
                 "000000000001000000000000",
                 0,
                 "새 블록"
-        ));
+        );
+        createdBlock.setContent("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}");
+
+        when(blockService.create(
+                eq(documentId),
+                eq(parentId),
+                eq(BlockType.TEXT),
+                eq("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}"),
+                eq(null),
+                eq(null),
+                eq("user-123")
+        )).thenReturn(createdBlock);
 
         mockMvc.perform(post("/v1/documents/{documentId}/blocks", documentId)
                         .contentType("application/json")
@@ -104,7 +114,16 @@ class BlockControllerWebMvcTest {
                                 {
                                   "parentId": "%s",
                                   "type": "TEXT",
-                                  "text": "새 블록"
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
                                 }
                                 """.formatted(parentId)))
                 .andExpect(status().isCreated())
@@ -115,7 +134,10 @@ class BlockControllerWebMvcTest {
                 .andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
                 .andExpect(jsonPath("$.data.parentId").value(parentId.toString()))
                 .andExpect(jsonPath("$.data.type").value("TEXT"))
-                .andExpect(jsonPath("$.data.text").value("새 블록"))
+                .andExpect(jsonPath("$.data.content.format").value("rich_text"))
+                .andExpect(jsonPath("$.data.content.schemaVersion").value(1))
+                .andExpect(jsonPath("$.data.content.segments[0].text").value("새 블록"))
+                .andExpect(jsonPath("$.data.content.segments[0].marks").isArray())
                 .andExpect(jsonPath("$.data.sortKey").value("000000000001000000000000"))
                 .andExpect(jsonPath("$.data.createdBy").value("user-123"))
                 .andExpect(jsonPath("$.data.version").value(0));
@@ -163,7 +185,16 @@ class BlockControllerWebMvcTest {
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "text": "새 블록"
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
                                 }
                                 """));
 
@@ -180,7 +211,7 @@ class BlockControllerWebMvcTest {
                 eq(documentId),
                 eq(parentId),
                 eq(BlockType.TEXT),
-                eq("새 블록"),
+                eq("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}"),
                 eq(null),
                 eq(null),
                 eq("user-123")
@@ -193,7 +224,16 @@ class BlockControllerWebMvcTest {
                                 {
                                   "parentId": "11111111-1111-1111-1111-111111111111",
                                   "type": "TEXT",
-                                  "text": "새 블록"
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
                                 }
                                 """));
 
@@ -208,11 +248,120 @@ class BlockControllerWebMvcTest {
                         .content("""
                                 {
                                   "type": "TEXT",
-                                  "text": "새 블록"
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
                                 }
                                 """));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_content가 없으면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsMissingContent() throws Exception {
+        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT"
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_content format이 다르면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsUnsupportedContentFormat() throws Exception {
+        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "plain_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_mark 타입이 허용 목록이 아니면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsUnsupportedMarkType() throws Exception {
+        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": [
+                                          {
+                                            "type": "link",
+                                            "value": "https://example.com"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_textColor 값이 hex 형식이 아니면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsInvalidTextColor() throws Exception {
+        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": [
+                                          {
+                                            "type": "textColor",
+                                            "value": "black"
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
     }
 
     @Test
