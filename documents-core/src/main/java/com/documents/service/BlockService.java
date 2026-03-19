@@ -20,7 +20,7 @@ public interface BlockService {
             String actorId
     );
 
-    Block update(UUID blockId, String text, Integer version, String actorId);
+    Block update(UUID blockId, String content, Integer version, String actorId);
 
     void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt);
 }

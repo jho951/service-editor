@@ -89,3 +89,9 @@
 - WebMvc 테스트에 중복 mark, 예상치 못한 mark value, 예상치 못한 segment 필드, 다중 segment 내 빈 text, 단일 빈 segment 허용 케이스를 추가했다.
 - Boot 통합 테스트에 중복 mark 타입 실패 케이스를 추가했다.
 - 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`
+
+## Step 11. 잔존 `text` 참조 정리
+
+- `DocumentApiIntegrationTest`의 블록 저장 헬퍼에 남아 있던 `Block.builder().text(...)` 호출을 제거하고 `content` fixture 생성으로 전환했다.
+- `BlockService` 인터페이스의 `update` 파라미터명을 `text`에서 `content`로 정리해 구현체와 의미를 일치시켰다.
+- 점검 결과 현재 코드에서 남은 `text`는 `content.segments[].text` 구조, validation 필드명, 테스트용 문자열 조립 범위로만 남아 있다.
