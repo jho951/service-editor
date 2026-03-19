@@ -401,14 +401,16 @@ class DocumentServiceImplTest {
 	@DisplayName("성공_문서 삭제 시 문서와 활성 블록을 같은 시각으로 soft delete 처리한다")
 	void deleteSoftDeletesDocumentAndActiveBlocks() {
 		UUID documentId = UUID.randomUUID();
-		when(documentRepository.softDeleteActiveById(eq(documentId), eq("user-456"), any()))
-			.thenReturn(1);
+		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(documentId)).thenReturn(java.util.List.of());
 		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
 
 		documentService.delete(documentId, " user-456 ");
 
 		ArgumentCaptor<java.time.LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(java.time.LocalDateTime.class);
-		verify(documentRepository).softDeleteActiveById(eq(documentId), eq("user-456"), deletedAtCaptor.capture());
+		verify(documentRepository).softDeleteActiveByIds(eq(java.util.List.of(documentId)), eq("user-456"),
+			deletedAtCaptor.capture());
 		verify(blockService).softDeleteAllByDocumentId(eq(documentId), eq("user-456"), eq(deletedAtCaptor.getValue()));
 	}
 
@@ -416,15 +418,44 @@ class DocumentServiceImplTest {
 	@DisplayName("성공_사용자 식별자가 공백이면 block 서비스에도 null 사용자로 위임한다")
 	void deleteDelegatesNullActorToBlockService() {
 		UUID documentId = UUID.randomUUID();
-		when(documentRepository.softDeleteActiveById(eq(documentId), isNull(), any()))
-			.thenReturn(1);
+		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(documentId)).thenReturn(java.util.List.of());
 		when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
 
 		documentService.delete(documentId, " ");
 
 		ArgumentCaptor<java.time.LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(java.time.LocalDateTime.class);
-		verify(documentRepository).softDeleteActiveById(eq(documentId), isNull(), deletedAtCaptor.capture());
+		verify(documentRepository).softDeleteActiveByIds(eq(java.util.List.of(documentId)), isNull(),
+			deletedAtCaptor.capture());
 		verify(blockService).softDeleteAllByDocumentId(eq(documentId), isNull(), eq(deletedAtCaptor.getValue()));
+	}
+
+	@Test
+	@DisplayName("성공_문서 삭제 시 활성 하위 문서와 각 문서의 블록도 함께 soft delete 처리한다")
+	void deleteSoftDeletesDescendantDocumentsAndBlocks() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID rootId = UUID.randomUUID();
+		UUID childId = UUID.randomUUID();
+		UUID grandChildId = UUID.randomUUID();
+		Document rootDocument = document(rootId, workspaceId, null, "루트 문서", "00000000000000000001");
+		Document childDocument = document(childId, workspaceId, rootId, "하위 문서", "00000000000000000002");
+		Document grandChildDocument = document(grandChildId, workspaceId, childId, "손자 문서", "00000000000000000003");
+		when(documentRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(java.util.List.of(childDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(childId))
+			.thenReturn(java.util.List.of(grandChildDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(grandChildId)).thenReturn(java.util.List.of());
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.delete(rootId, ACTOR_ID);
+
+		ArgumentCaptor<java.time.LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(java.time.LocalDateTime.class);
+		verify(documentRepository, times(1)).softDeleteActiveByIds(eq(java.util.List.of(rootId, childId, grandChildId)),
+			eq(ACTOR_ID), deletedAtCaptor.capture());
+		verify(blockService).softDeleteAllByDocumentId(eq(rootId), eq(ACTOR_ID), eq(deletedAtCaptor.getValue()));
+		verify(blockService).softDeleteAllByDocumentId(eq(childId), eq(ACTOR_ID), eq(deletedAtCaptor.getValue()));
+		verify(blockService).softDeleteAllByDocumentId(eq(grandChildId), eq(ACTOR_ID), eq(deletedAtCaptor.getValue()));
 	}
 
 	@Test
@@ -432,89 +463,12 @@ class DocumentServiceImplTest {
 	void deleteThrowsWhenDocumentMissing() {
 		UUID documentId = UUID.randomUUID();
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
-		when(documentRepository.softDeleteActiveById(eq(documentId), eq(ACTOR_ID), any()))
-			.thenReturn(0);
 
 		assertThatThrownBy(() -> documentService.delete(documentId, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.hasMessage("요청한 문서를 찾을 수 없습니다.")
 			.extracting("errorCode")
 			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
-	}
-
-	@Test
-	@DisplayName("성공_활성 문서 삭제 시 문서 벌크 삭제 메서드를 정상 호출한다")
-	void deleteActiveDocumentCallsDocumentSoftDelete() {
-		UUID documentId = UUID.randomUUID();
-		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
-		when(documentRepository.softDeleteActiveById(eq(documentId), eq(ACTOR_ID), any()))
-			.thenReturn(1);
-
-		documentService.delete(documentId, ACTOR_ID);
-
-		verify(documentRepository).softDeleteActiveById(eq(documentId), eq(ACTOR_ID), any());
-	}
-
-	@Test
-	@DisplayName("성공_문서 삭제 시 해당 문서의 활성 블록 soft delete 메서드도 함께 호출한다")
-	void deleteDocumentCallsBlockSoftDelete() {
-		UUID documentId = UUID.randomUUID();
-		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
-		when(documentRepository.softDeleteActiveById(eq(documentId), eq("user-456"), any()))
-			.thenReturn(1);
-
-		documentService.delete(documentId, " user-456 ");
-
-		verify(blockService).softDeleteAllByDocumentId(eq(documentId), eq("user-456"), any());
-	}
-
-	@Test
-	@DisplayName("성공_문서 삭제와 블록 삭제는 같은 사용자 식별자와 같은 삭제 시각으로 처리한다")
-	void deleteDocumentUsesSameActorAndDeletedAtForDocumentAndBlocks() {
-		UUID documentId = UUID.randomUUID();
-		when(textNormalizer.normalizeNullable(" user-789 ")).thenReturn("user-789");
-		when(documentRepository.softDeleteActiveById(eq(documentId), eq("user-789"), any()))
-			.thenReturn(1);
-
-		documentService.delete(documentId, " user-789 ");
-
-		ArgumentCaptor<java.time.LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(java.time.LocalDateTime.class);
-		verify(documentRepository).softDeleteActiveById(eq(documentId), eq("user-789"), deletedAtCaptor.capture());
-		verify(blockService).softDeleteAllByDocumentId(eq(documentId), eq("user-789"), eq(deletedAtCaptor.getValue()));
-	}
-
-	@Test
-	@DisplayName("실패_존재하지 않는 문서 삭제 시 문서 없음 예외를 던진다")
-	void deleteThrowsWhenDocumentDoesNotExist() {
-		UUID documentId = UUID.randomUUID();
-		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
-		when(documentRepository.softDeleteActiveById(eq(documentId), eq(ACTOR_ID), any()))
-			.thenReturn(0);
-
-		assertThatThrownBy(() -> documentService.delete(documentId, ACTOR_ID))
-			.isInstanceOf(BusinessException.class)
-			.hasMessage("요청한 문서를 찾을 수 없습니다.")
-			.extracting("errorCode")
-			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
-
-		verify(blockService, never()).softDeleteAllByDocumentId(any(), any(), any());
-	}
-
-	@Test
-	@DisplayName("실패_이미 삭제된 문서 삭제 시 문서 없음 예외를 던진다")
-	void deleteThrowsWhenDocumentAlreadyDeleted() {
-		UUID documentId = UUID.randomUUID();
-		when(textNormalizer.normalizeNullable(" deleted-user ")).thenReturn("deleted-user");
-		when(documentRepository.softDeleteActiveById(eq(documentId), eq("deleted-user"), any()))
-			.thenReturn(0);
-
-		assertThatThrownBy(() -> documentService.delete(documentId, " deleted-user "))
-			.isInstanceOf(BusinessException.class)
-			.hasMessage("요청한 문서를 찾을 수 없습니다.")
-			.extracting("errorCode")
-			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
-
-		verify(blockService, never()).softDeleteAllByDocumentId(any(), any(), any());
 	}
 
 	private Workspace workspace(UUID workspaceId) {

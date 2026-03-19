@@ -1,5 +1,6 @@
 package com.documents.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +13,7 @@ import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.BlockRepository;
+import com.documents.repository.DocumentRepository;
 import com.documents.support.OrderedSortKeyGenerator;
 import com.documents.support.OrderedSortKeyGenerator.SortKeyRebalanceRequiredException;
 import com.documents.support.TextNormalizer;
@@ -28,14 +30,14 @@ public class BlockServiceImpl implements BlockService {
     private static final int MAX_BLOCK_DEPTH = 10;
 
     private final BlockRepository blockRepository;
-    private final DocumentService documentService;
+    private final DocumentRepository documentRepository;
     private final TextNormalizer textNormalizer;
     private final OrderedSortKeyGenerator orderedSortKeyGenerator;
 
     @Override
     @Transactional(readOnly = true)
     public List<Block> getAllByDocumentId(UUID documentId) {
-        documentService.getById(documentId);
+        findActiveDocument(documentId);
         return blockRepository.findActiveByDocumentIdOrderBySortKey(documentId);
     }
 
@@ -50,7 +52,7 @@ public class BlockServiceImpl implements BlockService {
             UUID beforeBlockId,
             String actorId
     ) {
-        Document document = documentService.getById(documentId);
+        Document document = findActiveDocument(documentId);
         validateSupportedType(type);
         validateBlockLimit(documentId);
 
@@ -96,6 +98,17 @@ public class BlockServiceImpl implements BlockService {
         block.setText(text);
         block.setUpdatedBy(normalizedActorId);
         return block;
+    }
+
+    @Override
+    @Transactional
+    public void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt) {
+        blockRepository.softDeleteActiveByDocumentId(documentId, actorId, deletedAt);
+    }
+
+    private Document findActiveDocument(UUID documentId) {
+        return documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
     }
 
     private void validateSupportedType(BlockType type) {

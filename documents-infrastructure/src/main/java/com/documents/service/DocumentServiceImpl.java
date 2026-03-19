@@ -1,6 +1,7 @@
 package com.documents.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -89,11 +90,11 @@ public class DocumentServiceImpl implements DocumentService {
 	public void delete(UUID documentId, String actorId) {
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
 		LocalDateTime deletedAt = LocalDateTime.now();
-		int affectedRowCount = documentRepository.softDeleteActiveById(documentId, normalizedActorId, deletedAt);
-		if (affectedRowCount == 0) {
-			throw new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+		List<UUID> documentIdsToDelete = collectActiveDocumentTreeIds(findActiveDocument(documentId));
+		documentRepository.softDeleteActiveByIds(documentIdsToDelete, normalizedActorId, deletedAt);
+		for (UUID currentDocumentId : documentIdsToDelete) {
+			blockService.softDeleteAllByDocumentId(currentDocumentId, normalizedActorId, deletedAt);
 		}
-		blockService.softDeleteAllByDocumentId(documentId, normalizedActorId, deletedAt);
 	}
 
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
@@ -154,6 +155,21 @@ public class DocumentServiceImpl implements DocumentService {
 	private Document findActiveDocument(UUID documentId) {
 		return documentRepository.findByIdAndDeletedAtIsNull(documentId)
 			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+	}
+
+	private List<UUID> collectActiveDocumentTreeIds(Document rootDocument) {
+		List<UUID> documentIds = new ArrayList<>();
+		collectActiveDocumentTreeIds(rootDocument, documentIds);
+		return documentIds;
+	}
+
+	private void collectActiveDocumentTreeIds(Document document, List<UUID> documentIds) {
+		documentIds.add(document.getId());
+
+		List<Document> children = documentRepository.findActiveChildrenByParentIdOrderBySortKey(document.getId());
+		for (Document child : children) {
+			collectActiveDocumentTreeIds(child, documentIds);
+		}
 	}
 
 	private String normalizeNullableMetaJson(String value) {

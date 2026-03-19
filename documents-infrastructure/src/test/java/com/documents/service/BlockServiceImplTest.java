@@ -14,6 +14,7 @@ import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.BlockRepository;
+import com.documents.repository.DocumentRepository;
 import com.documents.support.OrderedSortKeyGenerator;
 import com.documents.support.TextNormalizer;
 import java.util.ArrayList;
@@ -37,7 +38,7 @@ class BlockServiceImplTest {
     private BlockRepository blockRepository;
 
     @Mock
-    private DocumentService documentService;
+    private DocumentRepository documentRepository;
 
     @Mock
     private TextNormalizer textNormalizer;
@@ -48,7 +49,7 @@ class BlockServiceImplTest {
     void setUp() {
         blockService = new BlockServiceImpl(
                 blockRepository,
-                documentService,
+                documentRepository,
                 textNormalizer,
                 new OrderedSortKeyGenerator()
         );
@@ -61,7 +62,7 @@ class BlockServiceImplTest {
         Block rootBlock = block(documentId, null, "000000000001000000000000");
         Block childBlock = block(documentId, rootBlock.getId(), "000000000001I00000000000");
 
-        when(documentService.getById(documentId)).thenReturn(document(documentId));
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId)));
         when(blockRepository.findActiveByDocumentIdOrderBySortKey(documentId))
                 .thenReturn(java.util.List.of(rootBlock, childBlock));
 
@@ -73,7 +74,7 @@ class BlockServiceImplTest {
     @DisplayName("성공_루트 텍스트 블록 생성 시 gap 기반 sortKey 전략으로 저장한다")
     void createRootBlockAppendsToDocumentRoot() {
         UUID documentId = UUID.randomUUID();
-        when(documentService.getById(documentId)).thenReturn(document(documentId));
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId)));
         when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, null))
@@ -104,7 +105,7 @@ class BlockServiceImplTest {
         Block first = block(documentId, parentId, "000000000001000000000000");
         Block second = block(documentId, parentId, "000000000002000000000000");
 
-        when(documentService.getById(documentId)).thenReturn(document(documentId));
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId)));
         when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(2L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(
@@ -126,7 +127,7 @@ class BlockServiceImplTest {
         UUID documentId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
 
-        when(documentService.getById(documentId)).thenReturn(document(documentId));
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId)));
         when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(parentId))
@@ -148,7 +149,7 @@ class BlockServiceImplTest {
     void createBlockThrowsWhenAfterBlockIdIsNotSibling() {
         UUID documentId = UUID.randomUUID();
 
-        when(documentService.getById(documentId)).thenReturn(document(documentId));
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId)));
         when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, null))
@@ -175,7 +176,7 @@ class BlockServiceImplTest {
         UUID documentId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
 
-        when(documentService.getById(documentId)).thenReturn(document(documentId));
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId)));
         when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
