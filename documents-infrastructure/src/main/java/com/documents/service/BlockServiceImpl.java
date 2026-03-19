@@ -106,6 +106,12 @@ public class BlockServiceImpl implements BlockService {
         blockRepository.softDeleteActiveByDocumentId(documentId, actorId, deletedAt);
     }
 
+    @Override
+    @Transactional
+    public void restoreAllByDocumentId(UUID documentId, String actorId, LocalDateTime updatedAt) {
+        blockRepository.restoreDeletedByDocumentId(documentId, actorId, updatedAt);
+    }
+
     private Document findActiveDocument(UUID documentId) {
         return documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));

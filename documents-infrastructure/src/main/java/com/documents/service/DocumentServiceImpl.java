@@ -108,6 +108,9 @@ public class DocumentServiceImpl implements DocumentService {
 		List<UUID> documentIdsToRestore = collectDeletedDocumentTreeIds(deletedDocument);
 
 		documentRepository.restoreDeletedByIds(documentIdsToRestore, normalizedActorId, restoredAt);
+		for (UUID currentDocumentId : documentIdsToRestore) {
+			blockService.restoreAllByDocumentId(currentDocumentId, normalizedActorId, restoredAt);
+		}
 	}
 
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
