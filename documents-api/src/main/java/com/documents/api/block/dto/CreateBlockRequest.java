@@ -1,5 +1,6 @@
 package com.documents.api.block.dto;
 
+import com.documents.api.block.validation.ValidBlockContent;
 import com.documents.domain.BlockType;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,6 +24,7 @@ public class CreateBlockRequest {
     private BlockType type;
 
     @NotNull
+    @ValidBlockContent
     @Schema(description = "TEXT 블록 content", nullable = false)
     private JsonNode content;
 

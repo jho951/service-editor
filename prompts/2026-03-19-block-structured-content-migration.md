@@ -46,3 +46,11 @@
 - `BlockService.create(...)`와 구현체를 `content` 기준으로 전환했다.
 - 생성 관련 테스트를 `content` 기준으로 수정하고, 저장소에는 직렬화된 JSON 문자열이 저장되는 점까지 검증했다.
 - 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-infrastructure:test --tests com.documents.service.BlockServiceImplTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`
+
+## Step 6. 블록 생성 요청 `content` validation 추가
+
+- `ValidBlockContent`, `BlockContentValidator`를 추가해 블록 생성 요청에서 structured content JSON 스키마를 서버 입구에서 검증하도록 했다.
+- 현재 검증 범위는 `format=rich_text`, `schemaVersion=1`, 비어 있지 않은 `segments`, segment의 `text`/`marks`, 허용 mark 타입, `textColor`의 `#RRGGBB` 형식, 전체 plain text 길이 합 `10,000` 이하다.
+- WebMvc 테스트에 `format`, mark 타입, `textColor` 형식 실패 케이스를 추가했다.
+- Boot 통합 테스트에 허용되지 않은 mark 타입 요청 실패 케이스를 추가했다.
+- 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`
