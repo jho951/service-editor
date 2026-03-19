@@ -71,8 +71,8 @@ public class Block extends BaseEntity {
     @Column(name = "type", nullable = false, length = 32)
     private BlockType type;
 
-    @Column(name = "text", nullable = false, length = 10000)
-    private String text;
+    @Column(name = "content_json", nullable = false, columnDefinition = "longtext")
+    private String content;
 
     @Column(name = "sort_key", nullable = false, length = 24)
     private String sortKey;
@@ -86,11 +86,35 @@ public class Block extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Deprecated(forRemoval = false)
+    public String getText() {
+        return content;
+    }
+
+    @Deprecated(forRemoval = false)
+    public void setText(String text) {
+        this.content = text;
+    }
+
     public UUID getDocumentId() {
         return document == null ? null : document.getId();
     }
 
     public UUID getParentId() {
         return parent == null ? null : parent.getId();
+    }
+
+    public static class BlockBuilder {
+
+        public BlockBuilder content(String content) {
+            this.content = content;
+            return this;
+        }
+
+        @Deprecated(forRemoval = false)
+        public BlockBuilder text(String text) {
+            this.content = text;
+            return this;
+        }
     }
 }
