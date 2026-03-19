@@ -1,11 +1,22 @@
 package com.documents.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
@@ -17,16 +28,6 @@ import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
 import com.documents.support.OrderedSortKeyGenerator;
 import com.documents.support.TextNormalizer;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Block 서비스 구현 검증")
@@ -66,7 +67,7 @@ class BlockServiceImplTest {
 
         when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId)));
         when(blockRepository.findActiveByDocumentIdOrderBySortKey(documentId))
-                .thenReturn(java.util.List.of(rootBlock, childBlock));
+                .thenReturn(List.of(rootBlock, childBlock));
 
         assertThat(blockService.getAllByDocumentId(documentId))
                 .containsExactly(rootBlock, childBlock);
@@ -114,7 +115,7 @@ class BlockServiceImplTest {
                 block(documentId, null, "000000000001000000000000")
         ));
         when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, parentId))
-                .thenReturn(new ArrayList<>(java.util.List.of(first, second)));
+                .thenReturn(new ArrayList<>(List.of(first, second)));
         when(blockRepository.save(any(Block.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Block created = blockService.create(
@@ -270,6 +271,53 @@ class BlockServiceImplTest {
                 .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("성공_블록 삭제 시 활성 하위 블록까지 같은 시각으로 bulk soft delete 처리한다")
+    void deleteSoftDeletesDescendantBlocks() {
+        UUID documentId = UUID.randomUUID();
+        UUID rootId = UUID.randomUUID();
+        UUID childId = UUID.randomUUID();
+        UUID grandChildId = UUID.randomUUID();
+        Block rootBlock = block(documentId, null, "000000000001000000000000");
+        rootBlock.setId(rootId);
+        Block childBlock = block(documentId, rootId, "000000000001I00000000000");
+        childBlock.setId(childId);
+        Block grandChildBlock = block(documentId, childId, "000000000001Q00000000000");
+        grandChildBlock.setId(grandChildId);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootBlock));
+        when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootId))
+                .thenReturn(List.of(childBlock));
+        when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(childId))
+                .thenReturn(List.of(grandChildBlock));
+        when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(grandChildId))
+                .thenReturn(List.of());
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+        blockService.delete(rootId, ACTOR_ID);
+
+        ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(blockRepository).softDeleteActiveByIds(
+                eq(List.of(rootId, childId, grandChildId)),
+                eq(ACTOR_ID),
+                deletedAtCaptor.capture()
+        );
+    }
+
+    @Test
+    @DisplayName("실패_이미 삭제되었거나 없는 블록은 삭제할 수 없다")
+    void deleteThrowsWhenBlockMissing() {
+        UUID blockId = UUID.randomUUID();
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> blockService.delete(blockId, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청한 블록을 찾을 수 없습니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
     }
 
     private Document document(UUID documentId) {

@@ -199,6 +199,24 @@ class BlockControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("성공_정상 삭제 요청에 대해 성공 응답을 반환한다")
+    void deleteBlockReturnsSuccessEnvelope() throws Exception {
+        UUID blockId = UUID.randomUUID();
+        doNothing().when(blockService).delete(blockId, "user-123");
+
+        mockMvc.perform(delete("/v1/blocks/{blockId}", blockId)
+                        .header("X-User-Id", "user-123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("요청 응답 성공"))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(blockService).delete(blockId, "user-123");
+    }
+
+    @Test
     @DisplayName("실패_type이 없으면 유효성 검사 오류를 반환한다")
     void createBlockRejectsMissingType() throws Exception {
         var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
@@ -610,6 +628,27 @@ class BlockControllerWebMvcTest {
                                   "version": 0
                                 }
                                 """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 블록 삭제 시 블록 없음 응답을 반환한다")
+    void deleteBlockReturnsNotFoundWhenBlockMissing() throws Exception {
+        UUID blockId = UUID.randomUUID();
+        doThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND))
+                .when(blockService).delete(blockId, "user-123");
+
+        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", blockId)
+                        .header("X-User-Id", "user-123"));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_인증 헤더가 없으면 블록 삭제 API는 인증 오류를 반환한다")
+    void deleteBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID()));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
     }

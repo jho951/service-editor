@@ -1,6 +1,7 @@
 package com.documents.api.block;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -271,6 +272,54 @@ class BlockApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("성공_블록 삭제 API는 하위 블록까지 soft delete 처리하고 다른 블록은 보존한다")
+    void deleteBlockSoftDeletesDescendantsOnly() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block rootBlock = saveBlock(document, null, "삭제 대상 루트", "000000000001000000000000");
+        Block childBlock = saveBlock(document, rootBlock, "삭제 대상 자식", "000000000001I00000000000");
+        Block grandChildBlock = saveBlock(document, childBlock, "삭제 대상 손자", "000000000001Q00000000000");
+        Block otherRootBlock = saveBlock(document, null, "보존 대상", "000000000002000000000000");
+
+        mockMvc.perform(delete("/v1/blocks/{blockId}", rootBlock.getId())
+                        .header("X-User-Id", "user-123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200));
+
+        Block deletedRoot = blockRepository.findById(rootBlock.getId()).orElseThrow();
+        Block deletedChild = blockRepository.findById(childBlock.getId()).orElseThrow();
+        Block deletedGrandChild = blockRepository.findById(grandChildBlock.getId()).orElseThrow();
+        Block survivedBlock = blockRepository.findById(otherRootBlock.getId()).orElseThrow();
+
+        assertThat(deletedRoot.getDeletedAt()).isNotNull();
+        assertThat(deletedChild.getDeletedAt()).isNotNull();
+        assertThat(deletedGrandChild.getDeletedAt()).isNotNull();
+        assertThat(survivedBlock.getDeletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 블록을 삭제하면 블록 없음 응답을 반환한다")
+    void deleteBlockReturnsNotFoundWhenBlockMissing() throws Exception {
+        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID())
+                        .header("X-User-Id", "user-123"));
+
+        result.andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006))
+                .andExpect(jsonPath("$.message").value("요청한 블록을 찾을 수 없습니다."));
+    }
+
+    @Test
     @DisplayName("성공_afterBlockId를 사용하면 기존 형제 사이 위치용 gap sortKey로 블록을 생성한다")
     void createBlockInsertsBetweenSiblings() throws Exception {
         Workspace workspace = workspaceRepository.save(Workspace.builder()
@@ -442,5 +491,18 @@ class BlockApiIntegrationTest {
 
     private String toContent(String text) {
         return "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"%s\",\"marks\":[]}]}".formatted(text);
+    }
+
+    private Block saveBlock(Document document, Block parent, String text, String sortKey) {
+        return blockRepository.save(Block.builder()
+                .id(UUID.randomUUID())
+                .document(document)
+                .parent(parent)
+                .type(BlockType.TEXT)
+                .content(toContent(text))
+                .sortKey(sortKey)
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .build());
     }
 }
