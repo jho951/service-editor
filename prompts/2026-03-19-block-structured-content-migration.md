@@ -77,3 +77,15 @@
 - 블록 관련 테스트 픽스처에서 `.text(...)`, `setText(...)` 사용을 모두 `.content(...)`, `setContent(...)` 기준으로 정리했다.
 - 남은 `text` 문자열은 모두 `content.segments[].text` JSON 구조 의미로만 사용된다.
 - 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-infrastructure:test --tests com.documents.service.BlockServiceImplTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`
+
+## Step 10. `content` validation 강화
+
+- 같은 segment 안에서 동일한 mark 타입이 중복되면 실패하도록 했다.
+- `textColor`만 `value`를 가질 수 있게 제한하고, 다른 mark의 `value`는 실패하도록 했다.
+- top-level content, segment, mark에 허용되지 않은 추가 필드가 있으면 실패하도록 했다.
+- 빈 segment 정책을 추가했다.
+- `segments`가 1개뿐이고 `text == ""`, `marks == []`인 경우만 빈 블록으로 허용한다.
+- 그 외 다중 segment 안의 빈 text는 모두 실패한다.
+- WebMvc 테스트에 중복 mark, 예상치 못한 mark value, 예상치 못한 segment 필드, 다중 segment 내 빈 text, 단일 빈 segment 허용 케이스를 추가했다.
+- Boot 통합 테스트에 중복 mark 타입 실패 케이스를 추가했다.
+- 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`

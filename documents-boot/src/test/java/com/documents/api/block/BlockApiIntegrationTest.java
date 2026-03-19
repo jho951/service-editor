@@ -399,6 +399,47 @@ class BlockApiIntegrationTest {
                 .andExpect(jsonPath("$.message").value("요청 필드 유효성 검사에 실패했습니다."));
     }
 
+    @Test
+    @DisplayName("실패_블록 생성 API에 중복 mark 타입이 오면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsDuplicateMarkType() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+
+        mockMvc.perform(post("/v1/documents/{documentId}/blocks", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": [
+                                          { "type": "bold" },
+                                          { "type": "bold" }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9016))
+                .andExpect(jsonPath("$.message").value("요청 필드 유효성 검사에 실패했습니다."));
+    }
+
     private String toContent(String text) {
         return "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"%s\",\"marks\":[]}]}".formatted(text);
     }

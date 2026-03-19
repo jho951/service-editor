@@ -3,6 +3,7 @@ package com.documents.api.block.validation;
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -20,10 +21,16 @@ public class BlockContentValidator implements ConstraintValidator<ValidBlockCont
             "strikethrough"
     );
     private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{6}$");
+    private static final Set<String> ALLOWED_CONTENT_FIELDS = Set.of("format", "schemaVersion", "segments");
+    private static final Set<String> ALLOWED_SEGMENT_FIELDS = Set.of("text", "marks");
+    private static final Set<String> ALLOWED_MARK_FIELDS = Set.of("type", "value");
 
     @Override
     public boolean isValid(JsonNode value, ConstraintValidatorContext context) {
         if (value == null || value.isNull() || !value.isObject()) {
+            return false;
+        }
+        if (!containsOnlyAllowedFields(value, ALLOWED_CONTENT_FIELDS)) {
             return false;
         }
 
@@ -42,9 +49,16 @@ public class BlockContentValidator implements ConstraintValidator<ValidBlockCont
             return false;
         }
 
+        if (isAllowedEmptyBlock(segmentsNode)) {
+            return true;
+        }
+
         int totalTextLength = 0;
         for (JsonNode segmentNode : segmentsNode) {
             if (!segmentNode.isObject()) {
+                return false;
+            }
+            if (!containsOnlyAllowedFields(segmentNode, ALLOWED_SEGMENT_FIELDS)) {
                 return false;
             }
 
@@ -57,19 +71,29 @@ public class BlockContentValidator implements ConstraintValidator<ValidBlockCont
             if (marksNode == null || !marksNode.isArray()) {
                 return false;
             }
+            if (textNode.textValue().isEmpty()) {
+                return false;
+            }
 
             totalTextLength += textNode.textValue().length();
             if (totalTextLength > MAX_TEXT_LENGTH) {
                 return false;
             }
 
+            Set<String> usedMarkTypes = new HashSet<>();
             for (JsonNode markNode : marksNode) {
                 if (!markNode.isObject()) {
+                    return false;
+                }
+                if (!containsOnlyAllowedFields(markNode, ALLOWED_MARK_FIELDS)) {
                     return false;
                 }
 
                 JsonNode typeNode = markNode.get("type");
                 if (!hasText(typeNode) || !SUPPORTED_MARK_TYPES.contains(typeNode.textValue())) {
+                    return false;
+                }
+                if (!usedMarkTypes.add(typeNode.textValue())) {
                     return false;
                 }
 
@@ -78,10 +102,45 @@ public class BlockContentValidator implements ConstraintValidator<ValidBlockCont
                     if (!hasText(valueNode) || !HEX_COLOR_PATTERN.matcher(valueNode.textValue()).matches()) {
                         return false;
                     }
+                } else if (markNode.has("value")) {
+                    return false;
                 }
             }
         }
 
+        return true;
+    }
+
+    private boolean isAllowedEmptyBlock(JsonNode segmentsNode) {
+        if (segmentsNode.size() != 1) {
+            return false;
+        }
+
+        JsonNode segmentNode = segmentsNode.get(0);
+        if (segmentNode == null || !segmentNode.isObject()) {
+            return false;
+        }
+        if (!containsOnlyAllowedFields(segmentNode, ALLOWED_SEGMENT_FIELDS)) {
+            return false;
+        }
+
+        JsonNode textNode = segmentNode.get("text");
+        JsonNode marksNode = segmentNode.get("marks");
+        return textNode != null
+                && textNode.isTextual()
+                && textNode.textValue().isEmpty()
+                && marksNode != null
+                && marksNode.isArray()
+                && marksNode.isEmpty();
+    }
+
+    private boolean containsOnlyAllowedFields(JsonNode objectNode, Set<String> allowedFields) {
+        var fieldNames = objectNode.fieldNames();
+        while (fieldNames.hasNext()) {
+            if (!allowedFields.contains(fieldNames.next())) {
+                return false;
+            }
+        }
         return true;
     }
 

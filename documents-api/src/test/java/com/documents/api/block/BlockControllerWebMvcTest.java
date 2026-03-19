@@ -386,6 +386,166 @@ class BlockControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("실패_같은 segment에 중복 mark 타입이 있으면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsDuplicateMarkType() throws Exception {
+        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": [
+                                          { "type": "bold" },
+                                          { "type": "bold" }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_textColor 외 mark에 value가 있으면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsUnexpectedMarkValue() throws Exception {
+        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": [
+                                          {
+                                            "type": "bold",
+                                            "value": true
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_segment에 허용되지 않은 필드가 있으면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsUnexpectedSegmentField() throws Exception {
+        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "새 블록",
+                                        "marks": [],
+                                        "extra": "field"
+                                      }
+                                    ]
+                                  }
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_빈 segment가 중간에 섞여 있으면 유효성 검사 오류를 반환한다")
+    void createBlockRejectsEmptySegmentInMultiSegmentContent() throws Exception {
+        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "",
+                                        "marks": []
+                                      },
+                                      {
+                                        "text": "새 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
+    @DisplayName("성공_segment가 1개뿐인 빈 블록은 유효성 검사에 통과한다")
+    void createBlockAllowsSingleEmptySegment() throws Exception {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block createdBlock = block(
+                blockId,
+                documentId,
+                null,
+                "000000000001000000000000",
+                0,
+                ""
+        );
+        createdBlock.setContent("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"\",\"marks\":[]}]}");
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"\",\"marks\":[]}]}"),
+                eq(null),
+                eq(null),
+                eq("user-123")
+        )).thenReturn(createdBlock);
+
+        mockMvc.perform(post("/v1/documents/{documentId}/blocks", documentId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "type": "TEXT",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.content.segments[0].text").value(""));
+    }
+
+    @Test
     @DisplayName("실패_content가 없으면 블록 수정 요청은 유효성 검사 오류를 반환한다")
     void updateBlockRejectsMissingContent() throws Exception {
         var result = mockMvc.perform(patch("/v1/blocks/{blockId}", UUID.randomUUID())
