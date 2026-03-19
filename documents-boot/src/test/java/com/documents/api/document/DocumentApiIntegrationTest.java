@@ -519,17 +519,21 @@ class DocumentApiIntegrationTest {
                 .build());
     }
 
-    private Block saveBlock(UUID documentId, UUID parentId, String text, String sortKey) {
+    private Block saveBlock(UUID documentId, UUID parentId, String content, String sortKey) {
         return blockRepository.save(Block.builder()
                 .id(UUID.randomUUID())
                 .document(documentRepository.getReferenceById(documentId))
                 .parent(parentId == null ? null : blockRepository.getReferenceById(parentId))
                 .type(BlockType.TEXT)
-                .text(text)
+                .content(toContent(content))
                 .sortKey(sortKey)
                 .createdBy("user-123")
                 .updatedBy("user-123")
                 .build());
+    }
+
+    private String toContent(String content) {
+        return "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"%s\",\"marks\":[]}]}".formatted(content);
     }
 
     @TestConfiguration

@@ -1,10 +1,11 @@
 package com.documents.service;
 
-import com.documents.domain.Block;
-import com.documents.domain.BlockType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import com.documents.domain.Block;
+import com.documents.domain.BlockType;
 
 public interface BlockService {
     List<Block> getAllByDocumentId(UUID documentId);
@@ -13,13 +14,13 @@ public interface BlockService {
             UUID documentId,
             UUID parentId,
             BlockType type,
-            String text,
+            String content,
             UUID afterBlockId,
             UUID beforeBlockId,
             String actorId
     );
 
-    Block update(UUID blockId, String text, Integer version, String actorId);
+    Block update(UUID blockId, String content, Integer version, String actorId);
 
     void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt);
 }

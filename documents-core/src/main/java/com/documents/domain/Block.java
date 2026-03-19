@@ -71,8 +71,8 @@ public class Block extends BaseEntity {
     @Column(name = "type", nullable = false, length = 32)
     private BlockType type;
 
-    @Column(name = "text", nullable = false, length = 10000)
-    private String text;
+    @Column(name = "content_json", nullable = false, columnDefinition = "longtext")
+    private String content;
 
     @Column(name = "sort_key", nullable = false, length = 24)
     private String sortKey;

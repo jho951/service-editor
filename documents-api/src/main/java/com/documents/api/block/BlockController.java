@@ -3,6 +3,7 @@ package com.documents.api.block;
 import com.documents.api.block.dto.BlockResponse;
 import com.documents.api.block.dto.CreateBlockRequest;
 import com.documents.api.block.dto.UpdateBlockRequest;
+import com.documents.api.block.support.BlockJsonCodec;
 import com.documents.api.code.SuccessCode;
 import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Block;
@@ -33,6 +34,7 @@ public class BlockController {
 
     private final BlockService blockService;
     private final BlockApiMapper blockApiMapper;
+    private final BlockJsonCodec blockJsonCodec;
 
     @Operation(summary = "문서 블록 목록 조회")
     @GetMapping("/documents/{documentId}/blocks")
@@ -56,7 +58,7 @@ public class BlockController {
                 documentId,
                 request.getParentId(),
                 request.getType(),
-                request.getText(),
+                blockJsonCodec.write(request.getContent()),
                 request.getAfterBlockId(),
                 request.getBeforeBlockId(),
                 userId
@@ -73,7 +75,12 @@ public class BlockController {
             @Valid @RequestBody UpdateBlockRequest request,
             @RequestHeader(USER_ID_HEADER) String userId
     ) {
-        Block updatedBlock = blockService.update(blockId, request.getText(), request.getVersion(), userId);
+        Block updatedBlock = blockService.update(
+                blockId,
+                blockJsonCodec.write(request.getContent()),
+                request.getVersion(),
+                userId
+        );
         return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, blockApiMapper.toResponse(updatedBlock)));
     }
 }

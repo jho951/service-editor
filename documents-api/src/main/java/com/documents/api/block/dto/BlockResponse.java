@@ -2,6 +2,7 @@ package com.documents.api.block.dto;
 
 import com.documents.api.dto.BaseResponse;
 import com.documents.domain.BlockType;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -27,8 +28,8 @@ public class BlockResponse extends BaseResponse {
     @Schema(description = "블록 타입")
     private BlockType type;
 
-    @Schema(description = "TEXT 블록 본문")
-    private String text;
+    @Schema(description = "TEXT 블록 content")
+    private JsonNode content;
 
     @Schema(description = "정렬 키")
     private String sortKey;

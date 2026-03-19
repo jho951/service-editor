@@ -33,6 +33,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class BlockServiceImplTest {
 
     private static final String ACTOR_ID = "user-123";
+    private static final String SIMPLE_CONTENT = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}";
+    private static final String UPDATED_CONTENT = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"수정된 블록\",\"marks\":[]}]}";
 
     @Mock
     private BlockRepository blockRepository;
@@ -81,7 +83,7 @@ class BlockServiceImplTest {
                 .thenReturn(new ArrayList<>());
         when(blockRepository.save(any(Block.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Block created = blockService.create(documentId, null, BlockType.TEXT, "새 블록", null, null, ACTOR_ID);
+        Block created = blockService.create(documentId, null, BlockType.TEXT, SIMPLE_CONTENT, null, null, ACTOR_ID);
 
         ArgumentCaptor<Block> captor = ArgumentCaptor.forClass(Block.class);
         verify(blockRepository).save(captor.capture());
@@ -91,7 +93,7 @@ class BlockServiceImplTest {
         assertThat(saved.getDocumentId()).isEqualTo(documentId);
         assertThat(saved.getParentId()).isNull();
         assertThat(saved.getType()).isEqualTo(BlockType.TEXT);
-        assertThat(saved.getText()).isEqualTo("새 블록");
+        assertThat(saved.getContent()).isEqualTo(SIMPLE_CONTENT);
         assertThat(saved.getSortKey()).isEqualTo("000000000001000000000000");
         assertThat(saved.getCreatedBy()).isEqualTo(ACTOR_ID);
         assertThat(saved.getUpdatedBy()).isEqualTo(ACTOR_ID);
@@ -115,7 +117,15 @@ class BlockServiceImplTest {
                 .thenReturn(new ArrayList<>(java.util.List.of(first, second)));
         when(blockRepository.save(any(Block.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Block created = blockService.create(documentId, parentId, BlockType.TEXT, "중간 블록", first.getId(), null, ACTOR_ID);
+        Block created = blockService.create(
+                documentId,
+                parentId,
+                BlockType.TEXT,
+                "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"중간 블록\",\"marks\":[]}]}",
+                first.getId(),
+                null,
+                ACTOR_ID
+        );
 
         assertThat(created.getSortKey()).isEqualTo("000000000001I00000000000");
         assertThat(second.getSortKey()).isEqualTo("000000000002000000000000");
@@ -137,7 +147,7 @@ class BlockServiceImplTest {
                         "000000000001000000000000"
                 )));
 
-        assertThatThrownBy(() -> blockService.create(documentId, parentId, BlockType.TEXT, "새 블록", null, null, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.create(documentId, parentId, BlockType.TEXT, SIMPLE_CONTENT, null, null, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("잘못된 요청입니다.")
                 .extracting("errorCode")
@@ -159,7 +169,7 @@ class BlockServiceImplTest {
                 documentId,
                 null,
                 BlockType.TEXT,
-                "새 블록",
+                SIMPLE_CONTENT,
                 UUID.randomUUID(),
                 null,
                 ACTOR_ID
@@ -181,7 +191,7 @@ class BlockServiceImplTest {
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> blockService.create(documentId, parentId, BlockType.TEXT, "새 블록", null, null, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.create(documentId, parentId, BlockType.TEXT, SIMPLE_CONTENT, null, null, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청한 블록을 찾을 수 없습니다.")
                 .extracting("errorCode")
@@ -202,10 +212,10 @@ class BlockServiceImplTest {
 
         block.setVersion(0);
 
-        Block updated = blockService.update(blockId, "수정된 블록", 0, ACTOR_ID);
+        Block updated = blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID);
 
         assertThat(updated).isSameAs(block);
-        assertThat(block.getText()).isEqualTo("수정된 블록");
+        assertThat(block.getContent()).isEqualTo(UPDATED_CONTENT);
         assertThat(block.getUpdatedBy()).isEqualTo(ACTOR_ID);
     }
 
@@ -216,7 +226,7 @@ class BlockServiceImplTest {
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청한 블록을 찾을 수 없습니다.")
                 .extracting("errorCode")
@@ -236,7 +246,7 @@ class BlockServiceImplTest {
 
         block.setVersion(0);
 
-        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("잘못된 요청입니다.")
                 .extracting("errorCode")
@@ -255,7 +265,7 @@ class BlockServiceImplTest {
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
-        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
                 .extracting("errorCode")
@@ -280,7 +290,7 @@ class BlockServiceImplTest {
                 .document(document(documentId))
                 .parent(parentId == null ? null : parentBlock(parentId, documentId))
                 .type(BlockType.TEXT)
-                .text("기존 블록")
+                .content(toContent("기존 블록"))
                 .sortKey(sortKey)
                 .build();
     }
@@ -290,9 +300,13 @@ class BlockServiceImplTest {
                 .id(blockId)
                 .document(document(documentId))
                 .type(BlockType.TEXT)
-                .text("부모 블록")
+                .content(toContent("부모 블록"))
                 .sortKey("000000000001000000000000")
                 .build();
+    }
+
+    private String toContent(String text) {
+        return "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"%s\",\"marks\":[]}]}".formatted(text);
     }
 
 }
