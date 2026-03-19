@@ -68,4 +68,19 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
             @Param("actorId") String actorId,
             @Param("deletedAt") LocalDateTime deletedAt
     );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Block b
+            set b.deletedAt = null,
+                b.updatedBy = :actorId,
+                b.updatedAt = :updatedAt
+            where b.document.id = :documentId
+              and b.deletedAt is not null
+            """)
+    void restoreDeletedByDocumentId(
+            @Param("documentId") UUID documentId,
+            @Param("actorId") String actorId,
+            @Param("updatedAt") LocalDateTime updatedAt
+    );
 }

@@ -310,6 +310,60 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("성공_soft delete된 문서 복구 요청에 대해 성공 응답을 반환한다")
+	void restoreDocumentReturnsSuccessEnvelope() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/restore", documentId)
+				.header(USER_ID_HEADER, ACTOR_ID))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.message").value("요청 응답 성공"))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data").doesNotExist());
+
+		verify(documentService).restore(documentId, ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서 복구 요청은 문서 없음 응답을 반환한다")
+	void restoreDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).restore(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/restore", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_이미 활성 상태인 문서 복구 요청은 문서 없음 응답을 반환한다")
+	void restoreDocumentReturnsNotFoundWhenDocumentAlreadyActive() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).restore(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/restore", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_사용자 식별자 헤더 없이 문서 복구 요청하면 인증 오류 응답을 반환한다")
+	void restoreDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/restore", documentId));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+		verify(documentService, never()).restore(any(), any());
+	}
+
+	@Test
 	@DisplayName("실패_icon이 객체 스키마를 따르지 않으면 유효성 검사 오류를 반환한다")
 	void createDocumentRejectsInvalidIconSchema() throws Exception {
 		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
