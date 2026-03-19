@@ -33,87 +33,87 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/v1")
 public class DocumentController {
 
-    // TODO: 임시 헤더 값. 인증 서버와 연동 후 수정 필요
-    private static final String USER_ID_HEADER = "X-User-Id";
+	// TODO: 임시 헤더 값. 인증 서버와 연동 후 수정 필요
+	private static final String USER_ID_HEADER = "X-User-Id";
 
-    private final DocumentService documentService;
-    private final DocumentApiMapper documentApiMapper;
+	private final DocumentService documentService;
+	private final DocumentApiMapper documentApiMapper;
 
-    @Operation(summary = "워크스페이스 문서 목록 조회")
-    @GetMapping("/workspaces/{workspaceId}/documents")
-    public ResponseEntity<GlobalResponse<List<DocumentResponse>>> getDocuments(
-            @PathVariable("workspaceId") UUID workspaceId
-    ) {
-        List<DocumentResponse> response = documentService.getAllByWorkspaceId(workspaceId).stream()
-                .map(documentApiMapper::toResponse)
-                .toList();
-        return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
-    }
+	@Operation(summary = "워크스페이스 문서 목록 조회")
+	@GetMapping("/workspaces/{workspaceId}/documents")
+	public ResponseEntity<GlobalResponse<List<DocumentResponse>>> getDocuments(
+		@PathVariable("workspaceId") UUID workspaceId
+	) {
+		List<DocumentResponse> response = documentService.getAllByWorkspaceId(workspaceId).stream()
+			.map(documentApiMapper::toResponse)
+			.toList();
+		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
+	}
 
-    @Operation(summary = "문서 생성")
-    @PostMapping("/workspaces/{workspaceId}/documents")
-    public ResponseEntity<GlobalResponse<DocumentResponse>> createDocument(
-            @PathVariable("workspaceId") UUID workspaceId,
-            @Valid @RequestBody CreateDocumentRequest request,
-            @RequestHeader(USER_ID_HEADER) String userId
-    ) {
-        Document createdDocument = documentService.create(
-                workspaceId,
-                request.getParentId(),
-                request.getTitle(),
-                documentApiMapper.serializeIcon(request),
-                documentApiMapper.serializeCover(request),
-                userId
-        );
+	@Operation(summary = "문서 생성")
+	@PostMapping("/workspaces/{workspaceId}/documents")
+	public ResponseEntity<GlobalResponse<DocumentResponse>> createDocument(
+		@PathVariable("workspaceId") UUID workspaceId,
+		@Valid @RequestBody CreateDocumentRequest request,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		Document createdDocument = documentService.create(
+			workspaceId,
+			request.getParentId(),
+			request.getTitle(),
+			documentApiMapper.serializeIcon(request),
+			documentApiMapper.serializeCover(request),
+			userId
+		);
 
-        return ResponseEntity.status(SuccessCode.CREATED.getHttpStatus())
-                .body(GlobalResponse.ok(SuccessCode.CREATED, documentApiMapper.toResponse(createdDocument)));
-    }
+		return ResponseEntity.status(SuccessCode.CREATED.getHttpStatus())
+			.body(GlobalResponse.ok(SuccessCode.CREATED, documentApiMapper.toResponse(createdDocument)));
+	}
 
-    @Operation(summary = "문서 단건 조회")
-    @GetMapping("/documents/{documentId}")
-    public ResponseEntity<GlobalResponse<DocumentResponse>> getDocument(
-            @PathVariable("documentId") UUID documentId
-    ) {
-        Document document = documentService.getById(documentId);
-        return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(document)));
-    }
+	@Operation(summary = "문서 단건 조회")
+	@GetMapping("/documents/{documentId}")
+	public ResponseEntity<GlobalResponse<DocumentResponse>> getDocument(
+		@PathVariable("documentId") UUID documentId
+	) {
+		Document document = documentService.getById(documentId);
+		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(document)));
+	}
 
-    @Operation(summary = "문서 수정")
-    @PatchMapping("/documents/{documentId}")
-    public ResponseEntity<GlobalResponse<DocumentResponse>> updateDocument(
-            @PathVariable("documentId") UUID documentId,
-            @Valid @RequestBody UpdateDocumentRequest request,
-            @RequestHeader(USER_ID_HEADER) String userId
-    ) {
-        Document updatedDocument = documentService.update(
-                documentId,
-                request.getTitle(),
-                documentApiMapper.serializeIcon(request),
-                documentApiMapper.serializeCover(request),
-                request.getParentId(),
-                userId
-        );
-        return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));
-    }
+	@Operation(summary = "문서 수정")
+	@PatchMapping("/documents/{documentId}")
+	public ResponseEntity<GlobalResponse<DocumentResponse>> updateDocument(
+		@PathVariable("documentId") UUID documentId,
+		@Valid @RequestBody UpdateDocumentRequest request,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		Document updatedDocument = documentService.update(
+			documentId,
+			request.getTitle(),
+			documentApiMapper.serializeIcon(request),
+			documentApiMapper.serializeCover(request),
+			request.getParentId(),
+			userId
+		);
+		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));
+	}
 
-    @Operation(summary = "문서 삭제")
-    @DeleteMapping("/documents/{documentId}")
-    public ResponseEntity<GlobalResponse<Void>> deleteDocument(
-            @PathVariable("documentId") UUID documentId,
-            @RequestHeader(USER_ID_HEADER) String userId
-    ) {
-        documentService.delete(documentId, userId);
-        return ResponseEntity.ok(GlobalResponse.ok());
-    }
+	@Operation(summary = "문서 삭제")
+	@DeleteMapping("/documents/{documentId}")
+	public ResponseEntity<GlobalResponse<Void>> deleteDocument(
+		@PathVariable("documentId") UUID documentId,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		documentService.delete(documentId, userId);
+		return ResponseEntity.ok(GlobalResponse.ok());
+	}
 
-    @Operation(summary = "문서 복구")
-    @PatchMapping("/documents/{documentId}/restore")
-    public ResponseEntity<GlobalResponse<Void>> restoreDocument(
-            @PathVariable("documentId") UUID documentId,
-            @RequestHeader(USER_ID_HEADER) String userId
-    ) {
-        documentService.restore(documentId, userId);
-        return ResponseEntity.ok(GlobalResponse.ok());
-    }
+	@Operation(summary = "문서 복구")
+	@PostMapping("/documents/{documentId}/restore")
+	public ResponseEntity<GlobalResponse<Void>> restoreDocument(
+		@PathVariable("documentId") UUID documentId,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		documentService.restore(documentId, userId);
+		return ResponseEntity.ok(GlobalResponse.ok());
+	}
 }
