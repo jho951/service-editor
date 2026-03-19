@@ -1,5 +1,7 @@
 package com.documents.service;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -21,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
 
+	private final BlockService blockService;
 	private final DocumentRepository documentRepository;
 	private final WorkspaceService workspaceService;
 	private final TextNormalizer textNormalizer;
@@ -82,6 +85,18 @@ public class DocumentServiceImpl implements DocumentService {
 		return document;
 	}
 
+	@Override
+	@Transactional
+	public void delete(UUID documentId, String actorId) {
+		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+		LocalDateTime deletedAt = LocalDateTime.now();
+		List<UUID> documentIdsToDelete = collectActiveDocumentTreeIds(findActiveDocument(documentId));
+		documentRepository.softDeleteActiveByIds(documentIdsToDelete, normalizedActorId, deletedAt);
+		for (UUID currentDocumentId : documentIdsToDelete) {
+			blockService.softDeleteAllByDocumentId(currentDocumentId, normalizedActorId, deletedAt);
+		}
+	}
+
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
 		if (parentId == null) {
 			return null;
@@ -140,6 +155,21 @@ public class DocumentServiceImpl implements DocumentService {
 	private Document findActiveDocument(UUID documentId) {
 		return documentRepository.findByIdAndDeletedAtIsNull(documentId)
 			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+	}
+
+	private List<UUID> collectActiveDocumentTreeIds(Document rootDocument) {
+		List<UUID> documentIds = new ArrayList<>();
+		collectActiveDocumentTreeIds(rootDocument, documentIds);
+		return documentIds;
+	}
+
+	private void collectActiveDocumentTreeIds(Document document, List<UUID> documentIds) {
+		documentIds.add(document.getId());
+
+		List<Document> children = documentRepository.findActiveChildrenByParentIdOrderBySortKey(document.getId());
+		for (Document child : children) {
+			collectActiveDocumentTreeIds(child, documentIds);
+		}
 	}
 
 	private String normalizeNullableMetaJson(String value) {

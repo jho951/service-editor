@@ -5,24 +5,35 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.hibernate.resource.jdbc.spi.StatementInspector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomizer;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 import com.documents.domain.Document;
+import com.documents.domain.Block;
+import com.documents.domain.BlockType;
 import com.documents.domain.Workspace;
+import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
 import com.documents.repository.WorkspaceRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(DocumentApiIntegrationTest.DocumentDeleteSqlCounterTestConfig.class)
 @DisplayName("Document API 통합 검증")
 class DocumentApiIntegrationTest {
 
@@ -35,10 +46,18 @@ class DocumentApiIntegrationTest {
     @Autowired
     private DocumentRepository documentRepository;
 
+    @Autowired
+    private BlockRepository blockRepository;
+
+    @Autowired
+    private DocumentDeleteSqlCounter documentDeleteSqlCounter;
+
     @BeforeEach
     void setUp() {
+        blockRepository.deleteAll();
         documentRepository.deleteAll();
         workspaceRepository.deleteAll();
+        documentDeleteSqlCounter.reset();
     }
 
     @Test
@@ -384,6 +403,69 @@ class DocumentApiIntegrationTest {
         assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
     }
 
+    @Test
+    @DisplayName("성공_문서 삭제 API는 하위 문서와 각 문서의 활성 블록까지 soft delete 처리한다")
+    void deleteDocumentSoftDeletesDescendantDocumentsAndBlocks() throws Exception {
+        Workspace workspace = workspace("Docs Root");
+        Document targetDocument = saveDocument(workspace.getId(), null, "삭제 대상 문서", "00000000000000000001");
+        Document childDocument = saveDocument(workspace.getId(), targetDocument.getId(), "하위 문서", "00000000000000000002");
+        Document otherDocument = saveDocument(workspace.getId(), null, "다른 문서", "00000000000000000002");
+
+        Block targetRootBlock = saveBlock(targetDocument.getId(), null, "대상 루트 블록", "000000000001000000000000");
+        Block targetChildBlock = saveBlock(targetDocument.getId(), targetRootBlock.getId(), "대상 자식 블록", "000000000001I00000000000");
+        Block childDocumentBlock = saveBlock(childDocument.getId(), null, "하위 문서 블록", "000000000001000000000000");
+        Block otherDocumentBlock = saveBlock(otherDocument.getId(), null, "다른 문서 블록", "000000000001000000000000");
+        documentDeleteSqlCounter.reset();
+
+        mockMvc.perform(delete("/v1/documents/{documentId}", targetDocument.getId())
+                        .header("X-User-Id", "user-123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200));
+
+        Document deletedDocument = documentRepository.findById(targetDocument.getId()).orElseThrow();
+        Document deletedChildDocument = documentRepository.findById(childDocument.getId()).orElseThrow();
+        assertThat(deletedDocument.getDeletedAt()).isNotNull();
+        assertThat(deletedChildDocument.getDeletedAt()).isNotNull();
+
+        Block deletedRootBlock = blockRepository.findById(targetRootBlock.getId()).orElseThrow();
+        Block deletedChildBlock = blockRepository.findById(targetChildBlock.getId()).orElseThrow();
+        Block deletedDescendantDocumentBlock = blockRepository.findById(childDocumentBlock.getId()).orElseThrow();
+        Block survivedOtherBlock = blockRepository.findById(otherDocumentBlock.getId()).orElseThrow();
+
+        assertThat(deletedRootBlock.getDeletedAt()).isNotNull();
+        assertThat(deletedChildBlock.getDeletedAt()).isNotNull();
+        assertThat(deletedDescendantDocumentBlock.getDeletedAt()).isNotNull();
+        assertThat(survivedOtherBlock.getDeletedAt()).isNull();
+        assertThat(documentDeleteSqlCounter.documentSoftDeleteUpdateCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("성공_문서 삭제 후 같은 문서를 단건 조회하면 문서 없음 응답을 반환한다")
+    void getDocumentReturnsNotFoundAfterDelete() throws Exception {
+        Workspace workspace = workspace("Docs Root");
+        Document document = saveDocument(workspace.getId(), null, "삭제 대상 문서", "00000000000000000001");
+        saveBlock(document.getId(), null, "대상 블록", "000000000001000000000000");
+
+        mockMvc.perform(delete("/v1/documents/{documentId}", document.getId())
+                        .header("X-User-Id", "user-123"))
+                .andExpect(status().isOk());
+
+        var result = mockMvc.perform(get("/v1/documents/{documentId}", document.getId()));
+
+        assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 문서를 삭제하면 문서 없음 응답을 반환한다")
+    void deleteDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+        var result = mockMvc.perform(delete("/v1/documents/{documentId}", UUID.randomUUID())
+                        .header("X-User-Id", "user-123"));
+
+        assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+    }
+
     private void assertErrorEnvelope(ResultActions result, String httpStatus, int code, String message) throws Exception {
         result.andExpect(status().is(org.springframework.http.HttpStatus.valueOf(httpStatus).value()))
                 .andExpect(jsonPath("$.httpStatus").value(httpStatus))
@@ -435,5 +517,54 @@ class DocumentApiIntegrationTest {
                 .sortKey(sortKey)
                 .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
                 .build());
+    }
+
+    private Block saveBlock(UUID documentId, UUID parentId, String text, String sortKey) {
+        return blockRepository.save(Block.builder()
+                .id(UUID.randomUUID())
+                .document(documentRepository.getReferenceById(documentId))
+                .parent(parentId == null ? null : blockRepository.getReferenceById(parentId))
+                .type(BlockType.TEXT)
+                .text(text)
+                .sortKey(sortKey)
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .build());
+    }
+
+    @TestConfiguration
+    static class DocumentDeleteSqlCounterTestConfig {
+
+        @Bean
+        DocumentDeleteSqlCounter documentDeleteSqlCounter() {
+            return new DocumentDeleteSqlCounter();
+        }
+
+        @Bean
+        HibernatePropertiesCustomizer documentDeleteSqlCounterCustomizer(DocumentDeleteSqlCounter counter) {
+            return properties -> properties.put("hibernate.session_factory.statement_inspector", counter);
+        }
+    }
+
+    static class DocumentDeleteSqlCounter implements StatementInspector {
+
+        private final AtomicInteger documentSoftDeleteUpdateCount = new AtomicInteger();
+
+        @Override
+        public String inspect(String sql) {
+            String normalizedSql = sql.toLowerCase(Locale.ROOT);
+            if (normalizedSql.contains("update documents") && normalizedSql.contains("deleted_at")) {
+                documentSoftDeleteUpdateCount.incrementAndGet();
+            }
+            return sql;
+        }
+
+        void reset() {
+            documentSoftDeleteUpdateCount.set(0);
+        }
+
+        int documentSoftDeleteUpdateCount() {
+            return documentSoftDeleteUpdateCount.get();
+        }
     }
 }

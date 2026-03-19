@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -94,5 +95,15 @@ public class DocumentController {
                 userId
         );
         return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));
+    }
+
+    @Operation(summary = "문서 삭제")
+    @DeleteMapping("/documents/{documentId}")
+    public ResponseEntity<GlobalResponse<Void>> deleteDocument(
+            @PathVariable("documentId") UUID documentId,
+            @RequestHeader(USER_ID_HEADER) String userId
+    ) {
+        documentService.delete(documentId, userId);
+        return ResponseEntity.ok(GlobalResponse.ok());
     }
 }

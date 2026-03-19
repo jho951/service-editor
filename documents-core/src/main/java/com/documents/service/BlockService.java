@@ -2,6 +2,7 @@ package com.documents.service;
 
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,4 +20,6 @@ public interface BlockService {
     );
 
     Block update(UUID blockId, String text, Integer version, String actorId);
+
+    void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt);
 }
