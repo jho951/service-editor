@@ -31,10 +31,6 @@ public class BlockResponse extends BaseResponse {
     @Schema(description = "TEXT 블록 content")
     private JsonNode content;
 
-    @Deprecated(forRemoval = false)
-    @Schema(description = "TEXT 블록 본문")
-    private String text;
-
     @Schema(description = "정렬 키")
     private String sortKey;
 

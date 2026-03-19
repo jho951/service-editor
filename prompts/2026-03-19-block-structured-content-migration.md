@@ -69,3 +69,11 @@
 - WebMvc 테스트와 Boot 통합 테스트에서 조회 응답의 `content.format`, `content.segments[].text`를 직접 검증하도록 수정했다.
 - 이로써 생성, 수정, 조회 핵심 경로가 모두 `content` 기반 계약으로 연결되었다.
 - 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-infrastructure:test --tests com.documents.service.BlockServiceImplTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`
+
+## Step 9. 기존 `text` 호환 레이어 제거
+
+- `Block` 엔티티의 deprecated `getText`/`setText`와 builder `text(...)` 호환 경로를 제거했다.
+- `BlockResponse.text`와 `BlockApiMapper`의 `text` 매핑을 제거했다.
+- 블록 관련 테스트 픽스처에서 `.text(...)`, `setText(...)` 사용을 모두 `.content(...)`, `setContent(...)` 기준으로 정리했다.
+- 남은 `text` 문자열은 모두 `content.segments[].text` JSON 구조 의미로만 사용된다.
+- 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-infrastructure:test --tests com.documents.service.BlockServiceImplTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`

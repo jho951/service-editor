@@ -86,35 +86,11 @@ public class Block extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
-    @Deprecated(forRemoval = false)
-    public String getText() {
-        return content;
-    }
-
-    @Deprecated(forRemoval = false)
-    public void setText(String text) {
-        this.content = text;
-    }
-
     public UUID getDocumentId() {
         return document == null ? null : document.getId();
     }
 
     public UUID getParentId() {
         return parent == null ? null : parent.getId();
-    }
-
-    public static class BlockBuilder {
-
-        public BlockBuilder content(String content) {
-            this.content = content;
-            return this;
-        }
-
-        @Deprecated(forRemoval = false)
-        public BlockBuilder text(String text) {
-            this.content = text;
-            return this;
-        }
     }
 }

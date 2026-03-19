@@ -20,7 +20,6 @@ public class BlockApiMapper {
                 .parentId(block.getParentId())
                 .type(block.getType())
                 .content(blockJsonCodec.read(block.getContent()))
-                .text(block.getText())
                 .sortKey(block.getSortKey())
                 .createdBy(block.getCreatedBy())
                 .updatedBy(block.getUpdatedBy())

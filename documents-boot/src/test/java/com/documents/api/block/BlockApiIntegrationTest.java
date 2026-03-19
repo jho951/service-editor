@@ -180,7 +180,7 @@ class BlockApiIntegrationTest {
                 .id(UUID.randomUUID())
                 .document(document)
                 .type(BlockType.TEXT)
-                .text("기존 블록")
+                .content(toContent("기존 블록"))
                 .sortKey("000000000001000000000000")
                 .createdBy("user-123")
                 .updatedBy("user-123")
@@ -238,12 +238,12 @@ class BlockApiIntegrationTest {
                 .id(UUID.randomUUID())
                 .document(document)
                 .type(BlockType.TEXT)
-                .text("기존 블록")
+                .content(toContent("기존 블록"))
                 .sortKey("000000000001000000000000")
                 .createdBy("user-123")
                 .updatedBy("user-123")
                 .build());
-        block.setText("다른 사용자 수정");
+        block.setContent(toContent("다른 사용자 수정"));
         blockRepository.save(block);
 
         mockMvc.perform(patch("/v1/blocks/{blockId}", block.getId())
@@ -287,7 +287,7 @@ class BlockApiIntegrationTest {
                 .id(UUID.randomUUID())
                 .document(document)
                 .type(BlockType.TEXT)
-                .text("첫 블록")
+                .content(toContent("첫 블록"))
                 .sortKey("000000000001000000000000")
                 .createdBy("user-123")
                 .updatedBy("user-123")
@@ -296,7 +296,7 @@ class BlockApiIntegrationTest {
                 .id(UUID.randomUUID())
                 .document(document)
                 .type(BlockType.TEXT)
-                .text("둘째 블록")
+                .content(toContent("둘째 블록"))
                 .sortKey("000000000002000000000000")
                 .createdBy("user-123")
                 .updatedBy("user-123")

@@ -290,7 +290,7 @@ class BlockServiceImplTest {
                 .document(document(documentId))
                 .parent(parentId == null ? null : parentBlock(parentId, documentId))
                 .type(BlockType.TEXT)
-                .text("기존 블록")
+                .content(toContent("기존 블록"))
                 .sortKey(sortKey)
                 .build();
     }
@@ -300,9 +300,13 @@ class BlockServiceImplTest {
                 .id(blockId)
                 .document(document(documentId))
                 .type(BlockType.TEXT)
-                .text("부모 블록")
+                .content(toContent("부모 블록"))
                 .sortKey("000000000001000000000000")
                 .build();
+    }
+
+    private String toContent(String text) {
+        return "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"%s\",\"marks\":[]}]}".formatted(text);
     }
 
 }
