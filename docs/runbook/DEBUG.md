@@ -14,11 +14,12 @@
 10. Block 정렬 디버깅 시 `sortKey`는 대문자 base36 고정폭 문자열이며, 같은 부모 아래 `ORDER BY sort_key ASC` 결과가 화면 순서와 일치해야 한다.
 11. 반복 삽입으로 gap이 없어지면 `SORT_KEY_REBALANCE_REQUIRED(409)`가 반환될 수 있다. 이 경우 즉시 전체 재정렬을 수행하지 않고 후속 reorder/rebalance 작업이 필요하다.
 12. Block 생성 실패를 재현할 때는 `parentId`를 다른 문서의 블록으로 보내거나, 존재하지 않는 `afterBlockId`를 보내서 `400` 또는 `404` 응답이 요구사항대로 나오는지 확인한다.
-13. API 통합 테스트는 저장소 루트에서 `./gradlew :documents-boot:test`로 실행한다. 하위 모듈 검증이 필요하면 같은 방식으로 `:documents-api:test`, `:documents-core:test`, `:documents-infrastructure:test`를 선택 실행한다.
-14. 빠른 API 계약 확인은 `./gradlew :documents-api:test`, 영속/서비스 구현 확인은 `./gradlew :documents-infrastructure:test`를 우선 사용하고, 최종 조립 확인 시 `:documents-boot:test`를 실행한다.
-15. 스키마 명명 규칙 확인이 필요하면 H2 `INFORMATION_SCHEMA.COLUMNS` 또는 MySQL `information_schema.columns`에서 `workspaces.workspace_id`, `documents.document_id`, `blocks.block_id` 컬럼이 생성됐는지 확인한다.
-16. 문서 계층 삭제 이슈를 확인할 때는 `information_schema.table_constraints`, `information_schema.referential_constraints`에서 `FK_DOCUMENTS_PARENT`가 존재하는지와 `DELETE_RULE = CASCADE`인지 함께 확인한다.
-17. 블록 계층 삭제 이슈를 확인할 때는 `FK_BLOCKS_DOCUMENT`, `FK_BLOCKS_PARENT`가 존재하는지와 두 FK 모두 `DELETE_RULE = CASCADE`인지 함께 확인한다.
+13. Block 삭제 API 확인이 필요하면 루트 블록과 하위 블록을 만든 뒤 `DELETE /v1/blocks/{blockId}`를 호출한다. 대상 블록 트리의 `deletedAt`만 채워지고 같은 문서의 다른 루트 블록은 유지되는지 확인한다.
+14. API 통합 테스트는 저장소 루트에서 `./gradlew :documents-boot:test`로 실행한다. 하위 모듈 검증이 필요하면 같은 방식으로 `:documents-api:test`, `:documents-core:test`, `:documents-infrastructure:test`를 선택 실행한다.
+15. 빠른 API 계약 확인은 `./gradlew :documents-api:test`, 영속/서비스 구현 확인은 `./gradlew :documents-infrastructure:test`를 우선 사용하고, 최종 조립 확인 시 `:documents-boot:test`를 실행한다.
+16. 스키마 명명 규칙 확인이 필요하면 H2 `INFORMATION_SCHEMA.COLUMNS` 또는 MySQL `information_schema.columns`에서 `workspaces.workspace_id`, `documents.document_id`, `blocks.block_id` 컬럼이 생성됐는지 확인한다.
+17. 문서 계층 삭제 이슈를 확인할 때는 `information_schema.table_constraints`, `information_schema.referential_constraints`에서 `FK_DOCUMENTS_PARENT`가 존재하는지와 `DELETE_RULE = CASCADE`인지 함께 확인한다.
+18. 블록 계층 삭제 이슈를 확인할 때는 `FK_BLOCKS_DOCUMENT`, `FK_BLOCKS_PARENT`가 존재하는지와 두 FK 모두 `DELETE_RULE = CASCADE`인지 함께 확인한다.
 
 ## 확인할 로그
 
@@ -38,6 +39,7 @@
 - `400` Document 목록 조회 실패: 커스텀 JPA 쿼리의 named parameter 바인딩 누락 또는 soft delete 조건/정렬 쿼리 오류 여부를 확인한다.
 - `404` Block 생성 실패: `parentId`가 soft delete되었거나 다른 문서의 블록을 부모로 지정한 경우인지 확인한다.
 - `400` Block 생성 실패: `afterBlockId`/`beforeBlockId`가 같은 sibling gap을 가리키는지, 요청 `parentId`와 같은 형제 집합인지 확인한다.
+- `404` Block 삭제 실패: 대상 `blockId`가 이미 soft delete되었거나 존재하지 않는지 확인한다.
 - `409` sort key 충돌: 같은 gap에 삽입이 누적되어 재균형이 필요한 상태인지 확인한다.
 - 스키마 검증 실패: 엔티티 `@Column(name = ...)` 값과 실제 생성된 DDL 컬럼명이 일치하는지 확인한다. PK는 `id`가 아니라 `${domain}_id` 규칙을 따른다.
 

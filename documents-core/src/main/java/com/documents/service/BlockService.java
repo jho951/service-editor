@@ -22,6 +22,8 @@ public interface BlockService {
 
     Block update(UUID blockId, String content, Integer version, String actorId);
 
+    void delete(UUID blockId, String actorId);
+
     void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt);
 
     void restoreAllByDocumentId(UUID documentId, String actorId, LocalDateTime updatedAt);

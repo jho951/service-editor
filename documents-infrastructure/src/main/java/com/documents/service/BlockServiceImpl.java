@@ -1,6 +1,7 @@
 package com.documents.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -102,6 +103,18 @@ public class BlockServiceImpl implements BlockService {
 
     @Override
     @Transactional
+    public void delete(UUID blockId, String actorId) {
+        String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+        LocalDateTime deletedAt = LocalDateTime.now();
+
+        List<UUID> blockIdsToDelete = new ArrayList<>();
+        collectActiveDescendantBlockIdsForSoftDelete(findActiveBlock(blockId), blockIdsToDelete);
+
+        blockRepository.softDeleteActiveByIds(blockIdsToDelete, normalizedActorId, deletedAt);
+    }
+
+    @Override
+    @Transactional
     public void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt) {
         blockRepository.softDeleteActiveByDocumentId(documentId, actorId, deletedAt);
     }
@@ -115,6 +128,11 @@ public class BlockServiceImpl implements BlockService {
     private Document findActiveDocument(UUID documentId) {
         return documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+    }
+
+    private Block findActiveBlock(UUID blockId) {
+        return blockRepository.findByIdAndDeletedAtIsNull(blockId)
+                .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
     }
 
     private void validateSupportedType(BlockType type) {
@@ -170,6 +188,15 @@ public class BlockServiceImpl implements BlockService {
             throw new BusinessException(BusinessErrorCode.SORT_KEY_REBALANCE_REQUIRED);
         } catch (IllegalArgumentException ex) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private void collectActiveDescendantBlockIdsForSoftDelete(Block block, List<UUID> blockIds) {
+        blockIds.add(block.getId());
+
+        List<Block> children = blockRepository.findActiveChildrenByParentIdOrderBySortKey(block.getId());
+        for (Block child : children) {
+            collectActiveDescendantBlockIdsForSoftDelete(child, blockIds);
         }
     }
 }
