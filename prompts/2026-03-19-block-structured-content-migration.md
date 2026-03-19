@@ -54,3 +54,11 @@
 - WebMvc 테스트에 `format`, mark 타입, `textColor` 형식 실패 케이스를 추가했다.
 - Boot 통합 테스트에 허용되지 않은 mark 타입 요청 실패 케이스를 추가했다.
 - 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`
+
+## Step 7. 블록 수정 경로 `content` JSON 전환
+
+- `UpdateBlockRequest`를 `text`에서 `JsonNode content` 기준으로 변경하고, 생성과 동일한 `ValidBlockContent` 검증을 재사용하도록 했다.
+- `BlockController.updateBlock(...)`은 이제 요청 `content`를 직렬화해서 서비스에 전달한다.
+- `BlockService.update(...)`와 구현체를 `content` 기준으로 변경하고, 저장 필드도 `block.content`를 직접 갱신하도록 바꿨다.
+- 수정 관련 WebMvc/서비스/통합 테스트를 `content` 응답 및 저장 검증 기준으로 갱신했다.
+- 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-infrastructure:test --tests com.documents.service.BlockServiceImplTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`

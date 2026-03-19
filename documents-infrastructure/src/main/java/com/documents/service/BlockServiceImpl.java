@@ -83,7 +83,7 @@ public class BlockServiceImpl implements BlockService {
 
     @Override
     @Transactional
-    public Block update(UUID blockId, String text, Integer version, String actorId) {
+    public Block update(UUID blockId, String content, Integer version, String actorId) {
         Block block = blockRepository.findByIdAndDeletedAtIsNull(blockId)
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
 
@@ -95,7 +95,7 @@ public class BlockServiceImpl implements BlockService {
             throw new BusinessException(BusinessErrorCode.CONFLICT);
         }
 
-        block.setText(text);
+        block.setContent(content);
         block.setUpdatedBy(normalizedActorId);
         return block;
     }

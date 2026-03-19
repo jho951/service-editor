@@ -75,7 +75,12 @@ public class BlockController {
             @Valid @RequestBody UpdateBlockRequest request,
             @RequestHeader(USER_ID_HEADER) String userId
     ) {
-        Block updatedBlock = blockService.update(blockId, request.getText(), request.getVersion(), userId);
+        Block updatedBlock = blockService.update(
+                blockId,
+                blockJsonCodec.write(request.getContent()),
+                request.getVersion(),
+                userId
+        );
         return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, blockApiMapper.toResponse(updatedBlock)));
     }
 }
