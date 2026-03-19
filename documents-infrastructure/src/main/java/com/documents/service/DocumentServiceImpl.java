@@ -100,7 +100,14 @@ public class DocumentServiceImpl implements DocumentService {
 	@Override
 	@Transactional
 	public void restore(UUID documentId, String actorId) {
-		findActiveDocument(documentId);
+		Document deletedDocument = findDeletedDocument(documentId);
+		validateParentForRestore(deletedDocument);
+
+		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+		LocalDateTime restoredAt = LocalDateTime.now();
+		List<UUID> documentIdsToRestore = collectDeletedDocumentTreeIds(deletedDocument);
+
+		documentRepository.restoreDeletedByIds(documentIdsToRestore, normalizedActorId, restoredAt);
 	}
 
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
@@ -158,9 +165,33 @@ public class DocumentServiceImpl implements DocumentService {
 		}
 	}
 
+	private void validateParentForRestore(Document document) {
+		if (document.getParentId() == null) {
+			return;
+		}
+
+		Document parentDocument = documentRepository.findById(document.getParentId())
+			.orElseThrow(() -> new BusinessException(BusinessErrorCode.INVALID_REQUEST));
+
+		if (parentDocument.getDeletedAt() != null) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+	}
+
 	private Document findActiveDocument(UUID documentId) {
 		return documentRepository.findByIdAndDeletedAtIsNull(documentId)
 			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+	}
+
+	private Document findDeletedDocument(UUID documentId) {
+		Document document = documentRepository.findById(documentId)
+			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+
+		if (document.getDeletedAt() == null) {
+			throw new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+		}
+
+		return document;
 	}
 
 	private List<UUID> collectActiveDocumentTreeIds(Document rootDocument) {
@@ -175,6 +206,21 @@ public class DocumentServiceImpl implements DocumentService {
 		List<Document> children = documentRepository.findActiveChildrenByParentIdOrderBySortKey(document.getId());
 		for (Document child : children) {
 			collectActiveDocumentTreeIds(child, documentIds);
+		}
+	}
+
+	private List<UUID> collectDeletedDocumentTreeIds(Document rootDocument) {
+		List<UUID> documentIds = new ArrayList<>();
+		collectDeletedDocumentTreeIds(rootDocument, documentIds);
+		return documentIds;
+	}
+
+	private void collectDeletedDocumentTreeIds(Document document, List<UUID> documentIds) {
+		documentIds.add(document.getId());
+
+		List<Document> children = documentRepository.findDeletedChildrenByParentIdOrderBySortKey(document.getId());
+		for (Document child : children) {
+			collectDeletedDocumentTreeIds(child, documentIds);
 		}
 	}
 

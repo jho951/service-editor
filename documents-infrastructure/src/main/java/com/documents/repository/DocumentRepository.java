@@ -55,6 +55,18 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 		""")
 	List<Document> findActiveChildrenByParentIdOrderBySortKey(@Param("parentId") UUID parentId);
 
+	@Query("""
+		select d
+		from Document d
+		where d.parent.id = :parentId
+		  and d.deletedAt is not null
+		order by
+		  d.sortKey asc,
+		  d.createdAt asc,
+		  d.id asc
+		""")
+	List<Document> findDeletedChildrenByParentIdOrderBySortKey(@Param("parentId") UUID parentId);
+
 	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query("""
 		update Document d
@@ -67,5 +79,20 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 		@Param("documentIds") List<UUID> documentIds,
 		@Param("actorId") String actorId,
 		@Param("deletedAt") LocalDateTime deletedAt
+	);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+		update Document d
+		set d.deletedAt = null,
+		    d.updatedBy = :actorId,
+		    d.updatedAt = :updatedAt
+		where d.id in :documentIds
+		  and d.deletedAt is not null
+		""")
+	int restoreDeletedByIds(
+		@Param("documentIds") List<UUID> documentIds,
+		@Param("actorId") String actorId,
+		@Param("updatedAt") LocalDateTime updatedAt
 	);
 }
