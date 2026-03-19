@@ -36,6 +36,9 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 @DisplayName("Block 컨트롤러 빠른 검증")
 class BlockControllerWebMvcTest {
 
+    private static final String SIMPLE_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}";
+    private static final String UPDATED_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"수정된 블록\",\"marks\":[]}]}";
+
     @Mock
     private BlockService blockService;
 
@@ -101,7 +104,7 @@ class BlockControllerWebMvcTest {
                 eq(documentId),
                 eq(parentId),
                 eq(BlockType.TEXT),
-                eq("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}"),
+                eq(SIMPLE_CONTENT_SERIALIZED),
                 eq(null),
                 eq(null),
                 eq("user-123")
@@ -149,22 +152,34 @@ class BlockControllerWebMvcTest {
         UUID documentId = UUID.randomUUID();
         UUID blockId = UUID.randomUUID();
 
-        when(blockService.update(eq(blockId), eq("수정된 블록"), eq(0), eq("user-123")))
-                .thenReturn(block(
+        Block updatedBlock = block(
                         blockId,
                         documentId,
                         null,
                         "000000000001000000000000",
                         1,
                         "수정된 블록"
-                ));
+                );
+        updatedBlock.setContent(UPDATED_CONTENT_SERIALIZED);
+
+        when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
+                .thenReturn(updatedBlock);
 
         mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "text": "수정된 블록",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "수정된 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  },
                                   "version": 0
                                 }
                                 """))
@@ -173,7 +188,9 @@ class BlockControllerWebMvcTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(blockId.toString()))
-                .andExpect(jsonPath("$.data.text").value("수정된 블록"))
+                .andExpect(jsonPath("$.data.content.format").value("rich_text"))
+                .andExpect(jsonPath("$.data.content.schemaVersion").value(1))
+                .andExpect(jsonPath("$.data.content.segments[0].text").value("수정된 블록"))
                 .andExpect(jsonPath("$.data.version").value(1));
     }
 
@@ -211,7 +228,7 @@ class BlockControllerWebMvcTest {
                 eq(documentId),
                 eq(parentId),
                 eq(BlockType.TEXT),
-                eq("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}"),
+                eq(SIMPLE_CONTENT_SERIALIZED),
                 eq(null),
                 eq(null),
                 eq("user-123")
@@ -365,14 +382,13 @@ class BlockControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("실패_text가 비어 있으면 유효성 검사 오류를 반환한다")
-    void updateBlockRejectsBlankText() throws Exception {
+    @DisplayName("실패_content가 없으면 블록 수정 요청은 유효성 검사 오류를 반환한다")
+    void updateBlockRejectsMissingContent() throws Exception {
         var result = mockMvc.perform(patch("/v1/blocks/{blockId}", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "text": " ",
                                   "version": 0
                                 }
                                 """));
@@ -385,7 +401,7 @@ class BlockControllerWebMvcTest {
     void updateBlockReturnsNotFoundWhenBlockMissing() throws Exception {
         UUID blockId = UUID.fromString("11111111-1111-1111-1111-111111111111");
 
-        when(blockService.update(eq(blockId), eq("수정된 블록"), eq(0), eq("user-123")))
+        when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
                 .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
 
         var result = mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
@@ -393,7 +409,16 @@ class BlockControllerWebMvcTest {
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "text": "수정된 블록",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "수정된 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  },
                                   "version": 0
                                 }
                                 """));
@@ -408,7 +433,16 @@ class BlockControllerWebMvcTest {
                         .contentType("application/json")
                         .content("""
                                 {
-                                  "text": "수정된 블록",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "수정된 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  },
                                   "version": 0
                                 }
                                 """));
@@ -424,7 +458,16 @@ class BlockControllerWebMvcTest {
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "text": "수정된 블록"
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "수정된 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  }
                                 }
                                 """));
 
@@ -436,7 +479,7 @@ class BlockControllerWebMvcTest {
     void updateBlockReturnsConflictWhenVersionMismatched() throws Exception {
         UUID blockId = UUID.randomUUID();
 
-        when(blockService.update(eq(blockId), eq("수정된 블록"), eq(0), eq("user-123")))
+        when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
                 .thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
 
         var result = mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
@@ -444,7 +487,16 @@ class BlockControllerWebMvcTest {
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "text": "수정된 블록",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "수정된 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  },
                                   "version": 0
                                 }
                                 """));

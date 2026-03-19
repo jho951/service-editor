@@ -34,6 +34,7 @@ class BlockServiceImplTest {
 
     private static final String ACTOR_ID = "user-123";
     private static final String SIMPLE_CONTENT = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}";
+    private static final String UPDATED_CONTENT = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"수정된 블록\",\"marks\":[]}]}";
 
     @Mock
     private BlockRepository blockRepository;
@@ -211,10 +212,10 @@ class BlockServiceImplTest {
 
         block.setVersion(0);
 
-        Block updated = blockService.update(blockId, "수정된 블록", 0, ACTOR_ID);
+        Block updated = blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID);
 
         assertThat(updated).isSameAs(block);
-        assertThat(block.getText()).isEqualTo("수정된 블록");
+        assertThat(block.getContent()).isEqualTo(UPDATED_CONTENT);
         assertThat(block.getUpdatedBy()).isEqualTo(ACTOR_ID);
     }
 
@@ -225,7 +226,7 @@ class BlockServiceImplTest {
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청한 블록을 찾을 수 없습니다.")
                 .extracting("errorCode")
@@ -245,7 +246,7 @@ class BlockServiceImplTest {
 
         block.setVersion(0);
 
-        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("잘못된 요청입니다.")
                 .extracting("errorCode")
@@ -264,7 +265,7 @@ class BlockServiceImplTest {
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
-        assertThatThrownBy(() -> blockService.update(blockId, "수정된 블록", 0, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
                 .extracting("errorCode")

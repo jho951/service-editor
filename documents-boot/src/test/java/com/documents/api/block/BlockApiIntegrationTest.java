@@ -28,6 +28,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @DisplayName("Block API 통합 검증")
 class BlockApiIntegrationTest {
 
+    private static final String SIMPLE_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}";
+    private static final String UPDATED_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"수정된 블록\",\"marks\":[]}]}";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -153,7 +156,7 @@ class BlockApiIntegrationTest {
         assertThat(saved.getDocumentId()).isEqualTo(document.getId());
         assertThat(saved.getParentId()).isNull();
         assertThat(saved.getType()).isEqualTo(BlockType.TEXT);
-        assertThat(saved.getContent()).isEqualTo("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}");
+        assertThat(saved.getContent()).isEqualTo(SIMPLE_CONTENT_SERIALIZED);
         assertThat(saved.getSortKey()).isEqualTo("000000000001000000000000");
         assertThat(saved.getCreatedBy()).isEqualTo("user-123");
     }
@@ -186,7 +189,16 @@ class BlockApiIntegrationTest {
                         .header("X-User-Id", "user-456")
                         .content("""
                                 {
-                                  "text": "수정된 블록",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "수정된 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  },
                                   "version": 0
                                 }
                                 """))
@@ -195,12 +207,14 @@ class BlockApiIntegrationTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").value(block.getId().toString()))
-                .andExpect(jsonPath("$.data.text").value("수정된 블록"))
+                .andExpect(jsonPath("$.data.content.format").value("rich_text"))
+                .andExpect(jsonPath("$.data.content.schemaVersion").value(1))
+                .andExpect(jsonPath("$.data.content.segments[0].text").value("수정된 블록"))
                 .andExpect(jsonPath("$.data.updatedBy").value("user-456"))
                 .andExpect(jsonPath("$.data.version").value(1));
 
         Block updated = blockRepository.findById(block.getId()).orElseThrow();
-        assertThat(updated.getText()).isEqualTo("수정된 블록");
+        assertThat(updated.getContent()).isEqualTo(UPDATED_CONTENT_SERIALIZED);
         assertThat(updated.getUpdatedBy()).isEqualTo("user-456");
         assertThat(updated.getVersion()).isEqualTo(1);
     }
@@ -235,7 +249,16 @@ class BlockApiIntegrationTest {
                         .header("X-User-Id", "user-456")
                         .content("""
                                 {
-                                  "text": "수정된 블록",
+                                  "content": {
+                                    "format": "rich_text",
+                                    "schemaVersion": 1,
+                                    "segments": [
+                                      {
+                                        "text": "수정된 블록",
+                                        "marks": []
+                                      }
+                                    ]
+                                  },
                                   "version": 0
                                 }
                                 """))
