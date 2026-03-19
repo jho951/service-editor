@@ -37,3 +37,12 @@
 - 서비스 로직을 `content` 기준으로 전환
 - validation/codec 도입
 - 테스트와 통합 API 시나리오를 structured content 기준으로 수정
+
+## Step 5. 블록 생성 경로 `content` JSON 전환
+
+- 블록 생성 요청 DTO를 `text`에서 `JsonNode content` 기준으로 변경했다.
+- `BlockJsonCodec`를 추가해 create 요청은 JSON object를 받고, 서비스 계층에는 직렬화된 문자열을 넘기도록 연결했다.
+- 블록 응답 DTO와 매퍼에 `content`를 추가해 생성 응답에서 structured content를 그대로 반환하도록 했다.
+- `BlockService.create(...)`와 구현체를 `content` 기준으로 전환했다.
+- 생성 관련 테스트를 `content` 기준으로 수정하고, 저장소에는 직렬화된 JSON 문자열이 저장되는 점까지 검증했다.
+- 검증: `./gradlew :documents-api:test --tests com.documents.api.block.BlockControllerWebMvcTest :documents-infrastructure:test --tests com.documents.service.BlockServiceImplTest :documents-boot:test --tests com.documents.api.block.BlockApiIntegrationTest`

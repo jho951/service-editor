@@ -13,7 +13,7 @@ public interface BlockService {
             UUID documentId,
             UUID parentId,
             BlockType type,
-            String text,
+            String content,
             UUID afterBlockId,
             UUID beforeBlockId,
             String actorId

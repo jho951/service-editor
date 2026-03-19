@@ -47,7 +47,7 @@ public class BlockServiceImpl implements BlockService {
             UUID documentId,
             UUID parentId,
             BlockType type,
-            String text,
+            String content,
             UUID afterBlockId,
             UUID beforeBlockId,
             String actorId
@@ -72,7 +72,7 @@ public class BlockServiceImpl implements BlockService {
                 .document(document)
                 .parent(parentBlock)
                 .type(type)
-                .text(text)
+                .content(content)
                 .sortKey(sortKey)
                 .createdBy(normalizedActorId)
                 .updatedBy(normalizedActorId)
