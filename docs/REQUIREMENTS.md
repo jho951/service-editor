@@ -28,11 +28,11 @@
 2. **문서 내부 블록(Block) 트리 구조**
 
 현재 단계의 목표는 **Notion형 문서 서비스의 최소 기능(MVP)** 을 안정적으로 제공하는 것이다.
-다만 블록 표현력은 축소하여, **v1에서는 `TEXT` 타입 블록 1종만 지원**한다.
+다만 블록 타입 종류는 축소하여, **v1에서는 `TEXT` 타입 블록 1종만 지원**한다.
 
 핵심 요구사항은 다음 한 문장으로 요약된다.
 
-> **문서는 계층 구조를 가지며, 각 문서의 콘텐츠는 ordered block tree로 저장된다. 현재 block.type은 `TEXT`만 지원하고, block.content는 plain string이다.**
+> **문서는 계층 구조를 가지며, 각 문서의 콘텐츠는 ordered block tree로 저장된다. 현재 block.type은 `TEXT`만 지원하고, TEXT 블록의 본문은 structured content JSON으로 저장된다.**
 
 ---
 
@@ -44,7 +44,7 @@
 - 각 문서의 본문은 블록 트리 구조로 저장되어야 한다.
 - 블록은 생성, 수정, 삭제, 이동, 재정렬이 가능해야 한다.
 - 자동 저장(autosave) 시나리오를 감당할 수 있어야 한다.
-- v1에서는 복잡한 리치 텍스트 편집 대신 **plain text block editor** 수준으로 범위를 제한한다.
+- v1에서는 블록 타입은 최소화하되, TEXT 블록 내부는 제한된 rich text mark를 지원한다.
 
 ### 2.2 기술적 목표
 - soft delete를 기본 삭제 전략으로 사용한다.
@@ -121,8 +121,12 @@
 
 ## 4.4 TEXT 블록 규칙
 - `block.type`은 현재 `TEXT`만 허용한다.
-- `block.content`는 plain string만 허용한다.
-- HTML, rich text span, JSON fragment, 파일 객체는 허용하지 않는다.
+- `block.content`는 structured JSON object여야 한다.
+- `block.content`는 최소한 `format`, `schemaVersion`, `segments`를 포함해야 한다.
+- 각 segment는 `text`, `marks`를 포함해야 한다.
+- v1 mark 타입은 `bold`, `italic`, `textColor`, `underline`, `strikethrough`만 허용한다.
+- `textColor`는 프론트가 바로 사용할 수 있는 `#RRGGBB` 형식 hex 문자열만 허용한다.
+- 링크, 멘션, inline code, 첨부 객체, 임의의 사용자 정의 mark는 v1에서 허용하지 않는다.
 
 ---
 
@@ -136,7 +140,9 @@
 - 코드 블록
 - 데이터베이스 블록
 - 멘션
-- 리치 텍스트 span 스타일링
+- 링크 mark
+- inline code mark
+- 사용자 정의 mark 확장
 - 실시간 다중 사용자 동시 편집
 - 커서 공유
 - presence
@@ -225,7 +231,7 @@ Block {
   documentId: string
   parentId: string | null
   type: "TEXT"
-  text: string
+  content: json
   sortKey: string
   version: number
   createdBy: string
@@ -240,10 +246,49 @@ Block {
 - 영속 기본 키 컬럼명은 `block_id`를 사용한다.
 - `documentId`: 블록이 속한 문서 ID. 영속 구현에서는 `document_id` FK로 `Document`를 참조한다.
 - `parentId`: 상위 블록 ID. `null`이면 문서 루트 블록. 영속 구현에서는 `parent_id` self FK로 상위 `Block`을 참조한다.
+- `type`: 블록 바깥 타입. 현재는 `TEXT`만 지원한다.
+- `content`: TEXT 블록 본문. structured rich text JSON object
 - `sortKey`: 같은 부모 아래 블록 순서 정렬용 키
-- `text`: TEXT 블록의 본문. plain string only
 - `version`: 낙관적 락용 버전
 - 물리 스키마의 `document_id`, `parent_id` FK는 hard delete 시 dangling block이 남지 않도록 `ON DELETE CASCADE`를 사용한다. 비즈니스 삭제 정책 자체는 soft delete를 우선한다.
+
+### 6.4.1 TEXT 블록 content 스키마
+
+```json
+{
+  "format": "rich_text",
+  "schemaVersion": 1,
+  "segments": [
+    {
+      "text": "Hello ",
+      "marks": []
+    },
+    {
+      "text": "world",
+      "marks": [
+        {
+          "type": "bold"
+        },
+        {
+          "type": "textColor",
+          "value": "#000000"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 설명
+- `content.format`: 본문 표현 포맷. v1은 `rich_text`만 허용한다.
+- `content.schemaVersion`: content 스키마 버전. v1은 `1`로 시작한다.
+- `content.segments`: 순서가 보장되는 텍스트 조각 배열
+- `segment.text`: 실제 텍스트 조각
+- `segment.marks`: 해당 텍스트 조각에 적용된 mark 목록
+- `mark.type`: mark 종류. v1 허용값은 `bold`, `italic`, `textColor`, `underline`, `strikethrough`
+- `mark.value`: 값이 필요한 mark에서만 사용한다. v1에서는 `textColor`에만 사용한다.
+- `Block.type`과 `content.format`은 같은 의미가 아니다.
+- `Block.type`은 블록 종류를 나타내고, `content.format`은 TEXT 블록 내부 본문 표현 포맷을 나타낸다.
 
 ---
 
@@ -276,6 +321,8 @@ Block {
 7. 순환 참조(cycle)는 허용하지 않는다.
 8. 다른 문서의 블록을 부모로 둘 수 없다.
 9. 물리 삭제가 필요한 운영/테스트 정리 상황에서는 상위 블록 또는 소속 문서 hard delete 시 하위 블록 FK가 함께 정리되어 dangling reference가 남지 않아야 한다.
+10. TEXT 블록 본문은 `content` JSON 전체를 canonical source로 사용한다.
+11. 같은 블록 안의 일부 구간만 바뀌더라도 v1 서버 충돌 판정 단위는 block 전체다.
 
 ## 7.3 사용자 참조 규칙
 1. 쓰기 작업은 인증된 사용자만 수행할 수 있다.
@@ -345,13 +392,13 @@ Block {
 - 사용자는 특정 문서에 TEXT 블록을 추가할 수 있어야 한다.
 - 부모 블록 하위에 추가 가능해야 한다.
 - 형제 블록 사이 위치를 지정할 수 있어야 한다.
-- `text`는 문자열만 허용한다.
+- `content`는 허용된 structured JSON 스키마만 허용한다.
 
 ## 8.7 텍스트 블록 수정
 ### 요구사항
-- 블록의 `text` 값을 수정할 수 있어야 한다.
-- `text`는 plain string이어야 한다.
-- HTML, JSON 구조, 파일 객체는 허용하지 않는다.
+- 블록의 `content` 값을 수정할 수 있어야 한다.
+- `content`는 허용된 structured JSON 스키마여야 한다.
+- 허용되지 않은 mark, schema, 객체 구조는 거부해야 한다.
 - 낡은 버전으로 저장 시 `409 Conflict`를 반환해야 한다.
 - 블록 수정은 블록 자신의 내용 또는 메타데이터 변경만 담당한다.
 - 블록 이동, 부모 변경, 순서 변경은 블록 수정과 분리된 별도 API에서 처리한다.
@@ -381,11 +428,11 @@ Block {
 - 서버는 요청의 `version`과 현재 저장된 `version`을 비교해 stale update를 검출할 수 있어야 한다.
 
 ### 버전 충돌 예시 시나리오
-1. 현재 DB의 block version이 `5`이고 text는 `"오늘 회의"`다.
+1. 현재 DB의 block version이 `5`이고 content는 `"오늘 회의"`를 표현하는 JSON이다.
 2. 사용자 A와 사용자 B가 같은 블록을 조회하고, 둘 다 version `5` 상태의 화면을 보고 잠시 편집만 한 채 저장하지 않는다.
-3. 사용자 A는 text를 `"오늘 회의 3시"`로 바꿔 먼저 저장한다.
-4. DB의 block text는 `"오늘 회의 3시"`가 되고 version은 `6`이 된다.
-5. 사용자 B는 여전히 예전 화면 `"오늘 회의"`를 보고 text를 `"오늘 회의 취소"`로 바꾼 뒤 몇 초 후 저장한다.
+3. 사용자 A는 content를 `"오늘 회의 3시"`가 되도록 바꿔 먼저 저장한다.
+4. DB의 block content는 `"오늘 회의 3시"`를 표현하는 최신 JSON이 되고 version은 `6`이 된다.
+5. 사용자 B는 여전히 예전 화면 `"오늘 회의"`를 보고 content를 `"오늘 회의 취소"`가 되도록 바꾼 뒤 몇 초 후 저장한다.
 6. 사용자 B가 version 없이 저장하면 서버는 최신 row를 다시 읽어 `"오늘 회의 취소"`를 덮어쓸 수 있고, 사용자 A의 `"3시"` 수정이 조용히 사라질 수 있다.
 7. 사용자 B가 충돌 검출용 request에 version `5`를 함께 보내면 서버는 현재 DB version `6`과 비교해 stale update로 판단하고 `409 Conflict`를 반환할 수 있다.
 
@@ -415,8 +462,16 @@ Block {
 
 ## 9.4 블록 검증
 - `type`은 현재 `TEXT`만 허용
-- `text`는 문자열이어야 함
-- `text` 최대 길이: `10,000`
+- `content`는 JSON object여야 함
+- `content.format`은 현재 `rich_text`만 허용
+- `content.schemaVersion`은 현재 `1`만 허용
+- `content.segments`는 배열이어야 하며 비어 있지 않아야 함
+- 각 `segment.text`는 문자열이어야 함
+- 각 `segment.marks`는 배열이어야 함
+- 허용 mark 타입: `bold`, `italic`, `textColor`, `underline`, `strikethrough`
+- `textColor.value`는 `#RRGGBB` 형식이어야 함
+- 링크, 멘션, inline code, 기타 임의 mark는 v1에서 허용하지 않음
+- 블록 전체 plain text 길이 합은 최대 `10,000`
 - `page/document` 당 최대 블록 수: `1,000`
 - 최대 블록 깊이: `10`
 - 다른 문서의 블록을 부모로 둘 수 없음
@@ -429,18 +484,27 @@ Block {
 
 ## 10.1 v1 정책
 - 실시간 협업 merge는 보장하지 않는다.
-- 낙관적 락을 사용한다.
+- 블록 수정 충돌 판정은 block 단위 낙관적 락을 사용한다.
 - stale version이면 `409 Conflict`를 반환한다.
-- 프론트는 최신 데이터를 다시 조회한 후 재적용한다.
+- 프론트는 최신 block content를 다시 조회한 후 재적용한다.
+- 같은 블록 안의 비중첩 수정도 v1에서는 block 단위 충돌로 처리할 수 있다.
 
 ## 10.2 향후 확장
 다음 기능은 v2 이후 별도 서비스 또는 확장 모듈로 분리 가능하다.
 
+- transaction 기반 저장 경로 강화
+- block content operation 모델
 - WebSocket
 - presence
 - cursor sync
 - CRDT / OT
 - operation log / snapshot 모델
+
+### 권장 로드맵
+1. v1: structured content + block 단위 optimistic lock
+2. v1 이후: `transactions` 중심 저장 경로 강화
+3. 이후: block content operation 단위 충돌 정보와 재적용 전략 확장
+4. 필요 시: OT / CRDT 모델 검토
 
 ---
 
@@ -574,7 +638,16 @@ TEXT 블록 생성.
 {
   "parentId": null,
   "type": "TEXT",
-  "text": "새 블록",
+  "content": {
+    "format": "rich_text",
+    "schemaVersion": 1,
+    "segments": [
+      {
+        "text": "새 블록",
+        "marks": []
+      }
+    ]
+  },
   "afterBlockId": null,
   "beforeBlockId": null
 }
@@ -586,7 +659,28 @@ TEXT 블록 생성.
 내용 수정 예시:
 ```json
 {
-  "text": "수정된 내용",
+  "content": {
+    "format": "rich_text",
+    "schemaVersion": 1,
+    "segments": [
+      {
+        "text": "수정된 ",
+        "marks": []
+      },
+      {
+        "text": "내용",
+        "marks": [
+          {
+            "type": "bold"
+          },
+          {
+            "type": "textColor",
+            "value": "#000000"
+          }
+        ]
+      }
+    ]
+  },
   "version": 3
 }
 ```
@@ -670,7 +764,7 @@ TEXT 블록 생성.
 1. block 존재 여부 확인
 2. 수정 가능한 필드만 검증
 3. version 정합성 확인
-4. block.text 또는 메타데이터 갱신
+4. block.content 또는 메타데이터 갱신
 5. block.updatedAt 및 version 갱신
 6. commit
 
@@ -739,6 +833,7 @@ TEXT 블록 생성.
 4. 향후 collaborative editing 도입 시 operations / snapshots / presence 모델 정의
 5. 검색 기능이 필요할 경우 별도 인덱싱 전략 수립
 6. 첨부 파일/이미지 업로드 도입 시 asset 모델 정의
+7. 링크, 멘션, inline code 등 추가 mark 타입의 schema 확장 정책 정의
 
 ---
 
@@ -749,7 +844,8 @@ TEXT 블록 생성.
 - 문서는 계층 구조를 가진다.
 - 문서 콘텐츠는 ordered block tree로 저장된다.
 - 현재 블록 타입은 `TEXT`만 지원한다.
-- TEXT 블록 본문은 plain string만 허용한다.
+- TEXT 블록 본문은 structured content JSON으로 저장된다.
+- v1 mark는 `bold`, `italic`, `textColor`, `underline`, `strikethrough`만 지원한다.
 - 문서/블록 생성, 조회, 수정, 삭제, 이동, 재정렬을 지원한다.
-- soft delete와 optimistic locking을 기본 정책으로 사용한다.
+- soft delete와 block 단위 optimistic locking을 기본 정책으로 사용한다.
 - 인증, 권한 최종 판단, 파일 업로드, 검색, 실시간 협업은 이 서비스 범위 밖이다.
