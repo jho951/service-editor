@@ -10,4 +10,5 @@ public interface DocumentService {
     Document getById(UUID documentId);
     Document update(UUID documentId, String title, String iconJson, String coverJson, UUID parentId, String actorId);
     void delete(UUID documentId, String actorId);
+    void restore(UUID documentId, String actorId);
 }

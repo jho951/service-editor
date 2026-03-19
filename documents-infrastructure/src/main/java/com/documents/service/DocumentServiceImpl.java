@@ -97,6 +97,12 @@ public class DocumentServiceImpl implements DocumentService {
 		}
 	}
 
+	@Override
+	@Transactional
+	public void restore(UUID documentId, String actorId) {
+		findActiveDocument(documentId);
+	}
+
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
 		if (parentId == null) {
 			return null;

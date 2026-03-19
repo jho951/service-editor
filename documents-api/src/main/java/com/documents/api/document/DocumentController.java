@@ -106,4 +106,14 @@ public class DocumentController {
         documentService.delete(documentId, userId);
         return ResponseEntity.ok(GlobalResponse.ok());
     }
+
+    @Operation(summary = "문서 복구")
+    @PatchMapping("/documents/{documentId}/restore")
+    public ResponseEntity<GlobalResponse<Void>> restoreDocument(
+            @PathVariable("documentId") UUID documentId,
+            @RequestHeader(USER_ID_HEADER) String userId
+    ) {
+        documentService.restore(documentId, userId);
+        return ResponseEntity.ok(GlobalResponse.ok());
+    }
 }
