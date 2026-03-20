@@ -520,6 +520,179 @@ class DocumentApiIntegrationTest {
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
 	}
 
+	@Test
+	@DisplayName("성공_문서 move API는 parentId와 sortKey와 updatedBy와 updatedAt을 반영한다")
+	void moveDocumentPersistsParentSortKeyAndAuditFields() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document rootA = saveDocument(workspace.getId(), null, "루트 A", "00000000000000000001");
+		Document rootB = saveDocument(workspace.getId(), null, "루트 B", "00000000000000000002");
+		Document movedDocument = saveDocument(workspace.getId(), rootA.getId(), "이동 대상", "00000000000000000001",
+			null, null, "user-123", "user-123");
+		LocalDateTime previousUpdatedAt = movedDocument.getUpdatedAt();
+
+		mockMvc.perform(post("/v1/documents/{documentId}/move", movedDocument.getId())
+				.contentType("application/json")
+				.header("X-User-Id", "user-456")
+				.content("""
+					{
+					  "targetParentId": "%s",
+					  "afterDocumentId": null,
+					  "beforeDocumentId": null
+					}
+					""".formatted(rootB.getId())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200));
+
+		Document updatedDocument = documentRepository.findById(movedDocument.getId()).orElseThrow();
+		assertThat(updatedDocument.getParentId()).isEqualTo(rootB.getId());
+		assertThat(updatedDocument.getSortKey()).isNotBlank();
+		assertThat(updatedDocument.getUpdatedBy()).isEqualTo("user-456");
+		assertThat(updatedDocument.getUpdatedAt()).isAfterOrEqualTo(previousUpdatedAt);
+	}
+
+	@Test
+	@DisplayName("성공_같은 부모 내 reorder 결과가 문서 목록 조회 순서에 반영된다")
+	void moveDocumentReordersWithinSameParentInDocumentList() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document parent = saveDocument(workspace.getId(), null, "부모 문서", "00000000000000000001");
+		Document first = saveDocument(workspace.getId(), parent.getId(), "첫 번째", "00000000000000000001");
+		Document second = saveDocument(workspace.getId(), parent.getId(), "두 번째", "00000000000000000002");
+		Document third = saveDocument(workspace.getId(), parent.getId(), "세 번째", "00000000000000000003");
+
+		mockMvc.perform(post("/v1/documents/{documentId}/move", third.getId())
+				.contentType("application/json")
+				.header("X-User-Id", "user-456")
+				.content("""
+					{
+					  "targetParentId": "%s",
+					  "afterDocumentId": "%s",
+					  "beforeDocumentId": "%s"
+					}
+					""".formatted(parent.getId(), first.getId(), second.getId())))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspace.getId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(4))
+			.andExpect(jsonPath("$.data[0].title").value("부모 문서"))
+			.andExpect(jsonPath("$.data[1].title").value("첫 번째"))
+			.andExpect(jsonPath("$.data[2].title").value("세 번째"))
+			.andExpect(jsonPath("$.data[3].title").value("두 번째"));
+	}
+
+	@Test
+	@DisplayName("성공_다른 부모로 이동한 결과가 문서 목록 조회에 반영된다")
+	void moveDocumentToAnotherParentReflectsInDocumentList() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document rootA = saveDocument(workspace.getId(), null, "루트 A", "00000000000000000001");
+		Document rootB = saveDocument(workspace.getId(), null, "루트 B", "00000000000000000002");
+		Document childA = saveDocument(workspace.getId(), rootA.getId(), "A의 자식", "00000000000000000001");
+		Document childB = saveDocument(workspace.getId(), rootB.getId(), "B의 자식", "00000000000000000001");
+
+		mockMvc.perform(post("/v1/documents/{documentId}/move", childA.getId())
+				.contentType("application/json")
+				.header("X-User-Id", "user-456")
+				.content("""
+					{
+					  "targetParentId": "%s",
+					  "afterDocumentId": "%s",
+					  "beforeDocumentId": null
+					}
+					""".formatted(rootB.getId(), childB.getId())))
+			.andExpect(status().isOk());
+
+		Document movedDocument = documentRepository.findById(childA.getId()).orElseThrow();
+		assertThat(movedDocument.getParentId()).isEqualTo(rootB.getId());
+
+		mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspace.getId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.length()").value(4))
+			.andExpect(jsonPath("$.data[0].title").value("루트 A"))
+			.andExpect(jsonPath("$.data[1].title").value("루트 B"))
+			.andExpect(jsonPath("$.data[2].title").value("B의 자식"))
+			.andExpect(jsonPath("$.data[3].title").value("A의 자식"));
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서 move 요청은 문서 없음 응답을 반환한다")
+	void moveDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", UUID.randomUUID())
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "targetParentId": null,
+				  "afterDocumentId": null,
+				  "beforeDocumentId": null
+				}
+				"""));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_삭제된 문서 move 요청은 문서 없음 응답을 반환한다")
+	void moveDocumentReturnsNotFoundWhenDeletedDocument() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document deletedDocument = saveDeletedDocument(workspace.getId(), "삭제된 문서", "00000000000000000001");
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", deletedDocument.getId())
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "targetParentId": null,
+				  "afterDocumentId": null,
+				  "beforeDocumentId": null
+				}
+				"""));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_자기 자신을 부모로 지정한 문서 move 요청은 잘못된 요청 응답을 반환한다")
+	void moveDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document document = saveDocument(workspace.getId(), null, "루트 문서", "00000000000000000001");
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", document.getId())
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "targetParentId": "%s",
+				  "afterDocumentId": null,
+				  "beforeDocumentId": null
+				}
+				""".formatted(document.getId())));
+
+		assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+	}
+
+	@Test
+	@DisplayName("실패_하위 문서를 부모로 지정한 문서 move 요청은 잘못된 요청 응답을 반환한다")
+	void moveDocumentReturnsBadRequestWhenCycleDetected() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document rootDocument = saveDocument(workspace.getId(), null, "루트 문서", "00000000000000000001");
+		Document childDocument = saveDocument(workspace.getId(), rootDocument.getId(), "하위 문서", "00000000000000000001");
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", rootDocument.getId())
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "targetParentId": "%s",
+				  "afterDocumentId": null,
+				  "beforeDocumentId": null
+				}
+				""".formatted(childDocument.getId())));
+
+		assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+	}
+
 	private void assertErrorEnvelope(ResultActions result, String httpStatus, int code, String message) throws
 		Exception {
 		result.andExpect(status().is(org.springframework.http.HttpStatus.valueOf(httpStatus).value()))
