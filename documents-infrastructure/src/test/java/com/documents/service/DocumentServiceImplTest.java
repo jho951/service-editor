@@ -763,6 +763,29 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("성공_루트 이동 시 parentId를 null로 바꾸고 sortKey와 updatedBy를 갱신한다")
+	void moveUpdatesRootParentSortKeyAndUpdatedBy() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID currentParentId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, currentParentId, "이동 대상", "00000000000000000009");
+		List<Document> siblings = List.of(
+			document(UUID.randomUUID(), workspaceId, null, "루트 문서", "00000000000000000001")
+		);
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, null)).thenReturn(siblings);
+		when(documentSortKeyGenerator.generate(siblings, documentId, null, null))
+			.thenReturn("00000000000000000010");
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.move(documentId, null, null, null, ACTOR_ID);
+
+		assertThat(document.getParentId()).isNull();
+		assertThat(document.getSortKey()).isEqualTo("00000000000000000010");
+		assertThat(document.getUpdatedBy()).isEqualTo(ACTOR_ID);
+	}
+
+	@Test
 	@DisplayName("성공_같은 부모 내 reorder도 sortKey와 updatedBy를 갱신한다")
 	void moveReordersWithinSameParent() {
 		UUID workspaceId = UUID.randomUUID();
