@@ -18,10 +18,13 @@ import com.documents.api.code.SuccessCode;
 import com.documents.api.document.dto.CreateDocumentRequest;
 import com.documents.api.document.dto.DocumentResponse;
 import com.documents.api.document.dto.MoveDocumentRequest;
+import com.documents.api.document.dto.DocumentTransactionRequest;
+import com.documents.api.document.dto.DocumentTransactionResponse;
 import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Document;
 import com.documents.service.DocumentService;
+import com.documents.service.DocumentTransactionService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +42,8 @@ public class DocumentController {
 
 	private final DocumentService documentService;
 	private final DocumentApiMapper documentApiMapper;
+	private final DocumentTransactionService documentTransactionService;
+	private final DocumentTransactionApiMapper documentTransactionApiMapper;
 
 	@Operation(summary = "워크스페이스 문서 목록 조회")
 	@GetMapping("/workspaces/{workspaceId}/documents")
@@ -96,6 +101,19 @@ public class DocumentController {
 			userId
 		);
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));
+	}
+
+	@Operation(summary = "문서 에디터 transaction 반영")
+	@PostMapping("/documents/{documentId}/transactions")
+	public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> applyTransactions(
+		@PathVariable("documentId") UUID documentId,
+		@Valid @RequestBody DocumentTransactionRequest request,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		DocumentTransactionResponse response = documentTransactionApiMapper.toResponse(
+			documentTransactionService.apply(documentId, documentTransactionApiMapper.toCommand(request), userId)
+		);
+		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
 	}
 
 	@Operation(summary = "문서 삭제")

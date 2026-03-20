@@ -1,0 +1,17 @@
+package com.documents.api.document.dto;
+
+import java.util.UUID;
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
+public class DocumentTransactionAppliedOperationResponse {
+
+    private String opId;
+    private String status;
+    private String tempId;
+    private UUID blockId;
+    private Long version;
+    private String sortKey;
+}
