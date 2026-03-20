@@ -557,9 +557,9 @@ class DocumentApiIntegrationTest {
 	void moveDocumentReordersWithinSameParentInDocumentList() throws Exception {
 		Workspace workspace = workspace("Docs Root");
 		Document parent = saveDocument(workspace.getId(), null, "부모 문서", "00000000000000000001");
-		Document first = saveDocument(workspace.getId(), parent.getId(), "첫 번째", "00000000000000000001");
-		Document second = saveDocument(workspace.getId(), parent.getId(), "두 번째", "00000000000000000002");
-		Document third = saveDocument(workspace.getId(), parent.getId(), "세 번째", "00000000000000000003");
+		Document first = saveDocument(workspace.getId(), parent.getId(), "첫 번째", "00000000000000000010");
+		Document second = saveDocument(workspace.getId(), parent.getId(), "두 번째", "00000000000000000030");
+		Document third = saveDocument(workspace.getId(), parent.getId(), "세 번째", "00000000000000000050");
 
 		mockMvc.perform(post("/v1/documents/{documentId}/move", third.getId())
 				.contentType("application/json")
@@ -586,10 +586,10 @@ class DocumentApiIntegrationTest {
 	@DisplayName("성공_다른 부모로 이동한 결과가 문서 목록 조회에 반영된다")
 	void moveDocumentToAnotherParentReflectsInDocumentList() throws Exception {
 		Workspace workspace = workspace("Docs Root");
-		Document rootA = saveDocument(workspace.getId(), null, "루트 A", "00000000000000000001");
-		Document rootB = saveDocument(workspace.getId(), null, "루트 B", "00000000000000000002");
-		Document childA = saveDocument(workspace.getId(), rootA.getId(), "A의 자식", "00000000000000000001");
-		Document childB = saveDocument(workspace.getId(), rootB.getId(), "B의 자식", "00000000000000000001");
+		Document rootA = saveDocument(workspace.getId(), null, "루트 A", "00000000000000000040");
+		Document rootB = saveDocument(workspace.getId(), null, "루트 B", "00000000000000000010");
+		Document childA = saveDocument(workspace.getId(), rootA.getId(), "A의 자식", "00000000000000000010");
+		Document childB = saveDocument(workspace.getId(), rootB.getId(), "B의 자식", "00000000000000000020");
 
 		mockMvc.perform(post("/v1/documents/{documentId}/move", childA.getId())
 				.contentType("application/json")
@@ -609,10 +609,11 @@ class DocumentApiIntegrationTest {
 		mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspace.getId()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.length()").value(4))
-			.andExpect(jsonPath("$.data[0].title").value("루트 A"))
-			.andExpect(jsonPath("$.data[1].title").value("루트 B"))
-			.andExpect(jsonPath("$.data[2].title").value("B의 자식"))
-			.andExpect(jsonPath("$.data[3].title").value("A의 자식"));
+			.andExpect(jsonPath("$.data[0].title").value("루트 B"))
+			.andExpect(jsonPath("$.data[1].title").value("B의 자식"))
+			.andExpect(jsonPath("$.data[2].title").value("A의 자식"))
+			.andExpect(jsonPath("$.data[2].parentId").value(rootB.getId().toString()))
+			.andExpect(jsonPath("$.data[3].title").value("루트 A"));
 	}
 
 	@Test
