@@ -737,6 +737,85 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("성공_문서 이동 시 부모와 sortKey와 updatedBy를 함께 갱신한다")
+	void moveUpdatesParentSortKeyAndUpdatedBy() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		UUID targetParentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000009");
+		Document targetParentDocument = parentDocument(targetParentId, workspaceId);
+		java.util.List<Document> siblings = java.util.List.of(
+			document(UUID.randomUUID(), workspaceId, targetParentId, "형제 문서", "00000000000000000001")
+		);
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(documentRepository.findByIdAndDeletedAtIsNull(targetParentId)).thenReturn(Optional.of(targetParentDocument));
+		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, targetParentId))
+			.thenReturn(siblings);
+		when(documentSortKeyGenerator.generate(siblings, documentId, null, null))
+			.thenReturn("00000000000000000010");
+		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
+
+		documentService.move(documentId, targetParentId, null, null, " user-456 ");
+
+		assertThat(document.getParentId()).isEqualTo(targetParentId);
+		assertThat(document.getSortKey()).isEqualTo("00000000000000000010");
+		assertThat(document.getUpdatedBy()).isEqualTo("user-456");
+	}
+
+	@Test
+	@DisplayName("성공_같은 부모 내 reorder도 sortKey와 updatedBy를 갱신한다")
+	void moveReordersWithinSameParent() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID parentId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		UUID afterDocumentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, parentId, "이동 대상", "00000000000000000009");
+		Document parentDocument = parentDocument(parentId, workspaceId);
+		java.util.List<Document> siblings = java.util.List.of(
+			document(afterDocumentId, workspaceId, parentId, "앞 문서", "00000000000000000001"),
+			document
+		);
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
+		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId))
+			.thenReturn(siblings);
+		when(documentSortKeyGenerator.generate(siblings, documentId, afterDocumentId, null))
+			.thenReturn("00000000000000000015");
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.move(documentId, parentId, afterDocumentId, null, ACTOR_ID);
+
+		assertThat(document.getParentId()).isEqualTo(parentId);
+		assertThat(document.getSortKey()).isEqualTo("00000000000000000015");
+		assertThat(document.getUpdatedBy()).isEqualTo(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("성공_동일 위치 no-op 요청은 문서를 갱신하지 않는다")
+	void moveDoesNothingWhenTargetLocationIsSame() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID parentId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, parentId, "이동 대상", "00000000000000000009");
+		document.setUpdatedBy("old-user");
+		Document parentDocument = parentDocument(parentId, workspaceId);
+		java.util.List<Document> siblings = java.util.List.of(document);
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
+		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId))
+			.thenReturn(siblings);
+		when(documentSortKeyGenerator.generate(siblings, documentId, null, null))
+			.thenReturn("00000000000000000009");
+
+		documentService.move(documentId, parentId, null, null, ACTOR_ID);
+
+		assertThat(document.getParentId()).isEqualTo(parentId);
+		assertThat(document.getSortKey()).isEqualTo("00000000000000000009");
+		assertThat(document.getUpdatedBy()).isEqualTo("old-user");
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+	}
+
+	@Test
 	@DisplayName("실패_존재하지 않는 문서는 이동 시 문서 없음 예외를 던진다")
 	void moveThrowsWhenDocumentMissing() {
 		UUID documentId = UUID.randomUUID();
