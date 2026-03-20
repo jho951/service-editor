@@ -122,6 +122,19 @@ public class DocumentServiceImpl implements DocumentService {
 		String actorId) {
 		Document document = findActiveDocument(documentId);
 		findValidParentForMove(document, targetParentId);
+
+		List<Document> siblings = documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(
+			document.getWorkspaceId(),
+			targetParentId
+		);
+
+		try {
+			documentSortKeyGenerator.generate(siblings, documentId, afterDocumentId, beforeDocumentId);
+		} catch (DocumentSortKeyGenerator.SortKeyRebalanceRequiredException ex) {
+			throw new BusinessException(BusinessErrorCode.SORT_KEY_REBALANCE_REQUIRED);
+		} catch (IllegalArgumentException ex) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
 	}
 
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {

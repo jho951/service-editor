@@ -46,6 +46,25 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 	@Query("""
 		select d
 		from Document d
+		where d.workspace.id = :workspaceId
+		  and (
+		    (:parentId is null and d.parent is null)
+		    or d.parent.id = :parentId
+		  )
+		  and d.deletedAt is null
+		order by
+		  d.sortKey asc,
+		  d.createdAt asc,
+		  d.id asc
+		""")
+	List<Document> findActiveByWorkspaceIdAndParentIdOrderBySortKey(
+		@Param("workspaceId") UUID workspaceId,
+		@Param("parentId") UUID parentId
+	);
+
+	@Query("""
+		select d
+		from Document d
 		where d.parent.id = :parentId
 		  and d.deletedAt is null
 		order by
