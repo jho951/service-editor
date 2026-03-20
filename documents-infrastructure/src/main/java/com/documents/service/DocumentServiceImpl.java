@@ -118,8 +118,10 @@ public class DocumentServiceImpl implements DocumentService {
 
 	@Override
 	@Transactional
-	public void move(UUID documentId, UUID targetParentId, UUID afterDocumentId, UUID beforeDocumentId, String actorId) {
-		findActiveDocument(documentId);
+	public void move(UUID documentId, UUID targetParentId, UUID afterDocumentId, UUID beforeDocumentId,
+		String actorId) {
+		Document document = findActiveDocument(documentId);
+		findValidParentForMove(document, targetParentId);
 	}
 
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
@@ -151,6 +153,25 @@ public class DocumentServiceImpl implements DocumentService {
 		}
 
 		validateNoCycle(documentId, parentDocument);
+		return parentDocument;
+	}
+
+	private Document findValidParentForMove(Document document, UUID targetParentId) {
+		if (Objects.equals(document.getId(), targetParentId)) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+
+		if (targetParentId == null) {
+			return null;
+		}
+
+		Document parentDocument = findActiveDocument(targetParentId);
+
+		if (!document.getWorkspaceId().equals(parentDocument.getWorkspaceId())) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+
+		validateNoCycle(document.getId(), parentDocument);
 		return parentDocument;
 	}
 

@@ -602,6 +602,92 @@ class DocumentServiceImplTest {
 		verify(blockService, never()).restoreAllByDocumentId(eq(otherDocumentId), any(), any());
 	}
 
+	@Test
+	@DisplayName("성공_targetParentId가 null이면 루트 이동을 허용한다")
+	void moveAllowsRootMoveWhenTargetParentIsNull() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, UUID.randomUUID(), "이동 대상", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+		assertThatCode(() -> documentService.move(documentId, null, null, null, ACTOR_ID))
+			.doesNotThrowAnyException();
+	}
+
+	@Test
+	@DisplayName("성공_활성 부모 문서가 같은 워크스페이스에 있으면 이동 검증을 통과한다")
+	void moveAllowsActiveParentInSameWorkspace() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		UUID parentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000001");
+		Document parentDocument = parentDocument(parentId, workspaceId);
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
+
+		assertThatCode(() -> documentService.move(documentId, parentId, null, null, ACTOR_ID))
+			.doesNotThrowAnyException();
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서는 이동 시 문서 없음 예외를 던진다")
+	void moveThrowsWhenDocumentMissing() {
+		UUID documentId = UUID.randomUUID();
+
+		assertThatThrownBy(() -> documentService.move(documentId, null, null, null, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청한 문서를 찾을 수 없습니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+	}
+
+	@Test
+	@DisplayName("실패_대상 부모 문서가 다른 워크스페이스에 있으면 잘못된 요청 예외를 던진다")
+	void moveThrowsWhenParentBelongsToOtherWorkspace() {
+		UUID documentId = UUID.randomUUID();
+		UUID parentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "이동 대상", "00000000000000000001");
+		Document parentDocument = parentDocument(parentId, UUID.randomUUID());
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
+
+		assertThatThrownBy(() -> documentService.move(documentId, parentId, null, null, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("잘못된 요청입니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+	}
+
+	@Test
+	@DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 예외를 던진다")
+	void moveThrowsWhenParentIsSelf() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "이동 대상", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+		assertThatThrownBy(() -> documentService.move(documentId, documentId, null, null, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+	}
+
+	@Test
+	@DisplayName("실패_자신의 하위 문서를 부모로 지정하면 순환 이동 예외를 던진다")
+	void moveThrowsWhenCycleDetected() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		UUID childId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, "루트 문서", "00000000000000000001");
+		Document childDocument = document(childId, workspaceId, documentId, "하위 문서", "00000000000000000002");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(documentRepository.findByIdAndDeletedAtIsNull(childId)).thenReturn(Optional.of(childDocument));
+
+		assertThatThrownBy(() -> documentService.move(documentId, childId, null, null, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+	}
+
 	private Workspace workspace(UUID workspaceId) {
 		return Workspace.builder()
 			.id(workspaceId)
