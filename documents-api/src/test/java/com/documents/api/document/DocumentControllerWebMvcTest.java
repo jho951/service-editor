@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import com.documents.api.block.support.BlockJsonCodec;
 import com.documents.api.document.support.DocumentJsonCodec;
 import com.documents.api.exception.GlobalExceptionHandler;
 import com.documents.api.support.ApiResponseAssertions;
@@ -27,6 +28,10 @@ import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.service.DocumentService;
+import com.documents.service.DocumentTransactionService;
+import com.documents.service.transaction.DocumentTransactionAppliedOperationResult;
+import com.documents.service.transaction.DocumentTransactionOperationStatus;
+import com.documents.service.transaction.DocumentTransactionResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +54,9 @@ class DocumentControllerWebMvcTest {
 
 	@Mock
 	private DocumentService documentService;
+
+	@Mock
+	private DocumentTransactionService documentTransactionService;
 
 	private MockMvc mockMvc;
 
@@ -101,13 +109,301 @@ class DocumentControllerWebMvcTest {
 		LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
 		validator.afterPropertiesSet();
 
-		mockMvc = MockMvcBuilders.standaloneSetup(new DocumentController(
-				documentService,
-				new DocumentApiMapper(new DocumentJsonCodec(new ObjectMapper()))
-			))
-			.setControllerAdvice(new GlobalExceptionHandler())
-			.setValidator(validator)
-			.build();
+			mockMvc = MockMvcBuilders.standaloneSetup(new DocumentController(
+					documentService,
+					new DocumentApiMapper(new DocumentJsonCodec(new ObjectMapper())),
+					documentTransactionService,
+					new DocumentTransactionApiMapper(new BlockJsonCodec(new ObjectMapper()))
+				))
+				.setControllerAdvice(new GlobalExceptionHandler())
+				.setValidator(validator)
+				.build();
+		}
+
+	@Test
+	@DisplayName("성공_create와 replace_content transaction 요청에 대해 매핑 응답을 반환한다")
+	void applyTransactionsReturnsAppliedOperations() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+
+		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
+			.thenReturn(new DocumentTransactionResult(
+				documentId,
+				"batch-1",
+				List.of(
+					new DocumentTransactionAppliedOperationResult(
+						"op-1",
+						DocumentTransactionOperationStatus.APPLIED,
+						"tmp:block:1",
+						blockId,
+						0,
+						"000000000001000000000000"
+					),
+					new DocumentTransactionAppliedOperationResult(
+						"op-2",
+						DocumentTransactionOperationStatus.APPLIED,
+						null,
+						blockId,
+						1,
+						"000000000001000000000000"
+					)
+				)
+			));
+
+		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "clientId": "web-editor",
+					  "batchId": "batch-1",
+					  "operations": [
+						    {
+						      "opId": "op-1",
+						      "type": "BLOCK_CREATE",
+						      "blockRef": "tmp:block:1",
+						      "parentId": null,
+						      "afterBlockId": null,
+						      "beforeBlockId": null
+					    },
+					    {
+					      "opId": "op-2",
+					      "type": "BLOCK_REPLACE_CONTENT",
+						      "blockRef": "tmp:block:1",
+					      "content": {
+					        "format": "rich_text",
+					        "schemaVersion": 1,
+					        "segments": [
+					          {
+					            "text": "새 블록",
+					            "marks": []
+					          }
+					        ]
+					      }
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.batchId").value("batch-1"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(0))
+			.andExpect(jsonPath("$.data.appliedOperations[1].opId").value("op-2"))
+			.andExpect(jsonPath("$.data.appliedOperations[1].status").value("APPLIED"))
+			.andExpect(jsonPath("$.data.appliedOperations[1].blockId").value(blockId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[1].version").value(1));
+	}
+
+	@Test
+	@DisplayName("실패_replace_content에 content가 없으면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsReplaceContentWithoutContent() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_REPLACE_CONTENT",
+				      "blockRef": "tmp:block:1"
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_create에 content가 함께 오면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsCreateWithContent() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE",
+				      "blockRef": "tmp:block:1",
+				      "content": {
+				        "format": "rich_text",
+				        "schemaVersion": 1,
+				        "segments": [
+				          {
+				            "text": "잘못된 create",
+				            "marks": []
+				          }
+				        ]
+				      }
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_create에 version이 함께 오면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsCreateWithVersion() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE",
+				      "blockRef": "tmp:block:1",
+				      "version": 0
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_create에 blockRef가 없으면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsCreateWithoutBlockRef() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE"
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_replace_content에 위치 필드가 함께 오면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsReplaceContentWithPositionFields() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_REPLACE_CONTENT",
+				      "blockRef": "tmp:block:1",
+				      "parentId": "%s",
+				      "content": {
+				        "format": "rich_text",
+				        "schemaVersion": 1,
+				        "segments": [
+				          {
+				            "text": "잘못된 replace",
+				            "marks": []
+				          }
+				        ]
+				      }
+				    }
+				  ]
+				}
+				""".formatted(UUID.randomUUID())));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_transaction 서비스가 잘못된 요청 예외를 던지면 잘못된 요청 응답을 반환한다")
+	void applyTransactionsReturnsBadRequestWhenServiceRejectsRequest() throws Exception {
+		when(documentTransactionService.apply(any(), any(), eq(ACTOR_ID)))
+			.thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_REPLACE_CONTENT",
+				      "blockRef": "not-a-uuid",
+				      "content": {
+				        "format": "rich_text",
+				        "schemaVersion": 1,
+				        "segments": [
+				          {
+				            "text": "실패",
+				            "marks": []
+				          }
+				        ]
+				      }
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+	}
+
+	@Test
+	@DisplayName("실패_transaction 서비스가 충돌 예외를 던지면 충돌 응답을 반환한다")
+	void applyTransactionsReturnsConflictWhenServiceRejectsWithConflict() throws Exception {
+		when(documentTransactionService.apply(any(), any(), eq(ACTOR_ID)))
+			.thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_REPLACE_CONTENT",
+				      "blockRef": "%s",
+				      "version": 0,
+				      "content": {
+				        "format": "rich_text",
+				        "schemaVersion": 1,
+				        "segments": [
+				          {
+				            "text": "충돌",
+				            "marks": []
+				          }
+				        ]
+				      }
+				    }
+				  ]
+				}
+				""".formatted(UUID.randomUUID())));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
 	}
 
 	@Test
