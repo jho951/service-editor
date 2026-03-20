@@ -61,6 +61,9 @@ v1 전제는 다음과 같다.
 - 모든 transaction operation은 블록 참조 필드로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.
 - `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
+- 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
+- `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
+- 서버는 `blockRef`, `parentRef`, `afterRef`, `beforeRef`를 모두 같은 transaction 컨텍스트에서 해석해야 한다.
 - 다만 서버 내부에서는 `blocks.content_json` not null 제약을 만족시키기 위해 `BLOCK_CREATE` 시 기본 empty structured content를 먼저 저장할 수 있다.
 - 이 값은 외부 API 계약이 아니라 서버 영속 기본값이며, 같은 batch의 `BLOCK_REPLACE_CONTENT`가 오면 최종 본문으로 교체된다.
 - 기존 block 수정/이동/삭제는 `version`이 필요하다.
@@ -94,7 +97,8 @@ v1 전제는 다음과 같다.
 - `tempId`는 클라이언트 로컬 식별자다.
 - 백엔드는 이를 영속 ID로 저장하지 않는다.
 - `BLOCK_CREATE` 성공 시 서버가 실제 `blockId`를 생성하고, 같은 batch 안의 후속 operation은 컨텍스트에서 이 매핑을 해석한다.
-- 기존 block 대상 operation의 `blockRef`는 request 시점부터 실제 `blockId`를 담아야 한다.
+- 해석 대상은 `blockRef`뿐 아니라 `parentRef`, `afterRef`, `beforeRef`도 포함한다.
+- 기존 block 대상 ref는 request 시점부터 실제 `blockId`를 담아야 한다.
 
 ### 4. operation 순서대로 적용
 
@@ -143,7 +147,7 @@ sequenceDiagram
     API->>S: request 전달
     S->>S: 상위 request / operation 형식 검증
     S->>DB: transaction 시작
-    S->>B: BLOCK_CREATE(blockRef=tempId, 위치)
+    S->>B: BLOCK_CREATE(blockRef=tempId, parentRef/afterRef/beforeRef 해석)
     B->>DB: block insert
     DB-->>B: realBlockId, version=0
     B-->>S: tempId 매핑 등록
@@ -216,6 +220,7 @@ sequenceDiagram
 - sortKey 생성
 - 빈 TEXT block 생성
 - 생성된 block을 `tempId` 매핑 컨텍스트에 등록
+- 이후 `parentRef`, `afterRef`, `beforeRef`의 temp 값도 같은 컨텍스트로 해석
 
 중요:
 

@@ -97,6 +97,8 @@ v1 에디터 표준 operation은 4개만 사용한다.
 - 역할은 "블록을 트리에 등장시키는 것"이다.
 - 요청에서도 블록 참조 필드로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef` 값은 새 블록을 가리키는 `tempId`다.
+- 위치 참조는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
+- `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
 - 이 operation은 위치만 다루고, 본문은 다루지 않는다.
 - 본문은 같은 batch의 `BLOCK_REPLACE_CONTENT`가 최종 본문을 맡는다.
 
@@ -110,7 +112,8 @@ v1 에디터 표준 operation은 4개만 사용한다.
 ### `BLOCK_MOVE`
 
 - 블록 위치를 옮긴다.
-- `parentId`, `afterBlockId`, `beforeBlockId` 기준으로 새 위치를 확정한다.
+- `parentRef`, `afterRef`, `beforeRef` 기준으로 새 위치를 확정한다.
+- 위치 ref도 같은 batch 안의 새 block을 temp 값으로 가리킬 수 있다.
 
 ### `BLOCK_DELETE`
 
@@ -154,6 +157,7 @@ v1 에디터 표준 operation은 4개만 사용한다.
 여기서 `tempId`는 클라이언트 로컬 식별자일 뿐이고, DB에는 서버가 만든 실제 `blockId`가 저장된다.
 또한 서버는 새 `TEXT` 블록 저장 시 not null 제약을 만족시키기 위해 기본 empty structured content를 먼저 넣을 수 있다.
 이 기본값은 외부 transaction 계약이 아니라 서버 내부 영속 규칙이다.
+또한 temp 참조 해석은 `blockRef`뿐 아니라 `parentRef`, `afterRef`, `beforeRef`까지 같은 request 순서 컨텍스트에서 처리한다.
 
 ---
 

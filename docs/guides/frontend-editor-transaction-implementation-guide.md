@@ -155,9 +155,9 @@ v1에서 프론트가 다루는 operation은 4개다.
 - 필요한 값:
 - `blockRef`
 - 새 block이면 여기에 `tempId`
-- `parentId`
-- `afterBlockId`
-- `beforeBlockId`
+- `parentRef`
+- `afterRef`
+- `beforeRef`
 
 주의:
 
@@ -185,9 +185,9 @@ v1에서 프론트가 다루는 operation은 4개다.
 - 필요한 값:
 - `blockRef`
 - `version`
-- `parentId`
-- `afterBlockId`
-- `beforeBlockId`
+- `parentRef`
+- `afterRef`
+- `beforeRef`
 
 ### 블록 삭제
 
@@ -359,9 +359,9 @@ queue는 다음 정리 규칙을 수행해야 한다.
       "opId": "op-1",
       "type": "BLOCK_CREATE",
       "blockRef": "tmp:block:1",
-      "parentId": null,
-      "afterBlockId": null,
-      "beforeBlockId": null
+      "parentRef": null,
+      "afterRef": null,
+      "beforeRef": null
     },
     {
       "opId": "op-2",
@@ -561,7 +561,7 @@ sequenceDiagram
 1. 사용자가 새 부모 블록을 만든다.
 2. 프론트는 temp 부모 블록을 로컬에 추가하고 `BLOCK_CREATE(blockRef=parentTempId)`를 queue에 넣는다.
 3. 사용자가 그 아래 새 자식 블록을 만든다.
-4. 프론트는 temp 자식 블록을 로컬에 추가하고 `BLOCK_CREATE(blockRef=childTempId, parentId=parentTempId)`를 queue에 넣는다.
+4. 프론트는 temp 자식 블록을 로컬에 추가하고 `BLOCK_CREATE(blockRef=childTempId, parentRef=parentTempId)`를 queue에 넣는다.
 5. 자식 블록에 내용을 입력한다.
 6. 프론트는 `BLOCK_REPLACE_CONTENT(blockRef=childTempId, latestContent)`를 queue에 넣는다.
 7. 아직 flush 전 상태에서 부모 블록을 삭제한다.
@@ -590,7 +590,7 @@ sequenceDiagram
 
     U->>E: 부모 아래 새 자식 블록 생성
     E->>T: childTempId 블록 추가(parent=parentTempId)
-    E->>Q: BLOCK_CREATE(blockRef=childTempId, parentId=parentTempId)
+    E->>Q: BLOCK_CREATE(blockRef=childTempId, parentRef=parentTempId)
 
     U->>E: 자식 블록 내용 입력
     E->>T: childTempId content 갱신

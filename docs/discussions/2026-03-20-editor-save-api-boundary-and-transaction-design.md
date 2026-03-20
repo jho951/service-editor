@@ -221,9 +221,9 @@
       "opId": "op-1",
       "type": "BLOCK_CREATE",
       "blockRef": "tmp-1",
-      "parentId": null,
-      "afterBlockId": null,
-      "beforeBlockId": null
+      "parentRef": null,
+      "afterRef": null,
+      "beforeRef": null
     },
     {
       "opId": "op-2",
@@ -245,9 +245,9 @@
       "type": "BLOCK_MOVE",
       "blockRef": "a2d7a3b0-55e0-44f8-9e19-0d1d01c2f7f0",
       "version": 5,
-      "parentId": null,
-      "afterBlockId": "6e3aef72-4ca4-4c2f-b70c-15f9d3b164c1",
-      "beforeBlockId": null
+      "parentRef": null,
+      "afterRef": "6e3aef72-4ca4-4c2f-b70c-15f9d3b164c1",
+      "beforeRef": null
     },
     {
       "opId": "op-4",
@@ -275,6 +275,10 @@
 - request에서 블록을 가리키는 공통 참조값
 - 새 블록이면 `tempId`, 기존 블록이면 실제 `blockId`
 
+- `parentRef`, `afterRef`, `beforeRef`
+- request에서 위치를 가리키는 공통 참조값
+- 같은 batch 안의 새 블록이면 `tempId`, 기존 블록이면 실제 `blockId`
+
 - `version`
 - block 단위 optimistic lock 기준값
 - 기존 블록에 대한 수정/이동/삭제에만 사용한다.
@@ -292,7 +296,8 @@
 
 - `BLOCK_MOVE`
 - 단일 블록 위치 이동
-- 서버는 `parentId`, `afterBlockId`, `beforeBlockId` 기준으로 새 `sortKey`를 계산한다.
+- 서버는 `parentRef`, `afterRef`, `beforeRef` 기준으로 새 `sortKey`를 계산한다.
+- 위치 ref도 temp parent, temp sibling anchor를 지원한다.
 
 - `BLOCK_DELETE`
 - 루트 블록 기준 subtree soft delete

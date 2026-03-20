@@ -74,9 +74,9 @@
   "opId": "op-1",
   "type": "BLOCK_CREATE",
   "blockRef": "tmp:block:1",
-  "parentId": null,
-  "afterBlockId": null,
-  "beforeBlockId": null
+  "parentRef": null,
+  "afterRef": null,
+  "beforeRef": null
 }
 ```
 
@@ -84,6 +84,8 @@
 
 - `BLOCK_CREATE`의 `blockRef` 값은 클라이언트 로컬 식별자인 `tempId`다.
 - 서버는 `tempId`를 그대로 저장하지 않고, 성공 시 실제 `blockId`를 생성해 응답에서 매핑을 돌려준다.
+- 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
+- `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담는다.
 - `BLOCK_CREATE`는 위치만 다룬다.
 - 본문은 포함하지 않는다.
 
@@ -145,16 +147,17 @@
   "type": "BLOCK_MOVE",
   "blockRef": "real-block-id",
   "version": 3,
-  "parentId": "new-parent-id",
-  "afterBlockId": "block-a",
-  "beforeBlockId": "block-b"
+  "parentRef": "new-parent-id",
+  "afterRef": "block-a",
+  "beforeRef": "block-b"
 }
 ```
 
 설명:
 
-- 이동 대상은 v1에서 기존 block 기준으로 시작한다.
-- 필요 시 같은 batch 안의 `tempId`를 anchor로 허용할지는 후속 검토 대상이다.
+- 위치 참조는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
+- `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담는다.
+- v1은 temp parent와 temp sibling anchor를 허용한다.
 
 ### 4. `BLOCK_DELETE`
 

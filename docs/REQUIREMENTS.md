@@ -468,7 +468,8 @@ Block {
 - 이동 후 트리 무결성이 깨지면 안 된다.
 - 이동 및 재정렬은 트랜잭션으로 처리해야 한다.
 - 단일 블록 이동은 drag and drop의 drop 시점에 1회 요청으로 처리할 수 있어야 한다.
-- 이동 요청은 `parentId`, `afterBlockId`, `beforeBlockId`, `version`을 기준으로 위치를 해석한다.
+- transaction 이동 요청은 `parentRef`, `afterRef`, `beforeRef`, `version`을 기준으로 위치를 해석한다.
+- `parentRef`, `afterRef`, `beforeRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담을 수 있어야 한다.
 - 블록 이동 시 `sortKey`, `updatedBy`, `updatedAt`, `version`을 함께 갱신해야 한다.
 
 ## 8.11 버전 관리
@@ -554,6 +555,10 @@ Block {
 - 모든 transaction operation은 블록 참조값으로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.
 - `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 서버가 내려준 실제 `blockId`를 담는다.
+- transaction 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
+- `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담을 수 있어야 한다.
+- v1은 temp parent, temp sibling anchor까지 지원해야 한다.
+- 서버는 request 순서대로 `tempId -> real blockId` 매핑 컨텍스트를 갱신하면서 `blockRef`, `parentRef`, `afterRef`, `beforeRef`를 모두 해석해야 한다.
 - `tempId`는 새 block을 같은 batch 안에서 참조하기 위한 클라이언트 로컬 식별자이며, 서버 영속 ID로 저장하지 않는다.
 - 서버는 새 block 생성 시 실제 `blockId`를 새로 발급하고, 성공 응답에서 `tempId -> blockId` 매핑을 반환한다.
 - 블록 수정 충돌 판정은 block 단위 낙관적 락을 사용한다.
@@ -777,8 +782,11 @@ TEXT 블록 생성.
 - 기존 block 수정/이동/삭제 operation은 `version`을 포함해야 한다.
 - 모든 transaction operation은 블록 참조 필드로 `blockRef`를 사용해야 한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣어야 한다.
+- 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용해야 한다.
+- `parentRef`, `afterRef`, `beforeRef`에는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 넣을 수 있어야 한다.
 - 기존 block 수정/이동/삭제 operation의 `blockRef`에는 서버가 내려준 실제 `blockId`를 넣어야 한다.
 - 새 block은 request에서 `blockRef=tempId`로 참조하고, 성공 응답에서 서버가 생성한 실제 `blockId`와 `tempId -> blockId` 매핑을 반환해야 한다.
+- 서버는 request 순서대로 `blockRef`, `parentRef`, `afterRef`, `beforeRef`의 temp 참조를 해석할 수 있어야 한다.
 - 하나의 operation이라도 실패하면 전체 rollback을 적용해야 한다.
 - 충돌 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함해야 한다.
 

@@ -53,6 +53,9 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 - 모든 transaction operation은 블록 참조값으로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.
 - `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담는다.
+- transaction 위치 참조도 `parentRef`, `afterRef`, `beforeRef`로 통일한다.
+- `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담는다.
+- v1은 temp parent, temp sibling anchor를 모두 지원하고, 서버는 request 순서대로 이 ref들을 해석한다.
 - `tempId`는 새 block을 같은 batch 안에서 참조하기 위한 클라이언트 로컬 식별자이며, 서버 영속 ID가 아니다.
 - 서버는 새 block 생성 시 실제 `blockId`를 발급하고, 성공 응답에서 `tempId -> blockId` 매핑을 반환한다.
 - 에디터 저장 queue는 클라이언트 로컬에서 관리하고, debounce 또는 명시적 flush 시점에 transaction 요청 하나로 서버에 보낸다.

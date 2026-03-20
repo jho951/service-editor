@@ -23,3 +23,9 @@
 - 서비스 테스트에 중복 `blockRef` create, unknown temp ref, 잘못된 real `blockRef`, existing block의 missing version, create 후 replace conflict 전파를 추가했다.
 - boot 통합 테스트에 create 뒤 기존 block 충돌이 나면 앞서 insert한 새 block까지 rollback되는 시나리오를 추가했다.
 - 검증은 `:documents-api:test --tests 'com.documents.api.document.DocumentControllerWebMvcTest' -x :documents-boot:test`, `:documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest' -x :documents-boot:test`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.
+
+## Step 4. 위치 참조를 ref 모델로 재정의
+
+- `blockRef`만 temp를 지원하면 부모-자식 생성과 같은 batch 내 sibling 기준 삽입이 막히므로, transaction 위치 참조도 `parentRef`, `afterRef`, `beforeRef`로 통일하기로 정리했다.
+- v1은 temp parent와 temp sibling anchor까지 지원하는 방향으로 요구사항, ADR, explainer, frontend/backend guide, discussion 문서를 갱신했다.
+- 서버는 request 순서대로 `tempId -> real blockId` 매핑 컨텍스트를 갱신하면서 `blockRef`, `parentRef`, `afterRef`, `beforeRef`를 모두 해석해야 한다는 구현 기준을 문서에 명시했다.
