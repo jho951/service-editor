@@ -125,6 +125,7 @@
 - `block.type`은 현재 `TEXT`만 허용한다.
 - `block.content`는 structured JSON object여야 한다.
 - `block.content`는 최소한 `format`, `schemaVersion`, `segments`를 포함해야 한다.
+- 새 `TEXT` 블록의 기본 `content`는 `segments` 1개와 빈 `text`, 빈 `marks`를 가진 empty structured content다.
 - 각 segment는 `text`, `marks`를 포함해야 한다.
 - v1 mark 타입은 `bold`, `italic`, `textColor`, `underline`, `strikethrough`만 허용한다.
 - `textColor`는 프론트가 바로 사용할 수 있는 `#RRGGBB` 형식 hex 문자열만 허용한다.
@@ -539,15 +540,36 @@ Block {
 
 ## 10.1 v1 정책
 - 실시간 협업 merge는 보장하지 않는다.
+- 에디터 저장 표준 write 경로는 `POST /v1/documents/{documentId}/transactions`를 사용한다.
+- autosave와 `Ctrl+S`는 서로 다른 API가 아니라 같은 저장 queue의 flush 트리거다.
+- debounce만으로 무한정 저장이 밀리면 안 되며, 장시간 연속 입력 중에도 `max autosave interval` 기준으로 강제 flush가 가능해야 한다.
+- 에디터 저장 queue는 클라이언트 로컬에서 관리한다.
+- 에디터 queue의 coalescing, 상쇄, 최종 batch 조립은 클라이언트가 담당한다.
+- 서버는 클라이언트가 보낸 최종 transaction batch를 검증하고 반영한다.
+- 에디터 v1 operation은 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE` 4개만 사용한다.
+- `BLOCK_CREATE`는 위치만 확정하고, 본문은 같은 batch의 `BLOCK_REPLACE_CONTENT`가 담당한다.
+- 서버는 `BLOCK_CREATE` 처리 시 DB의 `block.content` not null 규칙을 만족시키기 위해 새 `TEXT` 블록에 기본 empty structured content를 먼저 부여할 수 있다.
+- 이 기본 empty content는 외부 API 계약상 `BLOCK_CREATE`가 본문을 받는다는 뜻이 아니라, 서버 내부 기본값이다.
+- `BLOCK_REPLACE_CONTENT`는 range patch가 아니라 block `content` 전체 교체로 처리한다.
+- 모든 transaction operation은 블록 참조값으로 `blockRef`를 사용한다.
+- `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.
+- `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 서버가 내려준 실제 `blockId`를 담는다.
+- `tempId`는 새 block을 같은 batch 안에서 참조하기 위한 클라이언트 로컬 식별자이며, 서버 영속 ID로 저장하지 않는다.
+- 서버는 새 block 생성 시 실제 `blockId`를 새로 발급하고, 성공 응답에서 `tempId -> blockId` 매핑을 반환한다.
 - 블록 수정 충돌 판정은 block 단위 낙관적 락을 사용한다.
 - stale version이면 `409 Conflict`를 반환한다.
-- 프론트는 최신 block content를 다시 조회한 후 재적용한다.
+- transaction 실패 정책은 partial apply가 아니라 전체 rollback을 사용한다.
+- 충돌 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함해야 한다.
+- 프론트는 최신 block content를 기준으로 로컬 변경을 재적용하거나 사용자에게 충돌 상태를 보여줄 수 있어야 한다.
+- 전체 rollback은 서버 반영 기준이며, 프론트는 conflict 시 로컬 draft와 복구에 필요한 pending 상태를 바로 폐기하지 않아야 한다.
+- conflict 후 pending 복구는 실패한 batch payload 복원이 아니라, 현재 로컬 문서 상태 기준 재조립을 원칙으로 한다.
+- 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되고 있으면 다시 pending에 포함될 수 있다.
 - 같은 블록 안의 비중첩 수정도 v1에서는 block 단위 충돌로 처리할 수 있다.
+- `POST /v1/documents/{documentId}/blocks`, `PATCH /v1/blocks/{blockId}`, `DELETE /v1/blocks/{blockId}`는 에디터 표준 저장 경로가 아니라 운영/관리/비에디터 보조 경로로 둘 수 있다.
 
 ## 10.2 향후 확장
 다음 기능은 v2 이후 별도 서비스 또는 확장 모듈로 분리 가능하다.
 
-- transaction 기반 저장 경로 강화
 - block content operation 모델
 - WebSocket
 - presence
@@ -556,9 +578,9 @@ Block {
 - operation log / snapshot 모델
 
 ### 권장 로드맵
-1. v1: structured content + block 단위 optimistic lock
-2. v1 이후: `transactions` 중심 저장 경로 강화
-3. 이후: block content operation 단위 충돌 정보와 재적용 전략 확장
+1. v1: structured content + `transactions` 중심 저장 + block 단위 optimistic lock
+2. v2 이후: block content operation 단위 충돌 정보와 재적용 전략 확장
+3. 필요 시: WebSocket/presence/cursor sync 기반 협업 모델 검토
 4. 필요 시: OT / CRDT 모델 검토
 
 ---
@@ -688,9 +710,6 @@ Block {
 ### `POST /v1/documents/{documentId}/restore`
 문서 복구.
 
-### `GET /v1/documents/{documentId}/content`
-문서 메타데이터와 활성 블록 전체를 한 번에 조회.
-
 ## 12.4 블록 API
 
 ### `GET /v1/documents/{documentId}/blocks`
@@ -699,22 +718,13 @@ Block {
 
 ### `POST /v1/documents/{documentId}/blocks`
 TEXT 블록 생성.
+- 이 API는 운영/관리/비에디터 경로에서 사용할 수 있다.
+- 에디터 표준 생성/저장 경로는 `transactions`를 사용한다.
 
 요청 예시:
 ```json
 {
   "parentId": null,
-  "type": "TEXT",
-  "content": {
-    "format": "rich_text",
-    "schemaVersion": 1,
-    "segments": [
-      {
-        "text": "새 블록",
-        "marks": []
-      }
-    ]
-  },
   "afterBlockId": null,
   "beforeBlockId": null
 }
@@ -722,6 +732,8 @@ TEXT 블록 생성.
 
 ### `PATCH /v1/blocks/{blockId}`
 블록 내용 또는 블록 자체 메타데이터 수정.
+- 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
+- 에디터 표준 본문 저장 경로는 `transactions`를 사용한다.
 
 내용 수정 예시:
 ```json
@@ -752,21 +764,23 @@ TEXT 블록 생성.
 }
 ```
 
-### `POST /v1/blocks/{blockId}/move`
-단일 블록 이동.
-
-위치 변경 예시:
-```json
-{
-  "parentId": "new-parent-block-id",
-  "afterBlockId": "blk-a",
-  "beforeBlockId": "blk-b",
-  "version": 3
-}
-```
-
 ### `DELETE /v1/blocks/{blockId}`
 블록 soft delete.
+- 지정 루트 블록과 하위 블록 subtree를 함께 soft delete 한다.
+- 이 API는 명시적 단일 삭제 액션 또는 운영/관리/비에디터 경로에서 사용할 수 있다.
+- 에디터 표준 삭제 경로는 `transactions`를 사용한다.
+
+### `POST /v1/documents/{documentId}/transactions`
+에디터 생성/저장 batch 반영.
+- 에디터의 표준 write 경로다.
+- 한 요청에 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`를 함께 담을 수 있어야 한다.
+- 기존 block 수정/이동/삭제 operation은 `version`을 포함해야 한다.
+- 모든 transaction operation은 블록 참조 필드로 `blockRef`를 사용해야 한다.
+- `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣어야 한다.
+- 기존 block 수정/이동/삭제 operation의 `blockRef`에는 서버가 내려준 실제 `blockId`를 넣어야 한다.
+- 새 block은 request에서 `blockRef=tempId`로 참조하고, 성공 응답에서 서버가 생성한 실제 `blockId`와 `tempId -> blockId` 매핑을 반환해야 한다.
+- 하나의 operation이라도 실패하면 전체 rollback을 적용해야 한다.
+- 충돌 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함해야 한다.
 
 ---
 
@@ -821,24 +835,24 @@ TEXT 블록 생성.
 ## 15.1 트랜잭션이 필요한 작업
 - 문서 삭제 + 하위 블록 soft delete
 - 문서 복구
-- 블록 이동
+- 에디터 transaction batch 반영
 - 문서 부모 변경
 
 ## 15.2 저장 흐름 권장안
-### 블록 수정
-1. block 존재 여부 확인
-2. 수정 가능한 필드만 검증
-3. version 정합성 확인
-4. block.content 또는 메타데이터 갱신
-5. block.updatedAt 및 version 갱신
-6. commit
+### 에디터 transaction
+1. 클라이언트는 로컬 queue에서 pending operation을 모은다.
+2. debounce 또는 명시적 flush 시 `transactions` 요청을 만든다.
+3. 서버는 operation 순서대로 정합성, version, 위치, 삭제 정책을 검증한다.
+4. 하나라도 실패하면 전체 rollback 한다.
+5. 성공 시 operation별 반영 결과와 새 version, `tempId -> blockId` 매핑을 반환한다.
+6. 충돌 시 프론트는 로컬 draft를 유지하고, 현재 로컬 문서 상태 기준으로 pending을 다시 조립한다.
 
-### 블록 생성
+### 단건 블록 생성 보조 경로
 1. document 존재 여부 확인
 2. parentId가 있으면 같은 document의 block인지 확인
 3. afterBlockId / beforeBlockId 정합성 확인
 4. 정책에 따라 새 sortKey 계산
-5. block insert
+5. 빈 TEXT block insert
 6. document.updatedAt 및 version 정책 반영
 7. commit
 
