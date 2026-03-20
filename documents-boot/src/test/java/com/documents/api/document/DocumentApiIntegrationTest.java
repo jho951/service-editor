@@ -481,7 +481,7 @@ class DocumentApiIntegrationTest {
 		Block activeTargetBlock = saveBlock(deletedDocument.getId(), null, "활성 블록", "000000000002000000000000");
 		Block deletedOtherBlock = saveDeletedBlock(otherDocument.getId(), null, "다른 문서 블록", "000000000001000000000000");
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/restore", deletedDocument.getId())
+		mockMvc.perform(post("/v1/documents/{documentId}/restore", deletedDocument.getId())
 				.header("X-User-Id", "user-123"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -502,7 +502,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 문서 복구 요청은 문서 없음 응답을 반환한다")
 	void restoreDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/restore", UUID.randomUUID())
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", UUID.randomUUID())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -514,7 +514,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document activeDocument = saveDocument(workspace.getId(), null, "활성 문서", "00000000000000000001");
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/restore", activeDocument.getId())
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", activeDocument.getId())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");

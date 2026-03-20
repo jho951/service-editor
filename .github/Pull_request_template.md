@@ -56,7 +56,7 @@ closes #
 
 - (예) [/prompts/0-initial-setup.md](https://github.com/jho951/Block-server/blob/main/prompts/0-initial-setup.md)
 
-### 4. ADR 경로 (선택)
+### 4. 참조 문서 경로 (ADR, discussions, roadMap ...)
 - (예) [/docs/decisions/000-adr-template.md](https://github.com/jho951/Block-server/blob/main/docs/decisions/000-adr-template.md)
 
 ---

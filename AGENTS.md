@@ -6,6 +6,7 @@
 - 현재 유효한 제품 요구사항과 채택된 정책은 `docs/REQUIREMENTS.md`에 반영합니다.
 - 중요한 기술 선택은 ADR로 기록합니다.
 - 재현 가능한 디버깅 절차를 `docs/runbook/DEBUG.md`에 유지합니다.
+- 기능별 후속 Todo와 버전별 확장 검토는 `docs/roadmap/`에 버전/도메인/기능 단위로 정리합니다.
 
 
 # AGENTS Working Agreement
@@ -32,6 +33,15 @@
 - 다만 모든 대화나 자잘한 정리까지 `Step`으로 남기지는 않고, 목표를 실질적으로 전진시키는 설계 결정, 구현 단계, 검증 결과 중심으로만 기록합니다.
 - 코드 주석은 꼭 필요한 경우에만 추가하고, 기본 문체는 명사형/단답형으로 유지합니다.
 - 에러 메시지와 예외 메시지는 특별한 사유가 없으면 기본적으로 한글로 작성합니다.
+- 전체 코드베이스에서 가독성(명시성)과 성능 사이에 큰 차이가 없다면 반드시 가독성(명시성)을 우선합니다.
+- 코드는 현재 담당자가 아닌 다른 사람이 처음 읽어도 한 번에 흐름이 보이도록 작성합니다. 특히 Service, UseCase, Controller, Validator, Mapper처럼 비즈니스 흐름을 읽는 계층에서는 이 원칙을 더 강하게 적용합니다.
+- 메서드 분리는 역할 경계가 실제로 더 선명해질 때만 적용합니다. 성능 차이가 거의 없고 흐름 파악만 어려워진다면 과도한 helper/overload 분할보다 한 번에 읽히는 구현을 우선합니다.
+- `List`, `Map` 같은 컬렉션을 생성해서 다른 메서드에 넘기기만 하는 wrapper/helper는 만들지 않습니다. 수집 메서드가 필요하면 그 메서드 안에서 직접 결과 컬렉션을 만들고 반환합니다.
+- 단순 값 정리, 한 줄 위임, 컬렉션 생성, 한 번만 호출되는 얇은 포장 메서드처럼 의미를 늘리지 않는 helper는 만들지 않습니다.
+- 호출부만 봐도 무엇을 검증하는지, 무엇을 조회하는지, 무엇을 수집하는지, 무엇을 변경하는지 바로 읽혀야 합니다. 메서드명은 축약보다 역할과 결과가 드러나는 쪽을 우선합니다.
+- 단순 수집 로직을 위해 순회 방식 자체를 불필요하게 바꾸지 않습니다. 기존 재귀가 충분히 읽기 쉬우면 stack, queue, 임시 상태 객체 같은 구조를 새로 도입하지 않습니다.
+- 작은 처리 단위가 바뀌는 지점에서는 빈 줄과 들여쓰기를 사용해 읽기 단위를 드러냅니다. 문장이 바뀌었는데도 선언과 호출을 과하게 밀집시키는 형식은 피합니다.
+- 추상화는 "나중에 재사용할 수도 있음"이 아니라 "지금 여기서 의미가 늘어나는가"를 기준으로 판단합니다. 재사용 근거가 없으면 선제 분리를 하지 않습니다.
 
 ## Lightweight Flow
 
@@ -44,6 +54,9 @@
 - 전략 조사, 선택지 비교, 회의 정리 문서는 `docs/discussions/000-strategy-review-template.md` 구조를 기본으로 사용합니다.
 - `review`, `strategy`, `meeting`처럼 이름이 달라도 discussion 문서는 같은 템플릿 계열로 맞춥니다.
 - 전략 설명, 비교, 추천에는 이해를 돕기 위한 시나리오를 반드시 포함합니다.
+- 후속 작업 문서는 `docs/roadmap/v{major}/{domain}/{feature}.md` 형식을 기본으로 사용합니다.
+- 예: `docs/roadmap/v2/blocks/block-delete.md`, `docs/roadmap/v2/blocks/block-restore.md`
+- 각 roadmap 문서는 방금 구현한 기능을 기준으로, 후속 고도화, 검증 보강, 추가 정책, 운영 고려사항, 열어둘 질문을 정리합니다.
 
 ## ADR Trigger
 
@@ -55,6 +68,7 @@
 - Requirements: `docs/REQUIREMENTS.md`
 - Discussions: `docs/discussions/`
 - Decisions (ADR): `docs/decisions/`
+- Roadmaps: `docs/roadmap/`
 - Prompt logs: `prompts/`
 - Debug runbook: `docs/runbook/DEBUG.md`
 - Technical explainers: `prompts/explainers/`

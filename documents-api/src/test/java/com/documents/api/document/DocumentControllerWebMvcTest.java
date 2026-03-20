@@ -314,7 +314,7 @@ class DocumentControllerWebMvcTest {
 	void restoreDocumentReturnsSuccessEnvelope() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/restore", documentId)
+		mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
 				.header(USER_ID_HEADER, ACTOR_ID))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -333,7 +333,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).restore(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/restore", documentId)
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -346,7 +346,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).restore(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/restore", documentId)
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -357,7 +357,7 @@ class DocumentControllerWebMvcTest {
 	void restoreDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/restore", documentId));
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
 		verify(documentService, never()).restore(any(), any());

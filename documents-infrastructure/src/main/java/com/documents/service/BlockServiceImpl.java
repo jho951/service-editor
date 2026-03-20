@@ -1,6 +1,7 @@
 package com.documents.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -102,6 +103,16 @@ public class BlockServiceImpl implements BlockService {
 
     @Override
     @Transactional
+    public void delete(UUID blockId, String actorId) {
+        String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+        LocalDateTime deletedAt = LocalDateTime.now();
+        List<UUID> blockIdsToDelete = collectActiveDescendantBlockIdsForSoftDelete(findActiveBlock(blockId));
+
+        blockRepository.softDeleteActiveByIds(blockIdsToDelete, normalizedActorId, deletedAt);
+    }
+
+    @Override
+    @Transactional
     public void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt) {
         blockRepository.softDeleteActiveByDocumentId(documentId, actorId, deletedAt);
     }
@@ -115,6 +126,11 @@ public class BlockServiceImpl implements BlockService {
     private Document findActiveDocument(UUID documentId) {
         return documentRepository.findByIdAndDeletedAtIsNull(documentId)
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+    }
+
+    private Block findActiveBlock(UUID blockId) {
+        return blockRepository.findByIdAndDeletedAtIsNull(blockId)
+                .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
     }
 
     private void validateSupportedType(BlockType type) {
@@ -147,13 +163,14 @@ public class BlockServiceImpl implements BlockService {
     private void validateDepth(Block parentBlock) {
         int depth = 1;
         Block current = parentBlock;
+
         while (current != null) {
             depth++;
             if (depth > MAX_BLOCK_DEPTH) {
                 throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
             }
-            current = current.getParentId() == null ? null : blockRepository.findByIdAndDeletedAtIsNull(current.getParentId())
-                    .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
+
+            current = current.getParentId() == null ? null : findActiveBlock(current.getParentId());
         }
     }
 
@@ -171,5 +188,17 @@ public class BlockServiceImpl implements BlockService {
         } catch (IllegalArgumentException ex) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
         }
+    }
+
+    private List<UUID> collectActiveDescendantBlockIdsForSoftDelete(Block rootBlock) {
+        List<UUID> blockIds = new ArrayList<>();
+        blockIds.add(rootBlock.getId());
+
+        List<Block> children = blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootBlock.getId());
+        for (Block child : children) {
+            blockIds.addAll(collectActiveDescendantBlockIdsForSoftDelete(child));
+        }
+
+        return blockIds;
     }
 }
