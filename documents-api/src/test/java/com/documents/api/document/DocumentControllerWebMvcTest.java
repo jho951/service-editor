@@ -364,6 +364,113 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("성공_문서 move 요청에 대해 성공 응답을 반환한다")
+	void moveDocumentReturnsSuccessEnvelope() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "targetParentId": null,
+					  "afterDocumentId": null,
+					  "beforeDocumentId": null
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.message").value("요청 응답 성공"))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data").doesNotExist());
+
+		verify(documentService).move(documentId, null, null, null, ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서 move 요청은 문서 없음 응답을 반환한다")
+	void moveDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).move(documentId, null, null, null, ACTOR_ID);
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "targetParentId": null,
+				  "afterDocumentId": null,
+				  "beforeDocumentId": null
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_삭제된 문서 move 요청은 문서 없음 응답을 반환한다")
+	void moveDocumentReturnsNotFoundWhenDocumentDeleted() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).move(documentId, null, null, null, ACTOR_ID);
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "targetParentId": null,
+				  "afterDocumentId": null,
+				  "beforeDocumentId": null
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_자기 자신을 부모로 지정한 문서 move 요청은 잘못된 요청 응답을 반환한다")
+	void moveDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST))
+			.when(documentService).move(documentId, documentId, null, null, ACTOR_ID);
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "targetParentId": "%s",
+				  "afterDocumentId": null,
+				  "beforeDocumentId": null
+				}
+				""".formatted(documentId)));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+	}
+
+	@Test
+	@DisplayName("실패_사용자 식별자 헤더 없이 문서 move 요청하면 인증 오류 응답을 반환한다")
+	void moveDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+			.contentType("application/json")
+			.content("""
+				{
+				  "targetParentId": null,
+				  "afterDocumentId": null,
+				  "beforeDocumentId": null
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+		verify(documentService, never()).move(any(), any(), any(), any(), any());
+	}
+
+	@Test
 	@DisplayName("실패_icon이 객체 스키마를 따르지 않으면 유효성 검사 오류를 반환한다")
 	void createDocumentRejectsInvalidIconSchema() throws Exception {
 		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
