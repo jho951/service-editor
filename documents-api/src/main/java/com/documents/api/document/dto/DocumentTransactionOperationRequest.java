@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -29,11 +28,11 @@ public class DocumentTransactionOperationRequest {
     @ValidBlockContent
     private JsonNode content;
 
-    private UUID parentId;
+    private String parentRef;
 
-    private UUID afterBlockId;
+    private String afterRef;
 
-    private UUID beforeBlockId;
+    private String beforeRef;
 
     @AssertTrue
     public boolean isValidOperationShape() {
@@ -50,9 +49,9 @@ public class DocumentTransactionOperationRequest {
         if (type == DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT) {
             return hasText(blockRef)
                     && content != null
-                    && parentId == null
-                    && afterBlockId == null
-                    && beforeBlockId == null;
+                    && parentRef == null
+                    && afterRef == null
+                    && beforeRef == null;
         }
 
         return false;

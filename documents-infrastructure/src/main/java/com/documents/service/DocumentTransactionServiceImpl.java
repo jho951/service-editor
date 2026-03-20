@@ -58,14 +58,15 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
             Map<String, TempBlockContext> tempBlockContexts
     ) {
         validateBlockReferenceIsUnique(operation.blockReference(), tempBlockContexts);
+        ResolvedCreatePosition resolvedCreatePosition = resolveCreatePosition(operation, tempBlockContexts);
 
         Block createdBlock = blockService.create(
                 documentId,
-                operation.parentId(),
+                resolvedCreatePosition.parentId(),
                 BlockType.TEXT,
                 EMPTY_TEXT_BLOCK_CONTENT,
-                operation.afterBlockId(),
-                operation.beforeBlockId(),
+                resolvedCreatePosition.afterBlockId(),
+                resolvedCreatePosition.beforeBlockId(),
                 actorId
         );
         blockRepository.flush();
@@ -79,6 +80,17 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                 createdBlock.getId(),
                 createdBlock.getVersion(),
                 createdBlock.getSortKey()
+        );
+    }
+
+    private ResolvedCreatePosition resolveCreatePosition(
+            DocumentTransactionOperationCommand operation,
+            Map<String, TempBlockContext> tempBlockContexts
+    ) {
+        return new ResolvedCreatePosition(
+                resolveOptionalBlockReference(operation.parentReference(), tempBlockContexts),
+                resolveOptionalBlockReference(operation.afterReference(), tempBlockContexts),
+                resolveOptionalBlockReference(operation.beforeReference(), tempBlockContexts)
         );
     }
 
@@ -135,6 +147,19 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
         }
     }
 
+    private UUID resolveOptionalBlockReference(String blockReference, Map<String, TempBlockContext> tempBlockContexts) {
+        if (blockReference == null || blockReference.isBlank()) {
+            return null;
+        }
+
+        TempBlockContext tempBlockContext = findTempBlockContext(blockReference, tempBlockContexts);
+        if (isTempBlockReference(tempBlockContext)) {
+            return tempBlockContext.realBlockId();
+        }
+
+        return parseRealBlockId(blockReference);
+    }
+
     private void registerTempBlockContext(
             String blockReference,
             Block block,
@@ -176,5 +201,8 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
     }
 
     private record ResolvedBlockReference(UUID realBlockId, Integer version, String tempId) {
+    }
+
+    private record ResolvedCreatePosition(UUID parentId, UUID afterBlockId, UUID beforeBlockId) {
     }
 }

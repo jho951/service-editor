@@ -45,9 +45,9 @@ public class DocumentTransactionApiMapper {
                 request.getBlockRef(),
                 request.getVersion(),
                 blockJsonCodec.write(request.getContent()),
-                request.getParentId(),
-                request.getAfterBlockId(),
-                request.getBeforeBlockId()
+                request.getParentRef(),
+                request.getAfterRef(),
+                request.getBeforeRef()
         );
     }
 
