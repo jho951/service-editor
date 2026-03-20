@@ -76,7 +76,7 @@ public class DocumentServiceImpl implements DocumentService {
 		Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
 			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
-		Document parentDocument = validateParentForUpdate(document, documentId, parentId);
+		Document parentDocument = findValidParentForUpdate(document, documentId, parentId);
 		applyTitle(document, title);
 		applyMetadata(document, iconJson, coverJson);
 		document.setParent(parentDocument);
@@ -137,7 +137,7 @@ public class DocumentServiceImpl implements DocumentService {
 		return parentDocument;
 	}
 
-	private Document validateParentForUpdate(Document document, UUID documentId, UUID parentId) {
+	private Document findValidParentForUpdate(Document document, UUID documentId, UUID parentId) {
 		if (Objects.equals(documentId, parentId)) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
 		}
