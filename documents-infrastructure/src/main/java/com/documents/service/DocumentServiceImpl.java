@@ -116,6 +116,12 @@ public class DocumentServiceImpl implements DocumentService {
 		}
 	}
 
+	@Override
+	@Transactional
+	public void move(UUID documentId, UUID targetParentId, UUID afterDocumentId, UUID beforeDocumentId, String actorId) {
+		findActiveDocument(documentId);
+	}
+
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
 		if (parentId == null) {
 			return null;

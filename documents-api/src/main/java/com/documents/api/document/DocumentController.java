@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.documents.api.code.SuccessCode;
 import com.documents.api.document.dto.CreateDocumentRequest;
 import com.documents.api.document.dto.DocumentResponse;
+import com.documents.api.document.dto.MoveDocumentRequest;
 import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Document;
@@ -114,6 +115,23 @@ public class DocumentController {
 		@RequestHeader(USER_ID_HEADER) String userId
 	) {
 		documentService.restore(documentId, userId);
+		return ResponseEntity.ok(GlobalResponse.ok());
+	}
+
+	@Operation(summary = "문서 이동")
+	@PostMapping("/documents/{documentId}/move")
+	public ResponseEntity<GlobalResponse<Void>> moveDocument(
+		@PathVariable("documentId") UUID documentId,
+		@RequestBody MoveDocumentRequest request,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		documentService.move(
+			documentId,
+			request.getTargetParentId(),
+			request.getAfterDocumentId(),
+			request.getBeforeDocumentId(),
+			userId
+		);
 		return ResponseEntity.ok(GlobalResponse.ok());
 	}
 }
