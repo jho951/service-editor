@@ -423,6 +423,336 @@ class DocumentTransactionServiceImplTest {
         verify(blockService).update(blockId, secondContent, 1, ACTOR_ID);
     }
 
+    @Test
+    @DisplayName("성공_create는 temp parentRef를 실제 parentId로 해석한다")
+    void applyResolvesTempParentReferenceForCreate() {
+        UUID documentId = UUID.randomUUID();
+        UUID parentBlockId = UUID.randomUUID();
+        UUID childBlockId = UUID.randomUUID();
+
+        Block createdParentBlock = block(parentBlockId, documentId, "000000000001000000000000", 0);
+        Block createdChildBlock = block(childBlockId, documentId, "000000000001I00000000000", 0);
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdParentBlock);
+        when(blockService.create(
+                eq(documentId),
+                eq(parentBlockId),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdChildBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:parent",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:child",
+                                        null,
+                                        null,
+                                        "tmp:parent",
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::blockId)
+                .containsExactly(parentBlockId, childBlockId);
+    }
+
+    @Test
+    @DisplayName("성공_create는 temp afterRef와 beforeRef를 실제 anchor id로 해석한다")
+    void applyResolvesTempSiblingAnchorsForCreate() {
+        UUID documentId = UUID.randomUUID();
+        UUID firstBlockId = UUID.randomUUID();
+        UUID middleBlockId = UUID.randomUUID();
+        UUID beforeBlockId = UUID.randomUUID();
+
+        Block createdFirstBlock = block(firstBlockId, documentId, "000000000001000000000000", 0);
+        Block createdMiddleBlock = block(middleBlockId, documentId, "000000000001I00000000000", 0);
+        Block createdBeforeBlock = block(beforeBlockId, documentId, "000000000001Q00000000000", 0);
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdFirstBlock, createdBeforeBlock);
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(firstBlockId),
+                eq(beforeBlockId),
+                eq(ACTOR_ID)
+        )).thenReturn(createdMiddleBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:first",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:before",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-3",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:middle",
+                                        null,
+                                        null,
+                                        null,
+                                        "tmp:first",
+                                        "tmp:before"
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::blockId)
+                .containsExactly(firstBlockId, beforeBlockId, middleBlockId);
+    }
+
+    @Test
+    @DisplayName("실패_create의 parentRef가 존재하지 않는 temp를 가리키면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenCreateUsesUnknownTempParentReference() {
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                UUID.randomUUID(),
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:child",
+                                        null,
+                                        null,
+                                        "tmp:missing-parent",
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_create의 afterRef가 존재하지 않는 temp를 가리키면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenCreateUsesUnknownTempAfterReference() {
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                UUID.randomUUID(),
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block",
+                                        null,
+                                        null,
+                                        null,
+                                        "tmp:missing-after",
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_create의 beforeRef가 존재하지 않는 temp를 가리키면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenCreateUsesUnknownTempBeforeReference() {
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                UUID.randomUUID(),
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        "tmp:missing-before"
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_create가 아직 생성되지 않은 temp ref를 먼저 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenCreateReferencesFutureTempAnchor() {
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                UUID.randomUUID(),
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:middle",
+                                        null,
+                                        null,
+                                        null,
+                                        "tmp:first",
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:first",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("성공_create는 real afterRef와 temp beforeRef를 함께 해석한다")
+    void applyResolvesMixedRealAndTempAnchorsForCreate() {
+        UUID documentId = UUID.randomUUID();
+        UUID realAfterBlockId = UUID.randomUUID();
+        UUID tempBeforeBlockId = UUID.randomUUID();
+        UUID middleBlockId = UUID.randomUUID();
+
+        Block createdTempBeforeBlock = block(tempBeforeBlockId, documentId, "000000000002000000000000", 0);
+        Block createdMiddleBlock = block(middleBlockId, documentId, "000000000001I00000000000", 0);
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdTempBeforeBlock);
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(realAfterBlockId),
+                eq(tempBeforeBlockId),
+                eq(ACTOR_ID)
+        )).thenReturn(createdMiddleBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:before",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:middle",
+                                        null,
+                                        null,
+                                        null,
+                                        realAfterBlockId.toString(),
+                                        "tmp:before"
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::blockId)
+                .containsExactly(tempBeforeBlockId, middleBlockId);
+    }
+
     private Block block(UUID blockId, UUID documentId, String sortKey, int version) {
         Block block = Block.builder()
                 .id(blockId)

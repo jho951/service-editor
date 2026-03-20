@@ -162,9 +162,9 @@ class DocumentControllerWebMvcTest {
 						      "opId": "op-1",
 						      "type": "BLOCK_CREATE",
 						      "blockRef": "tmp:block:1",
-						      "parentId": null,
-						      "afterBlockId": null,
-						      "beforeBlockId": null
+						      "parentRef": null,
+						      "afterRef": null,
+						      "beforeRef": null
 					    },
 					    {
 					      "opId": "op-2",
@@ -314,7 +314,7 @@ class DocumentControllerWebMvcTest {
 				      "opId": "op-1",
 				      "type": "BLOCK_REPLACE_CONTENT",
 				      "blockRef": "tmp:block:1",
-				      "parentId": "%s",
+				      "parentRef": "%s",
 				      "content": {
 				        "format": "rich_text",
 				        "schemaVersion": 1,

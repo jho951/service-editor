@@ -166,7 +166,7 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("실패_create의 parentId가 다른 문서 블록이면 잘못된 요청 응답을 반환한다")
+    @DisplayName("실패_create의 parentRef가 다른 문서 블록이면 잘못된 요청 응답을 반환한다")
     void applyTransactionsReturnsBadRequestWhenCreateParentBelongsToOtherDocument() throws Exception {
         Document targetDocument = document("대상 문서");
         Document otherDocument = document("다른 문서");
@@ -184,7 +184,7 @@ class DocumentTransactionApiIntegrationTest {
                                       "opId": "op-1",
                                       "type": "BLOCK_CREATE",
                                       "blockRef": "tmp:block:1",
-                                      "parentId": "%s"
+                                      "parentRef": "%s"
                                     }
                                   ]
                                 }
@@ -196,7 +196,7 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("실패_create의 parentId가 존재하지 않으면 블록 없음 응답을 반환한다")
+    @DisplayName("실패_create의 parentRef가 존재하지 않으면 블록 없음 응답을 반환한다")
     void applyTransactionsReturnsNotFoundWhenCreateParentMissing() throws Exception {
         Document document = document("문서");
 
@@ -212,7 +212,7 @@ class DocumentTransactionApiIntegrationTest {
                                       "opId": "op-1",
                                       "type": "BLOCK_CREATE",
                                       "blockRef": "tmp:block:1",
-                                      "parentId": "%s"
+                                      "parentRef": "%s"
                                     }
                                   ]
                                 }
@@ -224,7 +224,7 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("실패_create의 afterBlockId가 활성 sibling이 아니면 잘못된 요청 응답을 반환한다")
+    @DisplayName("실패_create의 afterRef가 활성 sibling이 아니면 잘못된 요청 응답을 반환한다")
     void applyTransactionsReturnsBadRequestWhenCreateAfterBlockIdIsInvalid() throws Exception {
         Document document = document("문서");
 
@@ -240,7 +240,7 @@ class DocumentTransactionApiIntegrationTest {
                                       "opId": "op-1",
                                       "type": "BLOCK_CREATE",
                                       "blockRef": "tmp:block:1",
-                                      "afterBlockId": "%s"
+                                      "afterRef": "%s"
                                     }
                                   ]
                                 }
@@ -252,7 +252,7 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("실패_create의 afterBlockId와 beforeBlockId가 같은 값을 가리키면 잘못된 요청 응답을 반환한다")
+    @DisplayName("실패_create의 afterRef와 beforeRef가 같은 값을 가리키면 잘못된 요청 응답을 반환한다")
     void applyTransactionsReturnsBadRequestWhenCreateAnchorsPointToSameBlock() throws Exception {
         Document document = document("문서");
         Block siblingBlock = block(document, null, "형제 블록", "000000000001000000000000");
@@ -269,8 +269,8 @@ class DocumentTransactionApiIntegrationTest {
                                       "opId": "op-1",
                                       "type": "BLOCK_CREATE",
                                       "blockRef": "tmp:block:1",
-                                      "afterBlockId": "%s",
-                                      "beforeBlockId": "%s"
+                                      "afterRef": "%s",
+                                      "beforeRef": "%s"
                                     }
                                   ]
                                 }
@@ -342,6 +342,353 @@ class DocumentTransactionApiIntegrationTest {
         Block createdBlock = blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()).get(0);
         assertThat(createdBlock.getContent()).isEqualTo(content("두 번째 수정"));
         assertThat(createdBlock.getVersion()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("성공_create는 temp parentRef를 실제 parentId로 해석해 부모-자식을 함께 저장한다")
+    void applyTransactionsCreatesChildUnderTempParent() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:parent"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:child",
+                                      "parentRef": "tmp:parent"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:parent"))
+                .andExpect(jsonPath("$.data.appliedOperations[1].tempId").value("tmp:child"));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isEqualTo(2);
+
+        Block parentBlock = blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(document.getId(), null).get(0);
+        Block childBlock = blockRepository.findActiveChildrenByParentIdOrderBySortKey(parentBlock.getId()).get(0);
+
+        assertThat(childBlock.getParentId()).isEqualTo(parentBlock.getId());
+    }
+
+    @Test
+    @DisplayName("성공_create는 temp afterRef와 beforeRef를 실제 sibling anchor로 해석한다")
+    void applyTransactionsCreatesBlockBetweenTempSiblingAnchors() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:first"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:first",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "first",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:last"
+                                    },
+                                    {
+                                      "opId": "op-4",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:last",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "last",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-5",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:middle",
+                                      "afterRef": "tmp:first",
+                                      "beforeRef": "tmp:last"
+                                    },
+                                    {
+                                      "opId": "op-6",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:middle",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "middle",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[4].tempId").value("tmp:middle"));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isEqualTo(3);
+
+        assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()))
+                .extracting(Block::getContent)
+                .containsExactly(
+                        content("first"),
+                        content("middle"),
+                        content("last"));
+    }
+
+    @Test
+    @DisplayName("실패_create의 parentRef가 존재하지 않는 temp를 가리키면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenCreateParentRefUsesUnknownTemp() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:child",
+                                      "parentRef": "tmp:missing-parent"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_create의 afterRef가 존재하지 않는 temp를 가리키면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenCreateAfterRefUsesUnknownTemp() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block",
+                                      "afterRef": "tmp:missing-after"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_create의 beforeRef가 존재하지 않는 temp를 가리키면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenCreateBeforeRefUsesUnknownTemp() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block",
+                                      "beforeRef": "tmp:missing-before"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_create가 아직 생성되지 않은 temp anchor를 먼저 참조하면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenCreateUsesFutureTempAnchor() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:middle",
+                                      "afterRef": "tmp:first"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:first"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_create가 대상 parent의 sibling이 아닌 afterRef를 쓰면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenCreateUsesAfterRefThatIsNotSiblingOfTargetParent() throws Exception {
+        Document document = document("문서");
+        Block rootParent = block(document, null, "루트 부모", "000000000001000000000000");
+        Block childAnchor = block(document, rootParent, "자식 anchor", "000000000001I00000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block",
+                                      "afterRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(childAnchor.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("성공_create는 real afterRef와 temp beforeRef를 함께 해석해 중간 삽입한다")
+    void applyTransactionsCreatesBlockBetweenRealAndTempAnchors() throws Exception {
+        Document document = document("문서");
+        Block realAfterBlock = block(document, null, "real-after", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:before"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:before",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "before",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:middle",
+                                      "afterRef": "%s",
+                                      "beforeRef": "tmp:before"
+                                    },
+                                    {
+                                      "opId": "op-4",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:middle",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "middle",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(realAfterBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[2].tempId").value("tmp:middle"));
+
+        assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()))
+                .extracting(Block::getContent)
+                .containsExactly(
+                        content("real-after"),
+                        content("middle"),
+                        content("before"));
     }
 
     private Document document(String title) {

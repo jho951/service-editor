@@ -29,3 +29,17 @@
 - `blockRef`만 temp를 지원하면 부모-자식 생성과 같은 batch 내 sibling 기준 삽입이 막히므로, transaction 위치 참조도 `parentRef`, `afterRef`, `beforeRef`로 통일하기로 정리했다.
 - v1은 temp parent와 temp sibling anchor까지 지원하는 방향으로 요구사항, ADR, explainer, frontend/backend guide, discussion 문서를 갱신했다.
 - 서버는 request 순서대로 `tempId -> real blockId` 매핑 컨텍스트를 갱신하면서 `blockRef`, `parentRef`, `afterRef`, `beforeRef`를 모두 해석해야 한다는 구현 기준을 문서에 명시했다.
+
+## Step 5. temp 위치 ref 해석 구현
+
+- transaction DTO와 command의 위치 필드를 `parentRef`, `afterRef`, `beforeRef`로 바꾸고, `BLOCK_REPLACE_CONTENT`에는 위치 ref가 오지 못하도록 validation을 유지했다.
+- transaction service는 create 시 `parentRef`, `afterRef`, `beforeRef`도 `tempId -> real blockId` 컨텍스트로 해석한 뒤 기존 `BlockService.create(...)`에 실제 UUID를 넘기도록 확장했다.
+- 서비스 테스트에 temp parent, temp afterRef/beforeRef 해석 시나리오를 추가했고, boot 통합 테스트에도 temp parent와 temp sibling anchor를 실제 저장 순서/계층 반영까지 검증하는 시나리오를 추가했다.
+- 검증은 `:documents-api:test --tests 'com.documents.api.document.DocumentControllerWebMvcTest' -x :documents-boot:test`, `:documents-infrastructure:cleanTest :documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest' -x :documents-boot:test`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.
+
+## Step 6. temp ref edge case 테스트 보강
+
+- 존재하지 않는 temp `parentRef`, `afterRef`, `beforeRef`, 아직 생성 전 temp anchor 참조를 서비스/통합 테스트에서 `INVALID_REQUEST`로 고정했다.
+- 대상 parent의 sibling이 아닌 anchor를 create에 섞어 쓰는 경우와 real `afterRef` + temp `beforeRef` 혼합 anchor 해석도 테스트로 고정했다.
+- temp ref를 허용하더라도 request 순서와 sibling/parent 정합성을 반드시 지켜야 한다는 점을 현재 테스트 세트로 보강했다.
+- 검증은 `:documents-infrastructure:cleanTest :documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest' -x :documents-boot:test`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.
