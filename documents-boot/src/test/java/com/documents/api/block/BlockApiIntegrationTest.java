@@ -406,6 +406,332 @@ class BlockApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("성공_루트 블록을 다른 루트 위치로 재정렬하면 sortKey와 updatedBy와 version이 변경된다")
+    void moveRootBlockReordersAmongRootBlocks() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block first = saveBlock(document, null, "첫 블록", "000000000001000000000000");
+        Block moved = saveBlock(document, null, "이동 대상", "000000000002000000000000");
+        Block third = saveBlock(document, null, "셋째 블록", "000000000003000000000000");
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": "%s",
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """.formatted(third.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200));
+
+        Block reloaded = blockRepository.findById(moved.getId()).orElseThrow();
+        assertThat(reloaded.getParentId()).isNull();
+        assertThat(reloaded.getSortKey()).isEqualTo("000000000004000000000000");
+        assertThat(reloaded.getUpdatedBy()).isEqualTo("user-456");
+        assertThat(reloaded.getVersion()).isEqualTo(1);
+        assertThat(blockRepository.findById(first.getId()).orElseThrow().getSortKey())
+                .isEqualTo("000000000001000000000000");
+    }
+
+    @Test
+    @DisplayName("성공_블록을 다른 부모 블록 아래로 이동하면 parentId와 sortKey가 함께 변경된다")
+    void moveBlockToAnotherParent() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block parent = saveBlock(document, null, "대상 부모", "000000000001000000000000");
+        saveBlock(document, parent, "기존 자식", "000000000001000000000000");
+        Block moved = saveBlock(document, null, "이동 대상", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "parentId": "%s",
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """.formatted(parent.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200));
+
+        Block reloaded = blockRepository.findById(moved.getId()).orElseThrow();
+        assertThat(reloaded.getParentId()).isEqualTo(parent.getId());
+        assertThat(reloaded.getSortKey()).isEqualTo("000000000002000000000000");
+        assertThat(reloaded.getUpdatedBy()).isEqualTo("user-456");
+        assertThat(reloaded.getVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("성공_same parent 내 afterBlockId 기준 이동이 반영된다")
+    void moveBlockWithinSameParentUsingAfterAnchor() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block parent = saveBlock(document, null, "부모", "000000000001000000000000");
+        Block first = saveBlock(document, parent, "첫 자식", "000000000001000000000000");
+        Block second = saveBlock(document, parent, "둘째 자식", "000000000002000000000000");
+        Block moved = saveBlock(document, parent, "이동 대상", "000000000003000000000000");
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "parentId": "%s",
+                                  "afterBlockId": "%s",
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """.formatted(parent.getId(), first.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200));
+
+        Block reloaded = blockRepository.findById(moved.getId()).orElseThrow();
+        assertThat(reloaded.getParentId()).isEqualTo(parent.getId());
+        assertThat(reloaded.getSortKey()).isEqualTo("000000000001I00000000000");
+        assertThat(reloaded.getUpdatedBy()).isEqualTo("user-456");
+        assertThat(blockRepository.findById(second.getId()).orElseThrow().getSortKey())
+                .isEqualTo("000000000002000000000000");
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 블록 이동은 블록 없음 응답을 반환한다")
+    void moveBlockReturnsNotFoundWhenBlockMissing() throws Exception {
+        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", UUID.randomUUID())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """));
+
+        result.andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006))
+                .andExpect(jsonPath("$.message").value("요청한 블록을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("실패_삭제된 블록 이동은 블록 없음 응답을 반환한다")
+    void moveBlockReturnsNotFoundWhenBlockDeleted() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block deleted = blockRepository.save(Block.builder()
+                .id(UUID.randomUUID())
+                .document(document)
+                .type(BlockType.TEXT)
+                .content(toContent("삭제 블록"))
+                .sortKey("000000000001000000000000")
+                .createdBy("user-123")
+                .updatedBy("user-123")
+                .deletedAt(java.time.LocalDateTime.of(2026, 3, 20, 0, 0))
+                .build());
+
+        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", deleted.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """));
+
+        result.andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006))
+                .andExpect(jsonPath("$.message").value("요청한 블록을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("실패_블록 이동 API에 낡은 version이 오면 충돌 응답을 반환한다")
+    void moveBlockReturnsConflictWhenVersionMismatched() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block block = saveBlock(document, null, "이동 대상", "000000000001000000000000");
+        block.setContent(toContent("다른 사용자 수정"));
+        blockRepository.save(block);
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", block.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
+                .andExpect(jsonPath("$.code").value(9005))
+                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."));
+    }
+
+    @Test
+    @DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 응답을 반환한다")
+    void moveBlockReturnsBadRequestWhenParentIsSelf() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block block = saveBlock(document, null, "이동 대상", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", block.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s",
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """.formatted(block.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_하위 블록을 부모로 지정하면 잘못된 요청 응답을 반환한다")
+    void moveBlockReturnsBadRequestWhenParentIsDescendant() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block root = saveBlock(document, null, "루트", "000000000001000000000000");
+        Block child = saveBlock(document, root, "자식", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", root.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s",
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """.formatted(child.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_다른 문서의 블록을 부모나 anchor로 사용하면 잘못된 요청 응답을 반환한다")
+    void moveBlockReturnsBadRequestWhenParentOrAnchorBelongsToOtherDocument() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document sourceDocument = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("원본 문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Document otherDocument = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("다른 문서")
+                .sortKey("00000000000000000002")
+                .build());
+        Block moved = saveBlock(sourceDocument, null, "이동 대상", "000000000001000000000000");
+        Block otherParent = saveBlock(otherDocument, null, "다른 부모", "000000000001000000000000");
+        Block otherAnchor = saveBlock(otherDocument, null, "다른 anchor", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s",
+                                  "afterBlockId": "%s",
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """.formatted(otherParent.getId(), otherAnchor.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
     @DisplayName("실패_블록 생성 API에 허용되지 않은 mark가 오면 유효성 검사 오류를 반환한다")
     void createBlockRejectsUnsupportedMarkType() throws Exception {
         Workspace workspace = workspaceRepository.save(Workspace.builder()
