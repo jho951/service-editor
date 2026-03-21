@@ -369,11 +369,56 @@ Block {
 
 ## 8.3 문서 수정
 ### 요구사항
-- 문서 제목, 아이콘, 커버, 부모 문서를 수정할 수 있어야 한다.
-- 부모 변경 시 같은 워크스페이스 내 부모인지 검증해야 한다.
+- 문서 제목, 아이콘, 커버를 수정할 수 있어야 한다.
 - 낡은 버전으로 수정 요청 시 `409 Conflict`를 반환해야 한다.
 
-## 8.4 문서 삭제 및 복구
+### 결과 조건
+- 문서 수정 API는 메타데이터 수정만 담당해야 한다.
+- 부모 변경, 형제 순서 변경, 구조 이동은 별도 move API에서 처리해야 한다.
+
+## 8.4 문서 이동 / 순서 변경
+### 요구사항
+- 문서의 부모 변경과 형제 순서 변경은 `POST /v1/documents/{documentId}/move` 별도 API로 제공해야 한다.
+- 문서 move API는 제목, 아이콘, 커버 수정 책임을 갖지 않고 부모 변경과 순서 변경만 담당해야 한다.
+- 이동 대상 문서는 활성 문서여야 하며, 삭제된 문서는 `DOCUMENT_NOT_FOUND`로 처리해야 한다.
+- 대상 문서가 존재하지 않으면 `DOCUMENT_NOT_FOUND`를 반환해야 한다.
+- `targetParentId`가 `null`이면 루트 형제 집합으로 이동할 수 있어야 한다.
+- `targetParentId`가 있으면 활성 문서인지 검증해야 한다.
+- 대상 부모 문서는 같은 `workspaceId`에 속해야 한다.
+- 자기 자신을 부모로 지정하면 실패 처리해야 한다.
+- 자신의 하위 문서를 부모로 지정하는 순환 이동은 실패 처리해야 한다.
+- 이동 시 위치 해석용 요청 값은 `targetParentId`, `afterDocumentId`, `beforeDocumentId` 기준으로 설계해야 한다.
+- `afterDocumentId`, `beforeDocumentId`가 지정되면 둘 다 같은 부모 집합에 속한 활성 형제 문서인지 검증해야 한다.
+- `afterDocumentId`, `beforeDocumentId`를 동시에 받을 경우 부모 일치 여부와 순서 모순 여부를 검증해야 한다.
+- `afterDocumentId`, `beforeDocumentId`를 동시에 받을 경우 두 문서는 인접한 형제여야 하며, 두 문서 사이 위치로만 해석해야 한다.
+- 위치 계산 결과에 따라 같은 형제 집합 내에서 유일한 `sortKey`를 새로 계산해야 한다.
+- 이동 전후 부모가 같더라도 순서만 바뀌는 reorder를 지원해야 한다.
+- 이동 시 `parentId`, `sortKey`, `updatedBy`, `updatedAt`은 한 트랜잭션에서 함께 갱신해야 한다.
+- 이동 실패 시 부분 반영 없이 전체 롤백되어야 한다.
+- 정렬 키 공간 부족 시 현재 프로젝트 정책에 맞는 예외를 반환해야 한다.
+- 문서 트리 조회 결과에서 이동 후 부모/정렬 순서가 올바르게 반영되어야 한다.
+
+### 요청 예시
+```json
+{
+  "targetParentId": "새 부모 문서 ID 또는 null",
+  "afterDocumentId": "같은 형제 집합의 앞 문서 ID 또는 null",
+  "beforeDocumentId": "같은 형제 집합의 뒤 문서 ID 또는 null"
+}
+```
+
+### 위치 해석 규칙
+- `targetParentId = null`이면 루트 형제 집합으로 이동한다.
+- `afterDocumentId`만 있으면 해당 문서 뒤 위치로 해석한다.
+- `beforeDocumentId`만 있으면 해당 문서 앞 위치로 해석한다.
+- 둘 다 없으면 대상 부모의 마지막 위치로 해석한다.
+- 둘 다 있으면 두 문서 사이 위치로 해석한다.
+
+### 권장 정책
+- 동일 위치로 이동하는 no-op 요청은 성공으로 처리할 수 있어야 한다.
+- no-op 요청은 실제 DB 갱신 없이 성공 응답만 반환할 수 있다.
+
+## 8.5 문서 삭제 및 복구
 ### 요구사항
 - 문서 삭제는 soft delete로 처리해야 한다.
 - 문서 삭제 시 해당 문서의 모든 블록도 soft delete 처리해야 한다.
@@ -383,20 +428,20 @@ Block {
 ### 권장 정책
 - 부모 문서가 삭제 상태인 경우, 자식 문서 단독 복구는 실패 처리한다.
 
-## 8.5 블록 조회
+## 8.6 블록 조회
 ### 요구사항
 - 특정 문서의 블록 전체를 조회할 수 있어야 한다.
 - 블록은 정렬 순서가 보장되어야 한다.
 - 문서 콘텐츠 전체 조회 시 트리 구조로 반환할 수 있어야 한다.
 
-## 8.6 텍스트 블록 생성
+## 8.7 텍스트 블록 생성
 ### 요구사항
 - 사용자는 특정 문서에 TEXT 블록을 추가할 수 있어야 한다.
 - 부모 블록 하위에 추가 가능해야 한다.
 - 형제 블록 사이 위치를 지정할 수 있어야 한다.
 - `content`는 허용된 structured JSON 스키마만 허용한다.
 
-## 8.7 텍스트 블록 수정
+## 8.8 텍스트 블록 수정
 ### 요구사항
 - 블록의 `content` 값을 수정할 수 있어야 한다.
 - `content`는 허용된 structured JSON 스키마여야 한다.
@@ -405,7 +450,7 @@ Block {
 - 블록 수정은 블록 자신의 내용 또는 메타데이터 변경만 담당한다.
 - 블록 이동, 부모 변경, 순서 변경은 블록 수정과 분리된 별도 API에서 처리한다.
 
-## 8.8 블록 삭제
+## 8.9 블록 삭제
 ### 요구사항
 - 블록 삭제가 가능해야 한다.
 - v1에서는 **하위 블록 포함 soft delete**를 기본 정책으로 한다.
@@ -415,7 +460,7 @@ Block {
 - 블록 단위 server restore API는 v1 범위에 포함하지 않는다.
 - 같은 브라우저 세션 안의 직전 삭제/수정 복구는 클라이언트 undo/redo로 처리한다.
 
-## 8.9 블록 이동 / 순서 변경
+## 8.10 블록 이동 / 순서 변경
 ### 요구사항
 - 같은 문서 내에서 블록 순서를 바꿀 수 있어야 한다.
 - 부모를 변경하여 계층 이동이 가능해야 한다.
@@ -425,7 +470,7 @@ Block {
 - 이동 요청은 `parentId`, `afterBlockId`, `beforeBlockId`, `version`을 기준으로 위치를 해석한다.
 - 블록 이동 시 `sortKey`, `updatedBy`, `updatedAt`, `version`을 함께 갱신해야 한다.
 
-## 8.10 버전 관리
+## 8.11 버전 관리
 ### 요구사항
 - 문서와 블록은 각각 `version` 필드를 가져야 한다.
 - 수정 시 버전이 증가해야 한다.
@@ -458,6 +503,10 @@ Block {
 ## 9.3 문서 검증
 - `title` 최대 길이: `255`
 - `icon`, `cover`는 허용된 JSON 스키마만 허용
+- `targetParentId`가 있으면 활성 문서여야 하고 현재 문서와 같은 워크스페이스에 속해야 한다.
+- `afterDocumentId`, `beforeDocumentId`가 있으면 둘 다 활성 형제 문서여야 한다.
+- `afterDocumentId`, `beforeDocumentId`를 동시에 받으면 두 문서의 부모가 같아야 하며 서로 인접해야 한다.
+- 자기 자신을 부모로 지정하거나 자신의 하위 문서를 부모로 지정하는 요청은 허용하지 않는다.
 - v1에서 `icon`, `cover`는 JSON object만 허용한다.
 - v1에서 `icon`, `cover`의 최소 허용 스키마는 `{"type":"string","value":"string"}` 형태다.
 - `icon.type`, `icon.value`, `cover.type`, `cover.value`는 모두 비어 있지 않은 문자열이어야 한다.
@@ -619,7 +668,19 @@ Block {
 문서 단건 조회.
 
 ### `PATCH /v1/documents/{documentId}`
-문서 수정.
+문서 메타데이터 수정.
+
+### `POST /v1/documents/{documentId}/move`
+문서 부모 변경 및 형제 순서 변경.
+
+요청 예시:
+```json
+{
+  "targetParentId": "새 부모 문서 ID 또는 null",
+  "afterDocumentId": "같은 형제 집합의 앞 문서 ID 또는 null",
+  "beforeDocumentId": "같은 형제 집합의 뒤 문서 ID 또는 null"
+}
+```
 
 ### `DELETE /v1/documents/{documentId}`
 문서 soft delete.
