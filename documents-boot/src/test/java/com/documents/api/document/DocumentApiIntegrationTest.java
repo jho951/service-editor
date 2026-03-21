@@ -85,7 +85,7 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$.data.workspaceId").value(workspace.getId().toString()))
 			.andExpect(jsonPath("$.data.parentId").doesNotExist())
 			.andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
-			.andExpect(jsonPath("$.data.sortKey").value("00000000000000000001"))
+			.andExpect(jsonPath("$.data.sortKey").value("000000000001000000000000"))
 			.andExpect(jsonPath("$.data.icon.type").value("emoji"))
 			.andExpect(jsonPath("$.data.createdBy").value("user-123"))
 			.andExpect(jsonPath("$.data.version").value(0));
@@ -95,7 +95,7 @@ class DocumentApiIntegrationTest {
 		assertThat(savedDocument.getWorkspaceId()).isEqualTo(workspace.getId());
 		assertThat(savedDocument.getParentId()).isNull();
 		assertThat(savedDocument.getTitle()).isEqualTo("프로젝트 개요");
-		assertThat(savedDocument.getSortKey()).isEqualTo("00000000000000000001");
+		assertThat(savedDocument.getSortKey()).isEqualTo("000000000001000000000000");
 		assertThat(savedDocument.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"📄\"}");
 		assertThat(savedDocument.getCreatedBy()).isEqualTo("user-123");
 	}
@@ -524,9 +524,9 @@ class DocumentApiIntegrationTest {
 	@DisplayName("성공_문서 move API는 parentId와 sortKey와 updatedBy와 updatedAt을 반영한다")
 	void moveDocumentPersistsParentSortKeyAndAuditFields() throws Exception {
 		Workspace workspace = workspace("Docs Root");
-		Document rootA = saveDocument(workspace.getId(), null, "루트 A", "00000000000000000001");
-		Document rootB = saveDocument(workspace.getId(), null, "루트 B", "00000000000000000002");
-		Document movedDocument = saveDocument(workspace.getId(), rootA.getId(), "이동 대상", "00000000000000000001",
+		Document rootA = saveDocument(workspace.getId(), null, "루트 A", "000000000001000000000000");
+		Document rootB = saveDocument(workspace.getId(), null, "루트 B", "000000000002000000000000");
+		Document movedDocument = saveDocument(workspace.getId(), rootA.getId(), "이동 대상", "000000000001000000000000",
 			null, null, "user-123", "user-123");
 		LocalDateTime previousUpdatedAt = movedDocument.getUpdatedAt();
 
@@ -556,10 +556,10 @@ class DocumentApiIntegrationTest {
 	@DisplayName("성공_같은 부모 내 reorder 결과가 문서 목록 조회 순서에 반영된다")
 	void moveDocumentReordersWithinSameParentInDocumentList() throws Exception {
 		Workspace workspace = workspace("Docs Root");
-		Document parent = saveDocument(workspace.getId(), null, "부모 문서", "00000000000000000001");
-		Document first = saveDocument(workspace.getId(), parent.getId(), "첫 번째", "00000000000000000010");
-		Document second = saveDocument(workspace.getId(), parent.getId(), "두 번째", "00000000000000000030");
-		Document third = saveDocument(workspace.getId(), parent.getId(), "세 번째", "00000000000000000050");
+		Document parent = saveDocument(workspace.getId(), null, "부모 문서", "000000000001000000000000");
+		Document first = saveDocument(workspace.getId(), parent.getId(), "첫 번째", "000000000002000000000000");
+		Document second = saveDocument(workspace.getId(), parent.getId(), "두 번째", "000000000006000000000000");
+		Document third = saveDocument(workspace.getId(), parent.getId(), "세 번째", "00000000000A000000000000");
 
 		mockMvc.perform(post("/v1/documents/{documentId}/move", third.getId())
 				.contentType("application/json")
@@ -586,10 +586,10 @@ class DocumentApiIntegrationTest {
 	@DisplayName("성공_다른 부모로 이동한 결과가 문서 목록 조회에 반영된다")
 	void moveDocumentToAnotherParentReflectsInDocumentList() throws Exception {
 		Workspace workspace = workspace("Docs Root");
-		Document rootA = saveDocument(workspace.getId(), null, "루트 A", "00000000000000000040");
-		Document rootB = saveDocument(workspace.getId(), null, "루트 B", "00000000000000000010");
-		Document childA = saveDocument(workspace.getId(), rootA.getId(), "A의 자식", "00000000000000000010");
-		Document childB = saveDocument(workspace.getId(), rootB.getId(), "B의 자식", "00000000000000000020");
+		Document rootA = saveDocument(workspace.getId(), null, "루트 A", "000000000004000000000000");
+		Document rootB = saveDocument(workspace.getId(), null, "루트 B", "000000000001000000000000");
+		Document childA = saveDocument(workspace.getId(), rootA.getId(), "A의 자식", "000000000008000000000000");
+		Document childB = saveDocument(workspace.getId(), rootB.getId(), "B의 자식", "000000000002000000000000");
 
 		mockMvc.perform(post("/v1/documents/{documentId}/move", childA.getId())
 				.contentType("application/json")

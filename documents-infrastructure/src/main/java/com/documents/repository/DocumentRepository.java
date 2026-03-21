@@ -17,21 +17,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 	Optional<Document> findByIdAndDeletedAtIsNull(UUID id);
 
 	@Query("""
-		select max(d.sortKey)
-		from Document d
-		where d.workspace.id = :workspaceId
-		  and (
-		    (:parentId is null and d.parent is null)
-		    or d.parent.id = :parentId
-		  )
-		  and d.deletedAt is null
-		""")
-	Optional<String> findMaxSortKeyByWorkspaceIdAndParentId(
-		@Param("workspaceId") UUID workspaceId,
-		@Param("parentId") UUID parentId
-	);
-
-	@Query("""
 		select d
 		from Document d
 		where d.workspace.id = :workspaceId

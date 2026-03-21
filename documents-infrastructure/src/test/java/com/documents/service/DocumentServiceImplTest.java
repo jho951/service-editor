@@ -22,7 +22,7 @@ import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.DocumentRepository;
-import com.documents.support.DocumentSortKeyGenerator;
+import com.documents.support.OrderedSortKeyGenerator;
 import com.documents.support.TextNormalizer;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,7 +45,7 @@ class DocumentServiceImplTest {
 	private TextNormalizer textNormalizer;
 
 	@Mock
-	private DocumentSortKeyGenerator documentSortKeyGenerator;
+	private OrderedSortKeyGenerator orderedSortKeyGenerator;
 
 	@InjectMocks
 	private DocumentServiceImpl documentService;
@@ -57,7 +57,9 @@ class DocumentServiceImplTest {
 		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
 		when(textNormalizer.normalizeNullable(" " + ACTOR_ID + " ")).thenReturn(ACTOR_ID);
 		when(textNormalizer.normalizeRequired("  " + ROOT_TITLE + "  ")).thenReturn(ROOT_TITLE);
-		when(documentSortKeyGenerator.genNextSortKey(workspaceId, null)).thenReturn("00000000000000000001");
+		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, null)).thenReturn(List.of());
+		when(orderedSortKeyGenerator.generate(anyList(), any(), any(), isNull(), isNull()))
+			.thenReturn("000000000001000000000000");
 		when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		Document result = documentService.create(
@@ -79,7 +81,7 @@ class DocumentServiceImplTest {
 		assertThat(request.getTitle()).isEqualTo(ROOT_TITLE);
 		assertThat(request.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"📄\"}");
 		assertThat(request.getCoverJson()).isEqualTo("{\"type\":\"image\",\"value\":\"cover-1\"}");
-		assertThat(request.getSortKey()).isEqualTo("00000000000000000001");
+		assertThat(request.getSortKey()).isEqualTo("000000000001000000000000");
 		assertThat(request.getCreatedBy()).isEqualTo(ACTOR_ID);
 		assertThat(request.getUpdatedBy()).isEqualTo(ACTOR_ID);
 		assertThat(result).isSameAs(request);
@@ -92,7 +94,9 @@ class DocumentServiceImplTest {
 		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
 		when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
 		when(textNormalizer.normalizeRequired(ROOT_TITLE)).thenReturn(ROOT_TITLE);
-		when(documentSortKeyGenerator.genNextSortKey(workspaceId, null)).thenReturn("00000000000000000001");
+		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, null)).thenReturn(List.of());
+		when(orderedSortKeyGenerator.generate(anyList(), any(), any(), isNull(), isNull()))
+			.thenReturn("000000000001000000000000");
 		when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		Document result = documentService.create(workspaceId, null, ROOT_TITLE, null, null, " ");
@@ -111,13 +115,15 @@ class DocumentServiceImplTest {
 			.thenReturn(Optional.of(parentDocument(parentId, workspaceId)));
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 		when(textNormalizer.normalizeRequired("하위 문서")).thenReturn("하위 문서");
-		when(documentSortKeyGenerator.genNextSortKey(workspaceId, parentId)).thenReturn("00000000000000000010");
+		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(List.of());
+		when(orderedSortKeyGenerator.generate(anyList(), any(), any(), isNull(), isNull()))
+			.thenReturn("000000000001000000000000");
 		when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		Document result = documentService.create(workspaceId, parentId, "하위 문서", null, null, ACTOR_ID);
 
 		assertThat(result.getParentId()).isEqualTo(parentId);
-		assertThat(result.getSortKey()).isEqualTo("00000000000000000010");
+		assertThat(result.getSortKey()).isEqualTo("000000000001000000000000");
 		verify(documentRepository).findByIdAndDeletedAtIsNull(parentId);
 	}
 
@@ -649,17 +655,18 @@ class DocumentServiceImplTest {
 		Document afterDocument = document(afterDocumentId, workspaceId, parentId, "앞 문서", "00000000000000000001");
 		Document siblingDocument = document(UUID.randomUUID(), workspaceId, parentId, "다음 문서", "00000000000000000002");
 		List<Document> siblings = List.of(afterDocument, siblingDocument, document);
+		List<Document> targetSiblings = List.of(afterDocument, siblingDocument);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
 			siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, afterDocumentId, null))
+		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), isNull()))
 			.thenReturn("00000000000000000015");
 
 		assertThatCode(() -> documentService.move(documentId, parentId, afterDocumentId, null, ACTOR_ID))
 			.doesNotThrowAnyException();
 
-		verify(documentSortKeyGenerator).generate(siblings, documentId, afterDocumentId, null);
+		verify(orderedSortKeyGenerator).generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), isNull());
 	}
 
 	@Test
@@ -674,17 +681,18 @@ class DocumentServiceImplTest {
 		Document beforeDocument = document(beforeDocumentId, workspaceId, parentId, "뒤 문서", "00000000000000000002");
 		Document siblingDocument = document(UUID.randomUUID(), workspaceId, parentId, "앞 문서", "00000000000000000001");
 		List<Document> siblings = List.of(siblingDocument, beforeDocument, document);
+		List<Document> targetSiblings = List.of(siblingDocument, beforeDocument);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
 			siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, null, beforeDocumentId))
+		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), isNull(), eq(beforeDocumentId)))
 			.thenReturn("00000000000000000001");
 
 		assertThatCode(() -> documentService.move(documentId, parentId, null, beforeDocumentId, ACTOR_ID))
 			.doesNotThrowAnyException();
 
-		verify(documentSortKeyGenerator).generate(siblings, documentId, null, beforeDocumentId);
+		verify(orderedSortKeyGenerator).generate(eq(targetSiblings), any(), any(), isNull(), eq(beforeDocumentId));
 	}
 
 	@Test
@@ -697,17 +705,18 @@ class DocumentServiceImplTest {
 		Document parentDocument = parentDocument(parentId, workspaceId);
 		Document siblingDocument = document(UUID.randomUUID(), workspaceId, parentId, "형제 문서", "00000000000000000002");
 		List<Document> siblings = List.of(siblingDocument, document);
+		List<Document> targetSiblings = List.of(siblingDocument);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
 			siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, null, null))
+		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), isNull(), isNull()))
 			.thenReturn("00000000000000000003");
 
 		assertThatCode(() -> documentService.move(documentId, parentId, null, null, ACTOR_ID))
 			.doesNotThrowAnyException();
 
-		verify(documentSortKeyGenerator).generate(siblings, documentId, null, null);
+		verify(orderedSortKeyGenerator).generate(eq(targetSiblings), any(), any(), isNull(), isNull());
 	}
 
 	@Test
@@ -723,17 +732,18 @@ class DocumentServiceImplTest {
 		Document afterDocument = document(afterDocumentId, workspaceId, parentId, "앞 문서", "00000000000000000001");
 		Document beforeDocument = document(beforeDocumentId, workspaceId, parentId, "뒤 문서", "00000000000000000002");
 		List<Document> siblings = List.of(afterDocument, beforeDocument, document);
+		List<Document> targetSiblings = List.of(afterDocument, beforeDocument);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
 			siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, afterDocumentId, beforeDocumentId))
+		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), eq(beforeDocumentId)))
 			.thenReturn("000000000000000000015");
 
 		assertThatCode(() -> documentService.move(documentId, parentId, afterDocumentId, beforeDocumentId, ACTOR_ID))
 			.doesNotThrowAnyException();
 
-		verify(documentSortKeyGenerator).generate(siblings, documentId, afterDocumentId, beforeDocumentId);
+		verify(orderedSortKeyGenerator).generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), eq(beforeDocumentId));
 	}
 
 	@Test
@@ -751,7 +761,7 @@ class DocumentServiceImplTest {
 		when(documentRepository.findByIdAndDeletedAtIsNull(targetParentId)).thenReturn(Optional.of(targetParentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, targetParentId))
 			.thenReturn(siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, null, null))
+		when(orderedSortKeyGenerator.generate(eq(siblings), any(), any(), isNull(), isNull()))
 			.thenReturn("00000000000000000010");
 		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
 
@@ -774,7 +784,7 @@ class DocumentServiceImplTest {
 		);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, null)).thenReturn(siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, null, null))
+		when(orderedSortKeyGenerator.generate(eq(siblings), any(), any(), isNull(), isNull()))
 			.thenReturn("00000000000000000010");
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
@@ -798,11 +808,14 @@ class DocumentServiceImplTest {
 			document(afterDocumentId, workspaceId, parentId, "앞 문서", "00000000000000000001"),
 			document
 		);
+		List<Document> targetSiblings = List.of(
+			siblings.get(0)
+		);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId))
 			.thenReturn(siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, afterDocumentId, null))
+		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), isNull()))
 			.thenReturn("00000000000000000015");
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
@@ -823,11 +836,12 @@ class DocumentServiceImplTest {
 		document.setUpdatedBy("old-user");
 		Document parentDocument = parentDocument(parentId, workspaceId);
 		java.util.List<Document> siblings = java.util.List.of(document);
+		List<Document> targetSiblings = List.of();
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId))
 			.thenReturn(siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, null, null))
+		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), isNull(), isNull()))
 			.thenReturn("00000000000000000009");
 
 		documentService.move(documentId, parentId, null, null, ACTOR_ID);
@@ -913,11 +927,16 @@ class DocumentServiceImplTest {
 			document(beforeDocumentId, workspaceId, parentId, "뒤 문서", "00000000000000000003"),
 			document
 		);
+		List<Document> targetSiblings = List.of(
+			siblings.get(0),
+			siblings.get(1),
+			siblings.get(2)
+		);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
 			siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, afterDocumentId, beforeDocumentId))
+		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), eq(beforeDocumentId)))
 			.thenThrow(new IllegalArgumentException("afterDocumentId와 beforeDocumentId는 같은 삽입 간격을 가리켜야 합니다."));
 
 		assertThatThrownBy(
@@ -938,12 +957,13 @@ class DocumentServiceImplTest {
 		Document parentDocument = parentDocument(parentId, workspaceId);
 		List<Document> siblings = List.of(document(UUID.randomUUID(), workspaceId, parentId, "형제 문서",
 			"00000000000000000001"), document);
+		List<Document> targetSiblings = List.of(siblings.get(0));
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
 			siblings);
-		when(documentSortKeyGenerator.generate(siblings, documentId, null, null))
-			.thenThrow(new DocumentSortKeyGenerator.SortKeyRebalanceRequiredException());
+		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), isNull(), isNull()))
+			.thenThrow(new OrderedSortKeyGenerator.SortKeyRebalanceRequiredException());
 
 		assertThatThrownBy(() -> documentService.move(documentId, parentId, null, null, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)

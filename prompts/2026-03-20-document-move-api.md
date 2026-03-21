@@ -31,7 +31,7 @@
 ## Step 5. 위치 해석과 sortKey 계산 구현
 
 - 대상 부모 아래 활성 형제 문서를 조회하는 repository 메서드를 추가했다.
-- `DocumentSortKeyGenerator`에 move 전용 위치 기반 `sortKey` 계산을 추가했다.
+- `OrderedSortKeyGenerator`를 문서 move 경로에도 적용해 위치 기반 `sortKey` 계산을 재사용하도록 정리했다.
 - `afterDocumentId`만 있는 경우 뒤 위치, `beforeDocumentId`만 있는 경우 앞 위치, 둘 다 없는 경우 마지막 위치, 둘 다 있는 경우 두 문서 사이 위치로 해석했다.
 - `afterDocumentId`, `beforeDocumentId`가 같은 부모 집합의 활성 형제이며 서로 인접한 경우만 허용하도록 했다.
 - 정렬 키 공간 부족은 기존 프로젝트 정책대로 `SORT_KEY_REBALANCE_REQUIRED` 예외로 변환했다.

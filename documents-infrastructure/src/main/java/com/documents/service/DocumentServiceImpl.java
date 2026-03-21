@@ -14,7 +14,8 @@ import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.DocumentRepository;
-import com.documents.support.DocumentSortKeyGenerator;
+import com.documents.support.OrderedSortKeyGenerator;
+import com.documents.support.OrderedSortKeyGenerator.SortKeyRebalanceRequiredException;
 import com.documents.support.TextNormalizer;
 
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,7 @@ public class DocumentServiceImpl implements DocumentService {
 	private final DocumentRepository documentRepository;
 	private final WorkspaceService workspaceService;
 	private final TextNormalizer textNormalizer;
-	private final DocumentSortKeyGenerator documentSortKeyGenerator;
+	private final OrderedSortKeyGenerator orderedSortKeyGenerator;
 
 	@Override
 	@Transactional
@@ -38,7 +39,8 @@ public class DocumentServiceImpl implements DocumentService {
 
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
 		String normalizedTitle = textNormalizer.normalizeRequired(title);
-		String nextSortKey = documentSortKeyGenerator.genNextSortKey(workspaceId, parentId);
+		List<Document> siblings = documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId);
+		String nextSortKey = generateSortKey(siblings, null, null);
 
 		Document document = Document.builder()
 			.id(UUID.randomUUID())
@@ -128,14 +130,11 @@ public class DocumentServiceImpl implements DocumentService {
 			targetParentId
 		);
 
-		String nextSortKey;
-		try {
-			nextSortKey = documentSortKeyGenerator.generate(siblings, documentId, afterDocumentId, beforeDocumentId);
-		} catch (DocumentSortKeyGenerator.SortKeyRebalanceRequiredException ex) {
-			throw new BusinessException(BusinessErrorCode.SORT_KEY_REBALANCE_REQUIRED);
-		} catch (IllegalArgumentException ex) {
-			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
-		}
+		List<Document> targetSiblings = siblings.stream()
+			.filter(sibling -> !documentId.equals(sibling.getId()))
+			.toList();
+
+		String nextSortKey = generateSortKey(targetSiblings, afterDocumentId, beforeDocumentId);
 
 		if (Objects.equals(document.getParentId(), targetParentId)
 			&& Objects.equals(document.getSortKey(), nextSortKey)) {
@@ -145,6 +144,22 @@ public class DocumentServiceImpl implements DocumentService {
 		document.setParent(targetParentDocument);
 		document.setSortKey(nextSortKey);
 		document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
+	}
+
+	private String generateSortKey(List<Document> siblings, UUID afterDocumentId, UUID beforeDocumentId) {
+		try {
+			return orderedSortKeyGenerator.generate(
+				siblings,
+				Document::getId,
+				Document::getSortKey,
+				afterDocumentId,
+				beforeDocumentId
+			);
+		} catch (SortKeyRebalanceRequiredException ex) {
+			throw new BusinessException(BusinessErrorCode.SORT_KEY_REBALANCE_REQUIRED);
+		} catch (IllegalArgumentException ex) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
 	}
 
 	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
