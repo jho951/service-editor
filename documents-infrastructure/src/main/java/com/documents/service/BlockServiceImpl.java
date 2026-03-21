@@ -3,6 +3,7 @@ package com.documents.service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -103,6 +104,38 @@ public class BlockServiceImpl implements BlockService {
 
     @Override
     @Transactional
+    public void move(UUID blockId, UUID parentId, UUID afterBlockId, UUID beforeBlockId, Integer version, String actorId) {
+        Block block = findActiveBlock(blockId);
+
+        if (!block.getVersion().equals(version)) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+
+        Block targetParentBlock = findValidParentForMove(block, parentId);
+        List<Block> siblings = blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(block.getDocumentId(), parentId);
+        List<Block> targetSiblings = siblings.stream()
+                .filter(sibling -> !blockId.equals(sibling.getId()))
+                .toList();
+
+        String nextSortKey = generateSortKey(targetSiblings, afterBlockId, beforeBlockId);
+
+        if (Objects.equals(block.getParentId(), parentId)
+                && Objects.equals(block.getSortKey(), nextSortKey)) {
+            return;
+        }
+
+        String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+        if (normalizedActorId == null) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
+        block.setParent(targetParentBlock);
+        block.setSortKey(nextSortKey);
+        block.setUpdatedBy(normalizedActorId);
+    }
+
+    @Override
+    @Transactional
     public void delete(UUID blockId, String actorId) {
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
         LocalDateTime deletedAt = LocalDateTime.now();
@@ -160,6 +193,24 @@ public class BlockServiceImpl implements BlockService {
         return parentBlock;
     }
 
+    private Block findValidParentForMove(Block block, UUID parentId) {
+        if (Objects.equals(block.getId(), parentId)) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
+        if (parentId == null) {
+            return null;
+        }
+
+        Block parentBlock = findActiveBlock(parentId);
+        if (!block.getDocumentId().equals(parentBlock.getDocumentId())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
+        validateNoCycle(block.getId(), parentBlock);
+        return parentBlock;
+    }
+
     private void validateDepth(Block parentBlock) {
         int depth = 1;
         Block current = parentBlock;
@@ -167,6 +218,18 @@ public class BlockServiceImpl implements BlockService {
         while (current != null) {
             depth++;
             if (depth > MAX_BLOCK_DEPTH) {
+                throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+            }
+
+            current = current.getParentId() == null ? null : findActiveBlock(current.getParentId());
+        }
+    }
+
+    private void validateNoCycle(UUID blockId, Block parentBlock) {
+        Block current = parentBlock;
+
+        while (current != null) {
+            if (blockId.equals(current.getId())) {
                 throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
             }
 
