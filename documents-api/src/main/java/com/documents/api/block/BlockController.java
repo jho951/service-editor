@@ -2,6 +2,7 @@ package com.documents.api.block;
 
 import com.documents.api.block.dto.BlockResponse;
 import com.documents.api.block.dto.CreateBlockRequest;
+import com.documents.api.block.dto.MoveBlockRequest;
 import com.documents.api.block.dto.UpdateBlockRequest;
 import com.documents.api.block.support.BlockJsonCodec;
 import com.documents.api.code.SuccessCode;
@@ -92,6 +93,24 @@ public class BlockController {
             @RequestHeader(USER_ID_HEADER) String userId
     ) {
         blockService.delete(blockId, userId);
+        return ResponseEntity.ok(GlobalResponse.ok());
+    }
+
+    @Operation(summary = "블록 이동")
+    @PostMapping("/blocks/{blockId}/move")
+    public ResponseEntity<GlobalResponse<Void>> moveBlock(
+            @PathVariable("blockId") UUID blockId,
+            @Valid @RequestBody MoveBlockRequest request,
+            @RequestHeader(USER_ID_HEADER) String userId
+    ) {
+        blockService.move(
+                blockId,
+                request.getParentId(),
+                request.getAfterBlockId(),
+                request.getBeforeBlockId(),
+                request.getVersion(),
+                userId
+        );
         return ResponseEntity.ok(GlobalResponse.ok());
     }
 }
