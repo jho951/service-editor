@@ -274,6 +274,303 @@ class BlockServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_parentId와 anchor가 모두 null이면 루트 형제 집합의 마지막 위치로 이동한다")
+    void moveMovesBlockToDocumentRootLastPosition() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, UUID.randomUUID(), "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        block.setUpdatedBy("old-user");
+        Block sibling = block(documentId, null, "000000000002000000000000");
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, null))
+                .thenReturn(List.of(sibling));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+        blockService.move(blockId, null, null, null, 1, ACTOR_ID);
+
+        assertThat(block.getParentId()).isNull();
+        assertThat(block.getSortKey()).isEqualTo("000000000003000000000000");
+        assertThat(block.getUpdatedBy()).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_같은 부모에서 afterBlockId 기준으로 재정렬하면 새 sortKey와 updatedBy를 반영한다")
+    void moveReordersWithinSameParent() {
+        UUID documentId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID afterBlockId = UUID.randomUUID();
+        Block block = block(documentId, parentId, "000000000003000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        block.setUpdatedBy("old-user");
+        Block parent = parentBlock(parentId, documentId);
+        Block afterBlock = block(documentId, parentId, "000000000001000000000000");
+        afterBlock.setId(afterBlockId);
+        Block nextBlock = block(documentId, parentId, "000000000002000000000000");
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parent));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, parentId))
+                .thenReturn(List.of(afterBlock, nextBlock, block));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+        blockService.move(blockId, parentId, afterBlockId, null, 1, ACTOR_ID);
+
+        assertThat(block.getParentId()).isEqualTo(parentId);
+        assertThat(block.getSortKey()).isEqualTo("000000000001I00000000000");
+        assertThat(block.getUpdatedBy()).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_다른 부모로 이동하면 parentId와 sortKey와 updatedBy를 함께 갱신한다")
+    void moveUpdatesParentSortKeyAndUpdatedBy() {
+        UUID documentId = UUID.randomUUID();
+        UUID currentParentId = UUID.randomUUID();
+        UUID targetParentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, currentParentId, "000000000003000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        block.setUpdatedBy("old-user");
+        Block targetParent = parentBlock(targetParentId, documentId);
+        Block sibling = block(documentId, targetParentId, "000000000001000000000000");
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(targetParentId)).thenReturn(Optional.of(targetParent));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, targetParentId))
+                .thenReturn(List.of(sibling));
+        when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
+
+        blockService.move(blockId, targetParentId, null, null, 1, " user-456 ");
+
+        assertThat(block.getParentId()).isEqualTo(targetParentId);
+        assertThat(block.getSortKey()).isEqualTo("000000000002000000000000");
+        assertThat(block.getUpdatedBy()).isEqualTo("user-456");
+    }
+
+    @Test
+    @DisplayName("성공_요청 위치가 현재 위치와 같으면 no-op으로 성공 처리하고 변경하지 않는다")
+    void moveDoesNothingWhenTargetLocationIsSame() {
+        UUID documentId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, parentId, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        block.setUpdatedBy("old-user");
+        Block parent = parentBlock(parentId, documentId);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parent));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, parentId))
+                .thenReturn(List.of(block));
+
+        blockService.move(blockId, parentId, null, null, 1, ACTOR_ID);
+
+        assertThat(block.getParentId()).isEqualTo(parentId);
+        assertThat(block.getSortKey()).isEqualTo("000000000001000000000000");
+        assertThat(block.getUpdatedBy()).isEqualTo("old-user");
+        verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("실패_이동 대상 블록이 없으면 블록 없음 예외를 던진다")
+    void moveThrowsWhenBlockMissing() {
+        UUID blockId = UUID.randomUUID();
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> blockService.move(blockId, null, null, null, 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청한 블록을 찾을 수 없습니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("실패_version이 현재 블록 version과 다르면 충돌 예외를 던진다")
+    void moveThrowsWhenVersionMismatched() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+
+        assertThatThrownBy(() -> blockService.move(blockId, null, null, null, 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("실패_parentId가 존재하지 않으면 블록 없음 예외를 던진다")
+    void moveThrowsWhenParentMissing() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> blockService.move(blockId, parentId, null, null, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청한 블록을 찾을 수 없습니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("실패_대상 부모가 다른 문서 소속 블록이면 잘못된 요청 예외를 던진다")
+    void moveThrowsWhenParentBelongsToOtherDocument() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        Block otherDocumentParent = parentBlock(parentId, UUID.randomUUID());
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(otherDocumentParent));
+
+        assertThatThrownBy(() -> blockService.move(blockId, parentId, null, null, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("잘못된 요청입니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 예외를 던진다")
+    void moveThrowsWhenParentIsSelf() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+
+        assertThatThrownBy(() -> blockService.move(blockId, blockId, null, null, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_자기 하위 블록을 부모로 지정하면 순환 이동 예외를 던진다")
+    void moveThrowsWhenCycleDetected() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID childId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        Block child = block(documentId, blockId, "000000000002000000000000");
+        child.setId(childId);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(childId)).thenReturn(Optional.of(child));
+
+        assertThatThrownBy(() -> blockService.move(blockId, childId, null, null, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_afterBlockId가 대상 부모의 형제가 아니면 잘못된 요청 예외를 던진다")
+    void moveThrowsWhenAfterBlockIsNotSibling() {
+        UUID documentId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000003000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        Block parent = parentBlock(parentId, documentId);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parent));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, parentId))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> blockService.move(blockId, parentId, UUID.randomUUID(), null, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("잘못된 요청입니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_afterBlockId와 beforeBlockId가 같은 삽입 간격을 가리키지 않으면 잘못된 요청 예외를 던진다")
+    void moveThrowsWhenAnchorsAreContradictory() {
+        UUID documentId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID afterBlockId = UUID.randomUUID();
+        UUID beforeBlockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000009000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        Block parent = parentBlock(parentId, documentId);
+        Block afterBlock = block(documentId, parentId, "000000000001000000000000");
+        afterBlock.setId(afterBlockId);
+        Block middleBlock = block(documentId, parentId, "000000000002000000000000");
+        Block beforeBlock = block(documentId, parentId, "000000000003000000000000");
+        beforeBlock.setId(beforeBlockId);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parent));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, parentId))
+                .thenReturn(List.of(afterBlock, middleBlock, beforeBlock));
+
+        assertThatThrownBy(() -> blockService.move(blockId, parentId, afterBlockId, beforeBlockId, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("잘못된 요청입니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_sort key gap이 부족하면 재정렬 필요 예외를 던진다")
+    void moveThrowsWhenSortKeySpaceExhausted() {
+        UUID documentId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID afterBlockId = UUID.randomUUID();
+        UUID beforeBlockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000009000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        Block parent = parentBlock(parentId, documentId);
+        Block afterBlock = block(documentId, parentId, "000000000001000000000000");
+        afterBlock.setId(afterBlockId);
+        Block beforeBlock = block(documentId, parentId, "000000000001000000000001");
+        beforeBlock.setId(beforeBlockId);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parent));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, parentId))
+                .thenReturn(List.of(afterBlock, beforeBlock));
+
+        assertThatThrownBy(() -> blockService.move(blockId, parentId, afterBlockId, beforeBlockId, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("정렬 키 공간이 부족하여 재정렬이 필요합니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.SORT_KEY_REBALANCE_REQUIRED);
+    }
+
+    @Test
     @DisplayName("성공_블록 삭제 시 활성 하위 블록까지 같은 시각으로 bulk soft delete 처리한다")
     void deleteSoftDeletesDescendantBlocks() {
         UUID documentId = UUID.randomUUID();
