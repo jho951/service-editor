@@ -112,6 +112,7 @@ public class BlockServiceImpl implements BlockService {
         }
 
         Block targetParentBlock = findValidParentForMove(block, parentId);
+        validateDepth(targetParentBlock);
         List<Block> siblings = blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(block.getDocumentId(), parentId);
         List<Block> targetSiblings = siblings.stream()
                 .filter(sibling -> !blockId.equals(sibling.getId()))

@@ -50,3 +50,9 @@
 
 - ADR: `docs/decisions/011-separate-block-update-from-move-api.md`
 - Explainer: `prompts/explainers/ordered-sortkey-generator.md`
+
+## Step 9. 이동 깊이 제한 누락 보강
+
+- 후속 리뷰에서 블록 생성에는 적용되던 최대 깊이 제한이 블록 이동 경로에는 빠져 있음을 확인했다.
+- `BlockServiceImpl.move(...)`에 `validateDepth(targetParentBlock)`를 추가해 생성과 이동의 깊이 정책을 일치시켰다.
+- `BlockServiceImplTest`, `BlockApiIntegrationTest`에 최대 깊이 초과 부모로 이동할 때 `INVALID_REQUEST`를 반환하는 케이스를 추가했다.

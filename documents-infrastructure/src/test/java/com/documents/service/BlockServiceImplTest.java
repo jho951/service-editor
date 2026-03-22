@@ -489,6 +489,67 @@ class BlockServiceImplTest {
     }
 
     @Test
+    @DisplayName("실패_이동 대상 부모 깊이가 최대 깊이를 넘기면 잘못된 요청 예외를 던진다")
+    void moveThrowsWhenTargetParentDepthExceedsLimit() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID parent1Id = UUID.randomUUID();
+        UUID parent2Id = UUID.randomUUID();
+        UUID parent3Id = UUID.randomUUID();
+        UUID parent4Id = UUID.randomUUID();
+        UUID parent5Id = UUID.randomUUID();
+        UUID parent6Id = UUID.randomUUID();
+        UUID parent7Id = UUID.randomUUID();
+        UUID parent8Id = UUID.randomUUID();
+        UUID parent9Id = UUID.randomUUID();
+        UUID parent10Id = UUID.randomUUID();
+
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+
+        Block parent1 = parentBlock(parent1Id, documentId);
+        Block parent2 = parentBlock(parent2Id, documentId);
+        parent2.setParent(parent1);
+        Block parent3 = parentBlock(parent3Id, documentId);
+        parent3.setParent(parent2);
+        Block parent4 = parentBlock(parent4Id, documentId);
+        parent4.setParent(parent3);
+        Block parent5 = parentBlock(parent5Id, documentId);
+        parent5.setParent(parent4);
+        Block parent6 = parentBlock(parent6Id, documentId);
+        parent6.setParent(parent5);
+        Block parent7 = parentBlock(parent7Id, documentId);
+        parent7.setParent(parent6);
+        Block parent8 = parentBlock(parent8Id, documentId);
+        parent8.setParent(parent7);
+        Block parent9 = parentBlock(parent9Id, documentId);
+        parent9.setParent(parent8);
+        Block parent10 = parentBlock(parent10Id, documentId);
+        parent10.setParent(parent9);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent10Id)).thenReturn(Optional.of(parent10));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent9Id)).thenReturn(Optional.of(parent9));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent8Id)).thenReturn(Optional.of(parent8));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent7Id)).thenReturn(Optional.of(parent7));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent6Id)).thenReturn(Optional.of(parent6));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent5Id)).thenReturn(Optional.of(parent5));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent4Id)).thenReturn(Optional.of(parent4));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent3Id)).thenReturn(Optional.of(parent3));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent2Id)).thenReturn(Optional.of(parent2));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent1Id)).thenReturn(Optional.of(parent1));
+
+        assertThatThrownBy(() -> blockService.move(blockId, parent10Id, null, null, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("잘못된 요청입니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+
+        verify(blockRepository, never()).findActiveByDocumentIdAndParentIdOrderBySortKey(any(), any());
+    }
+
+    @Test
     @DisplayName("실패_afterBlockId가 대상 부모의 형제가 아니면 잘못된 요청 예외를 던진다")
     void moveThrowsWhenAfterBlockIsNotSibling() {
         UUID documentId = UUID.randomUUID();
