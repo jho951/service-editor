@@ -1,14 +1,19 @@
 package com.documents.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
@@ -20,15 +25,6 @@ import com.documents.service.transaction.DocumentTransactionCommand;
 import com.documents.service.transaction.DocumentTransactionOperationCommand;
 import com.documents.service.transaction.DocumentTransactionOperationType;
 import com.documents.service.transaction.DocumentTransactionResult;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Document transaction 서비스 구현 검증")
@@ -160,6 +156,106 @@ class DocumentTransactionServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_existing block move는 전달받은 version과 위치로 move를 호출한다")
+    void applyMovesExistingBlockWithRequestedVersion() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID afterBlockId = UUID.randomUUID();
+        Block movedBlock = block(blockId, documentId, "000000000001I00000000000", 5);
+
+        when(blockService.move(blockId, null, afterBlockId, null, 4, ACTOR_ID)).thenReturn(movedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        4,
+                                        null,
+                                        null,
+                                        afterBlockId.toString(),
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).hasSize(1);
+        assertThat(result.appliedOperations().get(0).blockId()).isEqualTo(blockId);
+        assertThat(result.appliedOperations().get(0).version()).isEqualTo(5);
+        assertThat(result.appliedOperations().get(0).sortKey()).isEqualTo("000000000001I00000000000");
+
+        verify(blockService).move(blockId, null, afterBlockId, null, 4, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_move는 temp parentRef를 실제 parentId로 해석한다")
+    void applyResolvesTempParentReferenceForMove() {
+        UUID documentId = UUID.randomUUID();
+        UUID tempParentId = UUID.randomUUID();
+        UUID existingBlockId = UUID.randomUUID();
+
+        Block createdParentBlock = block(tempParentId, documentId, "000000000001000000000000", 0);
+        Block movedBlock = block(existingBlockId, documentId, "000000000001I00000000000", 2);
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdParentBlock);
+        when(blockService.move(existingBlockId, tempParentId, null, null, 1, ACTOR_ID)).thenReturn(movedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:parent",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        existingBlockId.toString(),
+                                        1,
+                                        null,
+                                        "tmp:parent",
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::blockId)
+                .containsExactly(tempParentId, existingBlockId);
+        assertThat(result.appliedOperations().get(1).version()).isEqualTo(2);
+
+        verify(blockService).move(existingBlockId, tempParentId, null, null, 1, ACTOR_ID);
+    }
+
+    @Test
     @DisplayName("실패_replace_content가 알 수 없는 tempId를 참조하면 잘못된 요청 예외를 던진다")
     void applyThrowsWhenReplaceContentReferencesUnknownBlockReference() {
         assertThatThrownBy(() -> documentTransactionService.apply(
@@ -254,6 +350,34 @@ class DocumentTransactionServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("실패_move가 존재하지 않는 temp parentRef를 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenMoveUsesUnknownTempParentReference() {
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                UUID.randomUUID(),
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        UUID.randomUUID().toString(),
+                                        1,
+                                        null,
+                                        "tmp:missing-parent",
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
     }
 
     @Test

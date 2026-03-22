@@ -249,6 +249,56 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("성공_block_move transaction 요청에 대해 version과 sortKey 응답을 반환한다")
+	void applyTransactionsReturnsAppliedOperationsForBlockMove() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+
+		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
+			.thenReturn(new DocumentTransactionResult(
+				documentId,
+				"batch-move",
+				List.of(
+					new DocumentTransactionAppliedOperationResult(
+						"op-1",
+						DocumentTransactionOperationStatus.APPLIED,
+						null,
+						blockId,
+						5,
+						"000000000001I00000000000",
+						null
+					)
+				)
+			));
+
+		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "clientId": "web-editor",
+					  "batchId": "batch-move",
+					  "operations": [
+					    {
+					      "opId": "op-1",
+					      "type": "BLOCK_MOVE",
+					      "blockRef": "%s",
+					      "version": 4,
+					      "parentRef": null,
+					      "afterRef": "%s",
+					      "beforeRef": null
+					    }
+					  ]
+					}
+					""".formatted(blockId, UUID.randomUUID())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(5))
+			.andExpect(jsonPath("$.data.appliedOperations[0].sortKey").value("000000000001I00000000000"));
+	}
+
+	@Test
 	@DisplayName("실패_replace_content에 content가 없으면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsReplaceContentWithoutContent() throws Exception {
 		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
@@ -399,6 +449,40 @@ class DocumentControllerWebMvcTest {
 				      "opId": "op-1",
 				      "type": "BLOCK_DELETE",
 				      "blockRef": "%s"
+				    }
+				  ]
+				}
+				""".formatted(UUID.randomUUID())));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_block_move에 content가 함께 오면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsBlockMoveWithContent() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_MOVE",
+				      "blockRef": "%s",
+				      "version": 0,
+				      "content": {
+				        "format": "rich_text",
+				        "schemaVersion": 1,
+				        "segments": [
+				          {
+				            "text": "잘못된 move",
+				            "marks": []
+				          }
+				        ]
+				      }
 				    }
 				  ]
 				}

@@ -136,6 +136,87 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("성공_block_move는 기존 블록 위치를 옮기고 version과 sortKey를 갱신한다")
+    void applyTransactionsMovesExistingBlock() throws Exception {
+        Document document = document("문서");
+        Block beforeBlock = block(document, null, "앞 블록", "000000000001000000000000");
+        Block movingBlock = block(document, null, "이동 대상", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-move",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "parentRef": null,
+                                      "afterRef": null,
+                                      "beforeRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(movingBlock.getId(), beforeBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(movingBlock.getId().toString()))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(1))
+                .andExpect(jsonPath("$.data.appliedOperations[0].sortKey").exists());
+
+        Block reloadedMovingBlock = blockRepository.findByIdAndDeletedAtIsNull(movingBlock.getId()).orElseThrow();
+        assertThat(reloadedMovingBlock.getVersion()).isEqualTo(1);
+        assertThat(reloadedMovingBlock.getUpdatedBy()).isEqualTo("user-456");
+        assertThat(reloadedMovingBlock.getSortKey()).isNotEqualTo("000000000002000000000000");
+    }
+
+    @Test
+    @DisplayName("성공_block_move는 temp parentRef를 실제 parentId로 해석한다")
+    void applyTransactionsMovesExistingBlockUnderTempParent() throws Exception {
+        Document document = document("문서");
+        Block movingBlock = block(document, null, "이동 대상", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-temp-move",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:parent"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "parentRef": "tmp:parent"
+                                    }
+                                  ]
+                                }
+                                """.formatted(movingBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[1].blockId").value(movingBlock.getId().toString()))
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(1));
+
+        Block createdParentBlock = blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(document.getId(), null)
+                .stream()
+                .filter(block -> !block.getId().equals(movingBlock.getId()))
+                .findFirst()
+                .orElseThrow();
+        Block movedBlock = blockRepository.findByIdAndDeletedAtIsNull(movingBlock.getId()).orElseThrow();
+
+        assertThat(movedBlock.getParentId()).isEqualTo(createdParentBlock.getId());
+    }
+
+    @Test
     @DisplayName("실패_create 뒤 block_delete가 충돌하면 앞선 생성까지 전체 transaction을 rollback한다")
     void applyTransactionsRollsBackCreatedBlockWhenLaterDeleteConflicts() throws Exception {
         Document document = document("문서");
@@ -162,6 +243,49 @@ class DocumentTransactionApiIntegrationTest {
                                       "type": "BLOCK_DELETE",
                                       "blockRef": "%s",
                                       "version": 0
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
+                .andExpect(jsonPath("$.code").value(9005))
+                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isEqualTo(1);
+        assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()))
+                .extracting(Block::getId)
+                .containsExactly(existingBlock.getId());
+    }
+
+    @Test
+    @DisplayName("실패_create 뒤 block_move가 충돌하면 앞선 생성까지 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackCreatedBlockWhenLaterMoveConflicts() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        existingBlock.setContent(content("다른 사용자 수정"));
+        blockRepository.save(existingBlock);
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-move-conflict",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "parentRef": "tmp:block:1"
                                     }
                                   ]
                                 }
