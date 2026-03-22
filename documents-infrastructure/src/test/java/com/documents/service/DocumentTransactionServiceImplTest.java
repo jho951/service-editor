@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -124,7 +125,7 @@ class DocumentTransactionServiceImplTest {
         Block deletedBlock = block(blockId, documentId, "000000000001000000000000", 4);
         deletedBlock.setDeletedAt(deletedAt);
 
-        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(java.util.Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
         when(blockService.delete(blockId, ACTOR_ID)).thenReturn(deletedBlock);
 
         DocumentTransactionResult result = documentTransactionService.apply(
@@ -161,8 +162,10 @@ class DocumentTransactionServiceImplTest {
         UUID documentId = UUID.randomUUID();
         UUID blockId = UUID.randomUUID();
         UUID afterBlockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 4);
         Block movedBlock = block(blockId, documentId, "000000000001I00000000000", 5);
 
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.move(blockId, null, afterBlockId, null, 4, ACTOR_ID)).thenReturn(movedBlock);
         doNothing().when(blockRepository).flush();
 
@@ -203,6 +206,7 @@ class DocumentTransactionServiceImplTest {
         UUID existingBlockId = UUID.randomUUID();
 
         Block createdParentBlock = block(tempParentId, documentId, "000000000001000000000000", 0);
+        Block existingBlock = block(existingBlockId, documentId, "000000000002000000000000", 1);
         Block movedBlock = block(existingBlockId, documentId, "000000000001I00000000000", 2);
 
         when(blockService.create(
@@ -214,6 +218,7 @@ class DocumentTransactionServiceImplTest {
                 eq(null),
                 eq(ACTOR_ID)
         )).thenReturn(createdParentBlock);
+        when(blockRepository.findByIdAndDeletedAtIsNull(existingBlockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.move(existingBlockId, tempParentId, null, null, 1, ACTOR_ID)).thenReturn(movedBlock);
         doNothing().when(blockRepository).flush();
 
@@ -256,6 +261,81 @@ class DocumentTransactionServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_create 뒤 temp block move 후 replace_content를 적용하면 temp block context version을 갱신한다")
+    void applyUpdatesTempBlockVersionAfterMove() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID afterBlockId = UUID.randomUUID();
+        String movedContent =
+                "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"이동 후 수정\",\"marks\":[]}]}";
+
+        Block createdBlock = block(blockId, documentId, "000000000001000000000000", 0);
+        Block movedBlock = block(blockId, documentId, "000000000001I00000000000", 1);
+        Block updatedBlock = block(blockId, documentId, "000000000001I00000000000", 2);
+        updatedBlock.setContent(movedContent);
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdBlock);
+        when(blockService.move(blockId, null, afterBlockId, null, 0, ACTOR_ID)).thenReturn(movedBlock);
+        when(blockService.update(blockId, movedContent, 1, ACTOR_ID)).thenReturn(updatedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        afterBlockId.toString(),
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-3",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        "tmp:block:1",
+                                        null,
+                                        movedContent,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::version)
+                .containsExactly(0, 1, 2);
+
+        verify(blockService).move(blockId, null, afterBlockId, null, 0, ACTOR_ID);
+        verify(blockService).update(blockId, movedContent, 1, ACTOR_ID);
+    }
+
+    @Test
     @DisplayName("실패_replace_content가 알 수 없는 tempId를 참조하면 잘못된 요청 예외를 던진다")
     void applyThrowsWhenReplaceContentReferencesUnknownBlockReference() {
         assertThatThrownBy(() -> documentTransactionService.apply(
@@ -284,6 +364,43 @@ class DocumentTransactionServiceImplTest {
     }
 
     @Test
+    @DisplayName("실패_replace_content가 다른 문서 블록을 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenReplaceContentReferencesBlockFromOtherDocument() {
+        UUID documentId = UUID.randomUUID();
+        UUID otherDocumentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block otherDocumentBlock = block(blockId, otherDocumentId, "000000000001000000000000", 0);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(otherDocumentBlock));
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        blockId.toString(),
+                                        0,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+
+        verify(blockService, never()).update(any(), anyString(), any(), anyString());
+    }
+
+    @Test
     @DisplayName("실패_block_delete가 다른 문서 블록을 참조하면 잘못된 요청 예외를 던진다")
     void applyThrowsWhenDeleteReferencesBlockFromOtherDocument() {
         UUID documentId = UUID.randomUUID();
@@ -291,7 +408,7 @@ class DocumentTransactionServiceImplTest {
         UUID blockId = UUID.randomUUID();
         Block otherDocumentBlock = block(blockId, otherDocumentId, "000000000001000000000000", 0);
 
-        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(java.util.Optional.of(otherDocumentBlock));
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(otherDocumentBlock));
 
         assertThatThrownBy(() -> documentTransactionService.apply(
                 documentId,
@@ -325,7 +442,7 @@ class DocumentTransactionServiceImplTest {
         UUID blockId = UUID.randomUUID();
         Block block = block(blockId, documentId, "000000000001000000000000", 3);
 
-        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(java.util.Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
 
         assertThatThrownBy(() -> documentTransactionService.apply(
                 documentId,
@@ -353,10 +470,17 @@ class DocumentTransactionServiceImplTest {
     }
 
     @Test
-    @DisplayName("실패_move가 존재하지 않는 temp parentRef를 참조하면 잘못된 요청 예외를 던진다")
-    void applyThrowsWhenMoveUsesUnknownTempParentReference() {
+    @DisplayName("실패_move가 다른 문서 블록을 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenMoveReferencesBlockFromOtherDocument() {
+        UUID documentId = UUID.randomUUID();
+        UUID otherDocumentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block otherDocumentBlock = block(blockId, otherDocumentId, "000000000001000000000000", 1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(otherDocumentBlock));
+
         assertThatThrownBy(() -> documentTransactionService.apply(
-                UUID.randomUUID(),
+                documentId,
                 new DocumentTransactionCommand(
                         "web-editor",
                         "batch-1",
@@ -364,10 +488,158 @@ class DocumentTransactionServiceImplTest {
                                 new DocumentTransactionOperationCommand(
                                         "op-1",
                                         DocumentTransactionOperationType.BLOCK_MOVE,
-                                        UUID.randomUUID().toString(),
+                                        blockId.toString(),
+                                        1,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+
+        verify(blockService, never()).move(any(), any(), any(), any(), any(), anyString());
+    }
+
+    @Test
+    @DisplayName("실패_move가 존재하지 않는 temp parentRef를 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenMoveUsesUnknownTempParentReference() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
                                         1,
                                         null,
                                         "tmp:missing-parent",
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_move가 존재하지 않는 temp afterRef를 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenMoveUsesUnknownTempAfterReference() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        1,
+                                        null,
+                                        null,
+                                        "tmp:missing-after",
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_move가 존재하지 않는 temp beforeRef를 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenMoveUsesUnknownTempBeforeReference() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        1,
+                                        null,
+                                        null,
+                                        null,
+                                        "tmp:missing-before"
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_move가 아직 생성되지 않은 temp anchor를 먼저 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenMoveReferencesFutureTempAnchor() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        1,
+                                        null,
+                                        null,
+                                        "tmp:future-after",
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:future-after",
+                                        null,
+                                        null,
+                                        null,
                                         null,
                                         null
                                 )
@@ -550,9 +822,11 @@ class DocumentTransactionServiceImplTest {
     void applyReplacesExistingBlockWithRequestedVersion() {
         UUID documentId = UUID.randomUUID();
         UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 3);
         Block updatedBlock = block(blockId, documentId, "000000000001000000000000", 4);
         updatedBlock.setContent(REPLACED_CONTENT);
 
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
         doNothing().when(blockRepository).flush();
 

@@ -66,3 +66,10 @@
 - transaction 서비스는 기존 `BlockService.move(...)`를 재사용하고, temp 위치 ref를 같은 transaction 컨텍스트에서 실제 blockId로 해석한 뒤 이동 결과의 `version`, `sortKey`를 응답에 담도록 연결했다.
 - `BlockService.move(...)`는 transaction 응답이 결과 상태를 재사용할 수 있도록 `Block` 반환형으로 조정했고, 단건 move API는 기존처럼 반환값을 무시한다.
 - 문서 본문 요구사항과 guide는 이미 `BLOCK_MOVE` 계약을 포함하고 있어 추가 수정은 하지 않고, 서비스/WebMvc/boot 테스트와 작업 로그만 갱신했다.
+
+## Step 10. transaction 검증 테스트 보강
+
+- `DocumentTransactionServiceImpl`의 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE` 전반에 대해 temp ref 순서, unknown temp anchor, temp block move 후 version 전파, stale version, cross-document 참조를 더 촘촘히 검증하는 서비스 테스트를 추가했다.
+- 테스트 보강 과정에서 `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`가 요청 `documentId` 소속이 아닌 real blockRef를 통과시키는 구멍을 확인했고, 두 경로도 `resolveExistingBlock(...)`를 거쳐 문서 소속과 version을 함께 검증하도록 보정했다.
+- boot 통합 테스트에는 temp block move 후 replace 누적 반영, temp block delete 거절 및 rollback, move/replace의 다른 문서 블록 참조 거절, move no-op version 유지, unknown/future temp anchor 거절 시나리오를 추가했다.
+- 검증은 `:documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`, `:documents-api:test --tests 'com.documents.api.document.DocumentControllerWebMvcTest'`로 확인했다.

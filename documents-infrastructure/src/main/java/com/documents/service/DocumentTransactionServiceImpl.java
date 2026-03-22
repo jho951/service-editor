@@ -1,5 +1,14 @@
 package com.documents.service;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
 import com.documents.exception.BusinessErrorCode;
@@ -9,16 +18,9 @@ import com.documents.service.transaction.DocumentTransactionAppliedOperationResu
 import com.documents.service.transaction.DocumentTransactionCommand;
 import com.documents.service.transaction.DocumentTransactionOperationCommand;
 import com.documents.service.transaction.DocumentTransactionOperationStatus;
-import com.documents.service.transaction.DocumentTransactionOperationType;
 import com.documents.service.transaction.DocumentTransactionResult;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -42,10 +44,10 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                         applyCreate(documentId, operation, actorId, tempBlockContexts)
                 );
                 case BLOCK_REPLACE_CONTENT -> appliedOperations.add(
-                        applyReplaceContent(operation, actorId, tempBlockContexts)
+                        applyReplaceContent(documentId, operation, actorId, tempBlockContexts)
                 );
                 case BLOCK_MOVE -> appliedOperations.add(
-                        applyMove(operation, actorId, tempBlockContexts)
+                        applyMove(documentId, operation, actorId, tempBlockContexts)
                 );
                 case BLOCK_DELETE -> appliedOperations.add(
                         applyDelete(documentId, operation, actorId)
@@ -102,11 +104,12 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
     }
 
     private DocumentTransactionAppliedOperationResult applyReplaceContent(
+            UUID documentId,
             DocumentTransactionOperationCommand operation,
             String actorId,
             Map<String, TempBlockContext> tempBlockContexts
     ) {
-        ResolvedBlockReference resolvedBlockReference = resolveBlockReference(operation, tempBlockContexts);
+        ResolvedBlockReference resolvedBlockReference = resolveBlockReference(documentId, operation, tempBlockContexts);
         Block updatedBlock = blockService.update(
                 resolvedBlockReference.realBlockId(),
                 operation.content(),
@@ -150,11 +153,12 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
     }
 
     private DocumentTransactionAppliedOperationResult applyMove(
+            UUID documentId,
             DocumentTransactionOperationCommand operation,
             String actorId,
             Map<String, TempBlockContext> tempBlockContexts
     ) {
-        ResolvedBlockReference resolvedBlockReference = resolveBlockReference(operation, tempBlockContexts);
+        ResolvedBlockReference resolvedBlockReference = resolveBlockReference(documentId, operation, tempBlockContexts);
         ResolvedPositionReferences resolvedPositionReferences = resolvePositionReferences(operation, tempBlockContexts);
 
         Block movedBlock = blockService.move(
@@ -183,6 +187,7 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
     }
 
     private ResolvedBlockReference resolveBlockReference(
+            UUID documentId,
             DocumentTransactionOperationCommand operation,
             Map<String, TempBlockContext> tempBlockContexts
     ) {
@@ -195,10 +200,8 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
             );
         }
 
-        UUID realBlockId = parseRealBlockId(operation.blockReference());
-        validateVersionIsPresent(operation.version());
-
-        return new ResolvedBlockReference(realBlockId, operation.version(), null);
+        Block block = resolveExistingBlock(documentId, operation);
+        return new ResolvedBlockReference(block.getId(), block.getVersion(), null);
     }
 
     private void validateBlockReferenceIsUnique(String blockReference, Map<String, TempBlockContext> tempBlockContexts) {
