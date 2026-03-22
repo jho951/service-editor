@@ -176,6 +176,8 @@ v1에서 프론트가 다루는 operation은 4개다.
 주의:
 
 - `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
+- 같은 batch 안의 새 block이면 `version`을 보내지 않는다.
+- 기존 서버 block이면 batch 생성 시점에 클라이언트가 알고 있던 base `version`을 보낸다.
 - 키 입력마다 서버 호출하지 않는다.
 - queue에는 항상 "현재 최종 content"만 남도록 정리한다.
 
@@ -184,10 +186,15 @@ v1에서 프론트가 다루는 operation은 4개다.
 - operation: `BLOCK_MOVE`
 - 필요한 값:
 - `blockRef`
-- `version`
+- 기존 서버 block이면 `version`
 - `parentRef`
 - `afterRef`
 - `beforeRef`
+
+주의:
+
+- 같은 batch 안의 새 block이면 `version`을 보내지 않는다.
+- 기존 서버 block이면 같은 batch 안의 여러 move/replace/delete가 이어져도 모두 같은 base `version`을 보낸다.
 
 ### 블록 삭제
 
@@ -383,7 +390,32 @@ queue는 다음 정리 규칙을 수행해야 한다.
 ```
 
 기존 서버 block에 대한 수정/이동/삭제에는 `version`을 반드시 넣어야 한다.
+반대로 같은 batch 안의 temp block 대상 `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`에는 `version`을 넣지 않는다.
 또한 대상 식별자는 `blockId`가 아니라 `blockRef`를 사용한다.
+
+---
+
+## 9.1 현재 서버가 보장하는 규칙
+
+프론트 queue 구현은 아래 서버 규칙을 전제로 맞추는 것이 안전하다.
+
+- transaction은 부분 성공이 아니라 전체 commit 또는 전체 rollback이다.
+- `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`는 요청이 유효하지만 실제 상태 변화가 없으면 `status=NO_OP`로 응답한다.
+- `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`의 no-op는 version을 올리지 않는다.
+- `BLOCK_DELETE` 뒤 같은 batch에서 같은 block 또는 그 subtree 자식을 다시 `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`로 참조하면 실패하고 전체 rollback 된다.
+- 기존 서버 block에 대한 `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`는 현재 요청 `documentId` 소속 block만 허용한다.
+- `BLOCK_MOVE`는 self-anchor, reversed anchor, same-anchor, target parent와 맞지 않는 anchor 조합을 잘못된 요청으로 거절한다.
+- 같은 batch 안의 temp block은 앞선 operation 결과 version을 이어받는다.
+- `create -> ... -> delete` 같은 temp 상쇄는 여전히 queue에서 collapse하는 것이 우선이지만, 혹시 남아 들어오더라도 서버는 temp delete를 version 없이 처리할 수 있다.
+- 같은 batch 안의 기존 서버 block은 첫 참조에서 base `version`으로 동시성을 검증하고, 그 뒤 op들은 서버가 batch 내부 최신 version을 이어받아 처리한다.
+- 대신 같은 real block에 대해 batch 안에서 서로 다른 base `version`을 섞어 보내면 conflict로 실패한다.
+
+프론트 구현 기준:
+
+- `NO_OP`는 실패가 아니라 정상 결과다.
+- `INVALID_REQUEST`, `NOT_FOUND`, `CONFLICT`는 후속 op까지 포함해 batch 전체를 버리고 로컬 queue를 재구성해야 하는 실패다.
+- 특히 기존 서버 block을 한 batch에서 여러 번 다뤄도, 프론트는 뒤 op의 version을 다시 계산하지 않는다.
+- 같은 block의 뒤 op들도 처음 queue를 만들 때 기준으로 잡았던 같은 base `version`을 그대로 보낸다.
 
 ---
 

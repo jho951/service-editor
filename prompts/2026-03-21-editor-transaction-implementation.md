@@ -86,3 +86,24 @@
 
 - 추가 케이스: move no-op 뒤 replace, replace no-op 뒤 move, temp block 연속 move, `create -> replace -> move -> replace -> move` mixed batch, delete 뒤 후속 replace/move, subtree delete 뒤 자식 block 후속 replace, real block 연속 stale version, move self-anchor, move reversed anchor, move same-anchor(`afterRef == beforeRef`), target parent와 맞지 않는 afterRef/beforeRef.
 - 검증은 `:documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.
+
+## Step 13. real block batch version 계약 정리
+
+- temp block뿐 아니라 기존 서버 block도 같은 batch 안에서는 서버가 내부 최신 version을 이어받아 처리하도록 transaction 컨텍스트를 확장했다.
+- 프론트 계약은 `BLOCK_CREATE`와 temp 대상 `BLOCK_REPLACE_CONTENT`/`BLOCK_MOVE`는 version 없이 보내고, 기존 서버 block 대상 `BLOCK_REPLACE_CONTENT`/`BLOCK_MOVE`/`BLOCK_DELETE`는 batch 생성 시점의 base version을 보낸 뒤 같은 block의 후속 op에도 같은 base version을 유지하는 것으로 정리했다.
+- 같은 real block에 대해 batch 안에서 서로 다른 base version을 섞어 보내면 conflict로 실패하도록 검증했고, `replace -> move -> replace`, `replace -> move -> delete`, existing block의 missing version 같은 시나리오 테스트를 추가했다.
+- 프론트/백엔드 guide와 save model explainer도 같은 계약으로 갱신했다.
+
+## Step 14. block delete optimistic concurrency 보강
+
+- `BLOCK_DELETE`와 단건 block delete API는 pre-check만 하고 bulk soft delete를 실행하던 구조라, 검증 직후 다른 사용자가 root block을 먼저 수정해도 stale delete가 통과할 수 있었다.
+- `BlockService.delete(...)`에 version을 올리고, repository soft delete query도 root block id/version을 where 절에 함께 걸어 실제 삭제 시점까지 root version을 원자적으로 검증하도록 바꿨다.
+- transaction delete는 내부 current version을, 단건 block delete API는 request query param `version`을 전달하도록 맞췄다.
+- 서비스/WebMvc/boot 통합 테스트에 delete version 전달, stale delete conflict, 기존 delete 응답 경로를 다시 검증했다.
+
+## Step 15. temp block delete 허용
+
+- 기존에는 프론트 queue가 `create -> ... -> delete`를 flush 전에 collapse한다고 보고 temp block delete를 request shape에서 사실상 막고 있었다.
+- 하지만 collapse 실패나 경계 케이스까지 고려하면 temp delete를 전체 batch 에러로 터뜨리기보다, version 없이 자연스럽게 처리하는 쪽이 더 안전하다고 보고 `BLOCK_DELETE` request shape를 완화했다.
+- transaction 서비스는 기존 temp context/currentVersion 흐름을 그대로 사용해 create 직후의 temp block delete를 처리하고, real block delete만 base version을 요구하도록 유지했다.
+- 서비스/WebMvc/boot 통합 테스트에 `create -> delete(temp)` 성공 시나리오와 관련 request shape 통과를 추가했고, guide/explainer도 temp delete 허용 기준으로 갱신했다.

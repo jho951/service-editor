@@ -56,7 +56,6 @@ public class DocumentTransactionOperationRequest {
 
         if (type == DocumentTransactionOperationType.BLOCK_DELETE) {
             return hasText(blockRef)
-                    && version != null
                     && content == null
                     && parentRef == null
                     && afterRef == null
@@ -65,7 +64,6 @@ public class DocumentTransactionOperationRequest {
 
         if (type == DocumentTransactionOperationType.BLOCK_MOVE) {
             return hasText(blockRef)
-                    && version != null
                     && content == null;
         }
 

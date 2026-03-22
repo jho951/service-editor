@@ -108,12 +108,16 @@ v1 에디터 표준 operation은 4개만 사용한다.
 - 부분 범위 patch가 아니라 블록 본문 전체 저장이다.
 - 대상 식별자는 `blockRef`를 사용한다.
 - `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
+- 같은 batch 안의 새 block이면 `version`을 보내지 않는다.
+- 기존 서버 block이면 클라이언트가 batch를 만들 때 알고 있던 base `version`을 보낸다.
 
 ### `BLOCK_MOVE`
 
 - 블록 위치를 옮긴다.
 - `parentRef`, `afterRef`, `beforeRef` 기준으로 새 위치를 확정한다.
 - 위치 ref도 같은 batch 안의 새 block을 temp 값으로 가리킬 수 있다.
+- 같은 batch 안의 새 block이면 `version`을 보내지 않는다.
+- 기존 서버 block이면 클라이언트가 batch를 만들 때 알고 있던 base `version`을 보낸다.
 
 ### `BLOCK_DELETE`
 
@@ -230,6 +234,9 @@ structured JSON이 복잡하더라도 저장 단위는 "그 블록의 최종 con
 2. 프론트는 삭제 대상 블록을 루트 subtree 기준으로 정규화한다.
 3. 부모 블록과 자식 블록이 함께 선택되었으면 부모만 남기고 자식 delete는 제거한다.
 4. 남은 루트마다 `BLOCK_DELETE` operation을 만든다.
+
+같은 원리로, 같은 batch 안에서 방금 만든 temp block을 다시 지우는 경우도 서버는 처리할 수 있다.
+다만 이 경우도 프론트는 가능하면 flush 전에 `create -> ... -> delete`를 collapse하는 것이 우선이다.
 5. flush 시 한 번의 `transactions` 요청으로 보낸다.
 
 따라서 문서 전체 삭제는 "항상 delete 1개"가 아니라 "삭제 루트 집합"일 수 있다.
@@ -331,6 +338,13 @@ v1 동시성 기준은 `block.version`이다.
 4. 서버는 stale update로 보고 `409 Conflict`를 반환한다.
 
 즉 v1은 같은 블록 내부 비중첩 수정도 block 단위 충돌이다.
+
+다만 같은 batch 안에서 한 block을 여러 번 다루는 경우는 예외가 있다.
+
+- temp block은 create 이후의 최신 version을 서버가 내부 컨텍스트로 이어받는다.
+- 기존 서버 block도 첫 참조에서 base `version`으로 동시성을 검증한 뒤, 같은 batch 안의 뒤 operation은 서버가 내부 최신 version으로 이어서 처리한다.
+- 대신 같은 real block에 대해 batch 안에서 서로 다른 base `version`을 섞어 보내면 conflict다.
+- delete도 root block version을 실제 soft delete query의 조건으로 다시 걸어, 검증 직후 다른 사용자가 먼저 수정한 경우 stale delete가 그대로 통과하지 않게 막는다.
 
 ---
 

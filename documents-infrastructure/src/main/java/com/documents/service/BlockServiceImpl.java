@@ -142,13 +142,31 @@ public class BlockServiceImpl implements BlockService {
 
     @Override
     @Transactional
-    public Block delete(UUID blockId, String actorId) {
+    public Block delete(UUID blockId, Integer version, String actorId) {
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+        if (normalizedActorId == null) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
         LocalDateTime deletedAt = LocalDateTime.now();
         Block rootBlock = findActiveBlock(blockId);
+        if (!rootBlock.getVersion().equals(version)) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+
         List<UUID> blockIdsToDelete = collectActiveDescendantBlockIdsForSoftDelete(rootBlock);
 
-        blockRepository.softDeleteActiveByIds(blockIdsToDelete, normalizedActorId, deletedAt);
+        int deletedCount = blockRepository.softDeleteActiveByIdsWithRootVersion(
+                blockIdsToDelete,
+                rootBlock.getId(),
+                version,
+                normalizedActorId,
+                deletedAt
+        );
+        if (deletedCount == 0) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+
         rootBlock.setDeletedAt(deletedAt);
         rootBlock.setUpdatedBy(normalizedActorId);
         return rootBlock;

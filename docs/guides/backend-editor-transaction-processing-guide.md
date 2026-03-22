@@ -232,7 +232,8 @@ sequenceDiagram
 백엔드가 해야 하는 일:
 
 - 대상이 기존 block인지, 같은 batch의 temp block인지 해석
-- 기존 block이면 `version` 검증
+- 기존 block이면 첫 참조에서 `version` 검증
+- 같은 batch 안에서 이미 처리한 block이면 request의 base `version` 일관성만 확인하고, 실제 반영은 내부 최신 version으로 이어서 처리
 - structured content validation
 - content 교체
 - updatedBy 갱신
@@ -242,7 +243,8 @@ sequenceDiagram
 백엔드가 해야 하는 일:
 
 - 대상 block 조회
-- `version` 검증
+- 기존 block이면 첫 참조에서 `version` 검증
+- 같은 batch 안에서 이미 처리한 block이면 request의 base `version` 일관성만 확인하고, 실제 반영은 내부 최신 version으로 이어서 처리
 - parent/anchor 정합성 검증
 - 새 sortKey 계산
 - 위치 반영
@@ -252,9 +254,30 @@ sequenceDiagram
 백엔드가 해야 하는 일:
 
 - 대상 block 조회
-- `version` 검증
+- 기존 block의 base `version` 검증
+- 같은 batch 안에서 이미 처리한 block이면 request의 base `version` 일관성만 확인하고, 실제 delete는 내부 최신 version 기준으로 이어서 처리
 - subtree 수집
 - soft delete bulk update
+
+---
+
+## 5. 현재 서버 보장 정책
+
+현재 구현은 아래 정책을 명시적으로 보장한다.
+
+- transaction 실패 정책은 부분 적용이 아니라 전체 rollback이다.
+- `BLOCK_CREATE`, `BLOCK_DELETE`는 성공 시 항상 `APPLIED`다.
+- `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`는 실제 상태 변화가 없으면 `NO_OP`, 변화가 있으면 `APPLIED`다.
+- `NO_OP`에서는 version과 `updatedBy`를 증가시키지 않는다.
+- 기존 서버 block을 참조하는 `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`는 요청한 `documentId` 소속 active block만 허용한다.
+- `BLOCK_DELETE`는 subtree 단위로 적용되며, 같은 batch 뒤 operation이 삭제된 루트나 자식을 다시 참조하면 `BLOCK_NOT_FOUND`로 실패한다.
+- `BLOCK_MOVE`는 self-anchor, reversed anchor, same-anchor, target parent와 맞지 않는 anchor를 잘못된 요청으로 거절한다.
+- temp block은 같은 batch 안에서 create, replace, move, delete를 같은 context로 이어서 처리할 수 있다.
+- 기존 서버 block은 첫 참조에서만 DB와 동시성을 검증하고, 같은 batch의 뒤 operation은 서버가 내부 최신 version을 이어받아 처리한다.
+- 대신 같은 real block에 대해 batch 안에서 서로 다른 base `version`을 섞어 보내면 conflict로 실패한다.
+- `BLOCK_DELETE`도 실제 soft delete 시점에 root block version을 where 절에 함께 걸어, 검증 이후 다른 사용자가 먼저 바꾼 경우 conflict로 막는다.
+
+즉 백엔드는 queue coalescing을 다시 하지 않고, 프론트가 보낸 최종 batch를 현재 서버 상태와 transaction 규칙에 따라 검증하고 일괄 반영한다.
 
 ---
 

@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Block", description = "블록 API")
@@ -90,9 +91,10 @@ public class BlockController {
     @DeleteMapping("/blocks/{blockId}")
     public ResponseEntity<GlobalResponse<Void>> deleteBlock(
             @PathVariable("blockId") UUID blockId,
+            @RequestParam("version") Integer version,
             @RequestHeader(USER_ID_HEADER) String userId
     ) {
-        blockService.delete(blockId, userId);
+        blockService.delete(blockId, version, userId);
         return ResponseEntity.ok(GlobalResponse.ok());
     }
 
