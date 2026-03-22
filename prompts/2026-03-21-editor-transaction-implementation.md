@@ -58,3 +58,11 @@
 - `DocumentTransactionServiceImpl`은 `BlockService.delete(...)`가 돌려준 삭제된 루트 block에서 `deletedAt`을 응답에 사용하도록 단순화했다.
 - 단건 block delete API와 transaction delete가 같은 서비스 delete 경로를 그대로 공유하도록 맞췄다.
 - 검증은 `:documents-infrastructure:test --tests 'com.documents.service.BlockServiceImplTest' --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-api:test --tests 'com.documents.api.block.BlockControllerWebMvcTest' --tests 'com.documents.api.document.DocumentControllerWebMvcTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest' --tests 'com.documents.api.block.BlockApiIntegrationTest'`로 확인했다.
+
+## Step 9. block_move transaction 구현
+
+- 기존 문서 계약을 다시 확인하고, `transactions`에는 문서/사이드바 CRUD가 아니라 블록 저장 operation만 들어간다는 기준을 유지한 채 `BLOCK_MOVE`를 추가했다.
+- `BLOCK_MOVE`는 `blockRef + version + parentRef/afterRef/beforeRef` 조합을 사용하고, `content`는 허용하지 않도록 request shape을 확장했다.
+- transaction 서비스는 기존 `BlockService.move(...)`를 재사용하고, temp 위치 ref를 같은 transaction 컨텍스트에서 실제 blockId로 해석한 뒤 이동 결과의 `version`, `sortKey`를 응답에 담도록 연결했다.
+- `BlockService.move(...)`는 transaction 응답이 결과 상태를 재사용할 수 있도록 `Block` 반환형으로 조정했고, 단건 move API는 기존처럼 반환값을 무시한다.
+- 문서 본문 요구사항과 guide는 이미 `BLOCK_MOVE` 계약을 포함하고 있어 추가 수정은 하지 않고, 서비스/WebMvc/boot 테스트와 작업 로그만 갱신했다.

@@ -22,7 +22,7 @@ public interface BlockService {
 
     Block update(UUID blockId, String content, Integer version, String actorId);
 
-    void move(UUID blockId, UUID parentId, UUID afterBlockId, UUID beforeBlockId, Integer version, String actorId);
+    Block move(UUID blockId, UUID parentId, UUID afterBlockId, UUID beforeBlockId, Integer version, String actorId);
 
     Block delete(UUID blockId, String actorId);
 

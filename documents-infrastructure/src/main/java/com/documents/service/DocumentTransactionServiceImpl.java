@@ -44,6 +44,9 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                 case BLOCK_REPLACE_CONTENT -> appliedOperations.add(
                         applyReplaceContent(operation, actorId, tempBlockContexts)
                 );
+                case BLOCK_MOVE -> appliedOperations.add(
+                        applyMove(operation, actorId, tempBlockContexts)
+                );
                 case BLOCK_DELETE -> appliedOperations.add(
                         applyDelete(documentId, operation, actorId)
                 );
@@ -61,7 +64,7 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
             Map<String, TempBlockContext> tempBlockContexts
     ) {
         validateBlockReferenceIsUnique(operation.blockReference(), tempBlockContexts);
-        ResolvedCreatePosition resolvedCreatePosition = resolveCreatePosition(operation, tempBlockContexts);
+        ResolvedPositionReferences resolvedCreatePosition = resolvePositionReferences(operation, tempBlockContexts);
 
         Block createdBlock = blockService.create(
                 documentId,
@@ -87,11 +90,11 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
         );
     }
 
-    private ResolvedCreatePosition resolveCreatePosition(
+    private ResolvedPositionReferences resolvePositionReferences(
             DocumentTransactionOperationCommand operation,
             Map<String, TempBlockContext> tempBlockContexts
     ) {
-        return new ResolvedCreatePosition(
+        return new ResolvedPositionReferences(
                 resolveOptionalBlockReference(operation.parentReference(), tempBlockContexts),
                 resolveOptionalBlockReference(operation.afterReference(), tempBlockContexts),
                 resolveOptionalBlockReference(operation.beforeReference(), tempBlockContexts)
@@ -143,6 +146,39 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                 null,
                 null,
                 deletedBlock.getDeletedAt()
+        );
+    }
+
+    private DocumentTransactionAppliedOperationResult applyMove(
+            DocumentTransactionOperationCommand operation,
+            String actorId,
+            Map<String, TempBlockContext> tempBlockContexts
+    ) {
+        ResolvedBlockReference resolvedBlockReference = resolveBlockReference(operation, tempBlockContexts);
+        ResolvedPositionReferences resolvedPositionReferences = resolvePositionReferences(operation, tempBlockContexts);
+
+        Block movedBlock = blockService.move(
+                resolvedBlockReference.realBlockId(),
+                resolvedPositionReferences.parentId(),
+                resolvedPositionReferences.afterBlockId(),
+                resolvedPositionReferences.beforeBlockId(),
+                resolvedBlockReference.version(),
+                actorId
+        );
+        blockRepository.flush();
+
+        if (isTempBlockReference(resolvedBlockReference)) {
+            registerTempBlockContext(resolvedBlockReference.tempId(), movedBlock, tempBlockContexts);
+        }
+
+        return new DocumentTransactionAppliedOperationResult(
+                operation.opId(),
+                DocumentTransactionOperationStatus.APPLIED,
+                null,
+                movedBlock.getId(),
+                movedBlock.getVersion(),
+                movedBlock.getSortKey(),
+                null
         );
     }
 
@@ -251,6 +287,6 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
     private record ResolvedBlockReference(UUID realBlockId, Integer version, String tempId) {
     }
 
-    private record ResolvedCreatePosition(UUID parentId, UUID afterBlockId, UUID beforeBlockId) {
+    private record ResolvedPositionReferences(UUID parentId, UUID afterBlockId, UUID beforeBlockId) {
     }
 }

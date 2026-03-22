@@ -63,6 +63,12 @@ public class DocumentTransactionOperationRequest {
                     && beforeRef == null;
         }
 
+        if (type == DocumentTransactionOperationType.BLOCK_MOVE) {
+            return hasText(blockRef)
+                    && version != null
+                    && content == null;
+        }
+
         return false;
     }
 

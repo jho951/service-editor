@@ -104,7 +104,7 @@ public class BlockServiceImpl implements BlockService {
 
     @Override
     @Transactional
-    public void move(UUID blockId, UUID parentId, UUID afterBlockId, UUID beforeBlockId, Integer version, String actorId) {
+    public Block move(UUID blockId, UUID parentId, UUID afterBlockId, UUID beforeBlockId, Integer version, String actorId) {
         Block block = findActiveBlock(blockId);
 
         if (!block.getVersion().equals(version)) {
@@ -122,7 +122,7 @@ public class BlockServiceImpl implements BlockService {
 
         if (Objects.equals(block.getParentId(), parentId)
                 && Objects.equals(block.getSortKey(), nextSortKey)) {
-            return;
+            return block;
         }
 
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
@@ -133,6 +133,7 @@ public class BlockServiceImpl implements BlockService {
         block.setParent(targetParentBlock);
         block.setSortKey(nextSortKey);
         block.setUpdatedBy(normalizedActorId);
+        return block;
     }
 
     @Override
