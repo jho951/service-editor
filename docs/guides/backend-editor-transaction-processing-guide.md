@@ -258,6 +258,7 @@ sequenceDiagram
 - 같은 batch 안에서 이미 처리한 block이면 request의 base `version` 일관성만 확인하고, 실제 delete는 내부 최신 version 기준으로 이어서 처리
 - subtree 수집
 - soft delete bulk update
+- 삭제되는 subtree version 증가
 
 ---
 
@@ -276,6 +277,7 @@ sequenceDiagram
 - 기존 서버 block은 첫 참조에서만 DB와 동시성을 검증하고, 같은 batch의 뒤 operation은 서버가 내부 최신 version을 이어받아 처리한다.
 - 대신 같은 real block에 대해 batch 안에서 서로 다른 base `version`을 섞어 보내면 conflict로 실패한다.
 - `BLOCK_DELETE`도 실제 soft delete 시점에 root block version을 where 절에 함께 걸어, 검증 이후 다른 사용자가 먼저 바꾼 경우 conflict로 막는다.
+- `BLOCK_DELETE`는 soft delete 시 삭제되는 subtree version도 함께 증가시켜, 동시에 열려 있던 update/move가 삭제 상태를 되살리지 못하게 막는다.
 
 즉 백엔드는 queue coalescing을 다시 하지 않고, 프론트가 보낸 최종 batch를 현재 서버 상태와 transaction 규칙에 따라 검증하고 일괄 반영한다.
 

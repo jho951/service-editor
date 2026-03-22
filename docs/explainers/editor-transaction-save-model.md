@@ -345,6 +345,7 @@ v1 동시성 기준은 `block.version`이다.
 - 기존 서버 block도 첫 참조에서 base `version`으로 동시성을 검증한 뒤, 같은 batch 안의 뒤 operation은 서버가 내부 최신 version으로 이어서 처리한다.
 - 대신 같은 real block에 대해 batch 안에서 서로 다른 base `version`을 섞어 보내면 conflict다.
 - delete도 root block version을 실제 soft delete query의 조건으로 다시 걸어, 검증 직후 다른 사용자가 먼저 수정한 경우 stale delete가 그대로 통과하지 않게 막는다.
+- soft delete bulk update는 삭제되는 subtree의 version도 함께 증가시켜, 이미 열려 있던 update/move 트랜잭션이 삭제된 row의 `deletedAt`을 다시 null로 덮어쓰지 못하게 한다.
 
 ---
 

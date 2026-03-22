@@ -113,3 +113,10 @@
 - temp delete 허용 이후의 경계를 다시 점검해 `create -> replace -> delete(temp)`, `create -> move -> delete(temp)`, temp delete에 version 포함, existing delete missing version, temp delete 뒤 후속 replace/move, replace no-op 뒤 delete, move no-op 뒤 delete 시나리오를 추가로 고정했다.
 - 서비스 테스트는 currentVersion 전달과 예외 종류를, boot 통합 테스트는 실제 rollback과 최종 DB 상태를 함께 검증하도록 보강했다.
 - 검증은 `:documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.
+
+## Step 17. transaction 동시성 통합 검증 보강
+
+- `DocumentTransactionConcurrencyIntegrationTest`를 추가해 `CountDownLatch` 기반으로 같은 block의 `replace/replace`, `move/move`, `delete/delete`, `replace/move`, `replace/delete`, `move/delete`, `replace->move batch`와 단건 replace, 서로 다른 block replace 동시 요청을 실제 경합 상태로 검증했다.
+- 동시성 테스트 과정에서 soft delete bulk update가 version을 올리지 않으면 동시에 열린 update/move가 삭제된 row의 `deletedAt`을 다시 덮어써 block이 되살아날 수 있는 경쟁 조건을 확인했고, delete query가 삭제되는 subtree의 version도 함께 증가시키도록 보강했다.
+- API 레이어는 optimistic lock 예외 체인도 `409 CONFLICT`로 응답하도록 정리해 실제 경합에서 수동 conflict와 JPA conflict가 같은 계약으로 내려가게 맞췄다.
+- 검증은 `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`, `:documents-infrastructure:test --tests 'com.documents.service.BlockServiceImplTest' --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-api:test --tests 'com.documents.api.block.BlockControllerWebMvcTest' --tests 'com.documents.api.document.DocumentControllerWebMvcTest'`, `:documents-boot:test --tests 'com.documents.api.block.BlockApiIntegrationTest' --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest' --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`로 확인했다.

@@ -73,7 +73,9 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
     @Query("""
             update Block b
             set b.deletedAt = :deletedAt,
-                b.updatedBy = :actorId
+                b.updatedAt = :deletedAt,
+                b.updatedBy = :actorId,
+                b.version = b.version + 1
             where b.id in :blockIds
               and b.deletedAt is null
               and exists (

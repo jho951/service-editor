@@ -56,8 +56,27 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<GlobalResponse<Void>> handleException(Exception ex) {
+        if (hasOptimisticLockFailure(ex)) {
+            return ResponseEntity.status(ErrorCode.CONFLICT.getHttpStatus())
+                    .body(GlobalResponse.fail(ErrorCode.CONFLICT));
+        }
+
         return ResponseEntity.status(ErrorCode.FAIL.getHttpStatus())
                 .body(GlobalResponse.fail(ErrorCode.FAIL));
+    }
+
+    private boolean hasOptimisticLockFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String className = current.getClass().getName();
+            if (className.contains("OptimisticLock")
+                    || className.contains("StaleObjectState")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+
+        return false;
     }
 
     private ErrorCode mapBusinessError(String errorCodeName) {

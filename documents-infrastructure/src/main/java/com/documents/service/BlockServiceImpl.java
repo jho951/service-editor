@@ -168,7 +168,9 @@ public class BlockServiceImpl implements BlockService {
         }
 
         rootBlock.setDeletedAt(deletedAt);
+        rootBlock.setUpdatedAt(deletedAt);
         rootBlock.setUpdatedBy(normalizedActorId);
+        rootBlock.setVersion(version + 1);
         return rootBlock;
     }
 
