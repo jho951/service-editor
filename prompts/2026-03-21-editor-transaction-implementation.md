@@ -81,3 +81,8 @@
 - `DocumentTransactionServiceImpl`는 move/replace 공통 no-op 판정 규칙을 `resolveAppliedStatus(...)` 메서드로 올리고, operation type 기준 `switch`에서 현재는 `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`만 `NO_OP` 후보로 처리하고 `BLOCK_CREATE`, `BLOCK_DELETE`는 항상 `APPLIED`로 고정했다.
 - 서비스 테스트, WebMvc 테스트, boot 통합 테스트에 move/replace no-op status, version 유지, replace 시 updatedBy 유지 검증을 추가했다.
 - 검증은 `:documents-infrastructure:test --tests 'com.documents.service.BlockServiceImplTest' --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-api:test --tests 'com.documents.api.document.DocumentControllerWebMvcTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.
+
+## Step 12. transaction edge case 테스트 보강
+
+- 추가 케이스: move no-op 뒤 replace, replace no-op 뒤 move, temp block 연속 move, `create -> replace -> move -> replace -> move` mixed batch, delete 뒤 후속 replace/move, subtree delete 뒤 자식 block 후속 replace, real block 연속 stale version, move self-anchor, move reversed anchor, move same-anchor(`afterRef == beforeRef`), target parent와 맞지 않는 afterRef/beforeRef.
+- 검증은 `:documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.

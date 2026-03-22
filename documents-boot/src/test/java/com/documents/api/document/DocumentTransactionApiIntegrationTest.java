@@ -280,6 +280,197 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("성공_block_move no-op 뒤 replace_content는 기존 version으로 후속 수정에 성공한다")
+    void applyTransactionsReplacesContentAfterMoveNoOp() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-no-op-then-replace",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "no-op 뒤 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), existingBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0))
+                .andExpect(jsonPath("$.data.appliedOperations[1].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(1));
+
+        Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
+        assertThat(reloadedBlock.getContent()).isEqualTo(content("no-op 뒤 수정"));
+        assertThat(reloadedBlock.getVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("성공_replace_content no-op 뒤 move는 같은 version으로 후속 이동에 성공한다")
+    void applyTransactionsMovesBlockAfterReplaceContentNoOp() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+        Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-no-op-replace-then-move",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "기존 블록",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "parentRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), existingBlock.getId(), targetParent.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0))
+                .andExpect(jsonPath("$.data.appliedOperations[1].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(1));
+
+        Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
+        assertThat(reloadedBlock.getParentId()).isEqualTo(targetParent.getId());
+        assertThat(reloadedBlock.getVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("성공_create 뒤 replace, move, replace, move를 연속 적용하면 temp block version과 위치가 끝까지 누적 갱신된다")
+    void applyTransactionsAccumulatesTempBlockStateAcrossMixedOperations() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-mixed-sequence",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:parent"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "first replace",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-4",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "tmp:block:1",
+                                      "version": 1,
+                                      "parentRef": "tmp:parent"
+                                    },
+                                    {
+                                      "opId": "op-5",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "second replace",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-6",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "tmp:block:1",
+                                      "version": 3
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0))
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(0))
+                .andExpect(jsonPath("$.data.appliedOperations[2].version").value(1))
+                .andExpect(jsonPath("$.data.appliedOperations[3].version").value(2))
+                .andExpect(jsonPath("$.data.appliedOperations[4].version").value(3))
+                .andExpect(jsonPath("$.data.appliedOperations[5].version").value(4));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isEqualTo(2);
+
+        Block movedBackToRootBlock = blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(document.getId(), null)
+                .stream()
+                .filter(block -> content("second replace").equals(block.getContent()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(movedBackToRootBlock.getParentId()).isNull();
+        assertThat(movedBackToRootBlock.getVersion()).isEqualTo(4);
+    }
+
+    @Test
     @DisplayName("실패_block_delete가 temp blockRef를 참조하면 전체 transaction을 rollback한다")
     void applyTransactionsRollsBackCreatedBlockWhenDeleteReferencesTempBlock() throws Exception {
         Document document = document("문서");
@@ -312,6 +503,199 @@ class DocumentTransactionApiIntegrationTest {
                 .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
 
         assertThat(blockRepository.countActiveByDocumentId(document.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("실패_block_delete 뒤 같은 block replace_content를 참조하면 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackDeleteWhenLaterReplaceReferencesDeletedBlock() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-delete-then-replace",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "삭제 후 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), existingBlock.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006))
+                .andExpect(jsonPath("$.message").value("요청한 블록을 찾을 수 없습니다."));
+
+        Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
+        assertThat(reloadedBlock.getDeletedAt()).isNull();
+        assertThat(reloadedBlock.getContent()).isEqualTo(content("기존 블록"));
+    }
+
+    @Test
+    @DisplayName("실패_block_delete 뒤 같은 block move를 참조하면 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackDeleteWhenLaterMoveReferencesDeletedBlock() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-delete-then-move",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), existingBlock.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006))
+                .andExpect(jsonPath("$.message").value("요청한 블록을 찾을 수 없습니다."));
+
+        Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
+        assertThat(reloadedBlock.getDeletedAt()).isNull();
+        assertThat(reloadedBlock.getContent()).isEqualTo(content("기존 블록"));
+    }
+
+    @Test
+    @DisplayName("실패_subtree delete 뒤 자식 block replace_content를 참조하면 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackDeleteWhenLaterReplaceReferencesDeletedChildBlock() throws Exception {
+        Document document = document("문서");
+        Block parentBlock = block(document, null, "부모 블록", "000000000001000000000000");
+        Block childBlock = block(document, parentBlock, "자식 블록", "000000000001I00000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-delete-child-then-replace",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "삭제된 자식 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(parentBlock.getId(), childBlock.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006))
+                .andExpect(jsonPath("$.message").value("요청한 블록을 찾을 수 없습니다."));
+
+        Block reloadedParent = blockRepository.findByIdAndDeletedAtIsNull(parentBlock.getId()).orElseThrow();
+        Block reloadedChild = blockRepository.findByIdAndDeletedAtIsNull(childBlock.getId()).orElseThrow();
+
+        assertThat(reloadedParent.getDeletedAt()).isNull();
+        assertThat(reloadedChild.getDeletedAt()).isNull();
+        assertThat(reloadedChild.getContent()).isEqualTo(content("자식 블록"));
+    }
+
+    @Test
+    @DisplayName("실패_real block replace_content 뒤 같은 stale version move는 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackReplaceWhenLaterMoveUsesStaleVersionOnSameRealBlock() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+        Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-stale-real-block",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "먼저 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "parentRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), existingBlock.getId(), targetParent.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
+                .andExpect(jsonPath("$.code").value(9005))
+                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."));
+
+        Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
+        assertThat(reloadedBlock.getContent()).isEqualTo(content("기존 블록"));
+        assertThat(reloadedBlock.getVersion()).isEqualTo(0);
+        assertThat(reloadedBlock.getParentId()).isNull();
     }
 
     @Test
@@ -531,6 +915,165 @@ class DocumentTransactionApiIntegrationTest {
                                   ]
                                 }
                                 """.formatted(movingBlock.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_block_move가 자기 자신을 afterRef로 참조하면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenMoveUsesSelfAsAfterRef() throws Exception {
+        Document document = document("문서");
+        Block movingBlock = block(document, null, "이동 대상", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "afterRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(movingBlock.getId(), movingBlock.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_block_move의 afterRef와 beforeRef가 역순이면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenMoveAnchorsAreReversed() throws Exception {
+        Document document = document("문서");
+        Block firstBlock = block(document, null, "first", "000000000001000000000000");
+        Block middleBlock = block(document, null, "middle", "000000000002000000000000");
+        Block lastBlock = block(document, null, "last", "000000000003000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "afterRef": "%s",
+                                      "beforeRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(middleBlock.getId(), lastBlock.getId(), firstBlock.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_block_move의 afterRef와 beforeRef가 같은 값을 가리키면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenMoveAnchorsPointToSameBlock() throws Exception {
+        Document document = document("문서");
+        Block movingBlock = block(document, null, "moving", "000000000002000000000000");
+        Block anchorBlock = block(document, null, "anchor", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "afterRef": "%s",
+                                      "beforeRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(movingBlock.getId(), anchorBlock.getId(), anchorBlock.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_block_move가 대상 parent의 sibling이 아닌 afterRef를 쓰면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenMoveUsesAfterRefThatIsNotSiblingOfTargetParent() throws Exception {
+        Document document = document("문서");
+        Block rootParent = block(document, null, "루트 부모", "000000000001000000000000");
+        Block movingBlock = block(document, null, "moving", "000000000002000000000000");
+        Block childAnchor = block(document, rootParent, "자식 anchor", "000000000001I00000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "afterRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(movingBlock.getId(), childAnchor.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_block_move가 대상 parent의 sibling이 아닌 beforeRef를 쓰면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenMoveUsesBeforeRefThatIsNotSiblingOfTargetParent() throws Exception {
+        Document document = document("문서");
+        Block rootParent = block(document, null, "루트 부모", "000000000001000000000000");
+        Block movingBlock = block(document, null, "moving", "000000000002000000000000");
+        Block childAnchor = block(document, rootParent, "자식 anchor", "000000000001I00000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "beforeRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(movingBlock.getId(), childAnchor.getId())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.code").value(9015))
