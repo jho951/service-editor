@@ -1,5 +1,6 @@
 package com.documents.service.transaction;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record DocumentTransactionAppliedOperationResult(
@@ -8,6 +9,7 @@ public record DocumentTransactionAppliedOperationResult(
         String tempId,
         UUID blockId,
         Integer version,
-        String sortKey
+        String sortKey,
+        LocalDateTime deletedAt
 ) {
 }

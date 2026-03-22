@@ -202,7 +202,8 @@ class BlockControllerWebMvcTest {
     @DisplayName("성공_정상 삭제 요청에 대해 성공 응답을 반환한다")
     void deleteBlockReturnsSuccessEnvelope() throws Exception {
         UUID blockId = UUID.randomUUID();
-        doNothing().when(blockService).delete(blockId, "user-123");
+        when(blockService.delete(blockId, "user-123"))
+                .thenReturn(block(blockId, UUID.randomUUID(), null, "000000000001000000000000", 0, "삭제 대상"));
 
         mockMvc.perform(delete("/v1/blocks/{blockId}", blockId)
                         .header("X-User-Id", "user-123"))

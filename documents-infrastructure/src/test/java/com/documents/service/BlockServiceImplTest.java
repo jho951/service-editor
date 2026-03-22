@@ -654,7 +654,7 @@ class BlockServiceImplTest {
                 .thenReturn(List.of());
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
-        blockService.delete(rootId, ACTOR_ID);
+        Block result = blockService.delete(rootId, ACTOR_ID);
 
         ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
         verify(blockRepository).softDeleteActiveByIds(
@@ -662,6 +662,9 @@ class BlockServiceImplTest {
                 eq(ACTOR_ID),
                 deletedAtCaptor.capture()
         );
+        assertThat(result.getId()).isEqualTo(rootId);
+        assertThat(result.getDeletedAt()).isEqualTo(deletedAtCaptor.getValue());
+        assertThat(result.getUpdatedBy()).isEqualTo(ACTOR_ID);
     }
 
     @Test

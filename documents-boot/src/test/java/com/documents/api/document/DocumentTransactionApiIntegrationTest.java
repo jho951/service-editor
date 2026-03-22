@@ -98,6 +98,86 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("성공_block_delete는 루트 블록과 하위 subtree를 soft delete 처리한다")
+    void applyTransactionsDeletesBlockSubtree() throws Exception {
+        Document document = document("문서");
+        Block rootBlock = block(document, null, "루트 블록", "000000000001000000000000");
+        Block childBlock = block(document, rootBlock, "자식 블록", "000000000001I00000000000");
+        Block siblingBlock = block(document, null, "형제 블록", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-delete",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    }
+                                  ]
+                                }
+                                """.formatted(rootBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(rootBlock.getId().toString()))
+                .andExpect(jsonPath("$.data.appliedOperations[0].deletedAt").exists());
+
+        Block deletedRootBlock = blockRepository.findById(rootBlock.getId()).orElseThrow();
+        Block deletedChildBlock = blockRepository.findById(childBlock.getId()).orElseThrow();
+        Block activeSiblingBlock = blockRepository.findById(siblingBlock.getId()).orElseThrow();
+
+        assertThat(deletedRootBlock.getDeletedAt()).isNotNull();
+        assertThat(deletedChildBlock.getDeletedAt()).isNotNull();
+        assertThat(activeSiblingBlock.getDeletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("실패_create 뒤 block_delete가 충돌하면 앞선 생성까지 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackCreatedBlockWhenLaterDeleteConflicts() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        existingBlock.setContent(content("다른 사용자 수정"));
+        blockRepository.save(existingBlock);
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-delete-conflict",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
+                .andExpect(jsonPath("$.code").value(9005))
+                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isEqualTo(1);
+        assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()))
+                .extracting(Block::getId)
+                .containsExactly(existingBlock.getId());
+    }
+
+    @Test
     @DisplayName("성공_existing block replace_content는 본문과 version을 갱신한다")
     void applyTransactionsReplacesExistingBlockContent() throws Exception {
         Document document = document("문서");

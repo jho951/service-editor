@@ -1,5 +1,6 @@
 package com.documents.api.document.dto;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,4 +15,5 @@ public class DocumentTransactionAppliedOperationResponse {
     private UUID blockId;
     private Long version;
     private String sortKey;
+    private LocalDateTime deletedAt;
 }

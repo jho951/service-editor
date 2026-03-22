@@ -43,3 +43,18 @@
 - 대상 parent의 sibling이 아닌 anchor를 create에 섞어 쓰는 경우와 real `afterRef` + temp `beforeRef` 혼합 anchor 해석도 테스트로 고정했다.
 - temp ref를 허용하더라도 request 순서와 sibling/parent 정합성을 반드시 지켜야 한다는 점을 현재 테스트 세트로 보강했다.
 - 검증은 `:documents-infrastructure:cleanTest :documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest' -x :documents-boot:test`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.
+
+## Step 7. block_delete transaction 구현
+
+- 문서/사이드바 CRUD가 아니라 에디터 블록 batch 저장이라는 기존 설계를 다시 확인하고, transaction에는 `BLOCK_DELETE`만 추가했다.
+- `BLOCK_DELETE`는 `blockRef + version`만 받도록 request shape을 고정하고, transaction 서비스에서 block 소속 문서와 version을 검증한 뒤 기존 block delete를 호출하도록 연결했다.
+- delete 응답에는 삭제된 루트 block의 `blockId`, `deletedAt`을 포함하도록 applied operation 결과 모델을 확장했다.
+- 서비스/WebMvc/boot 통합 테스트에 subtree soft delete, 다른 문서 block 거절, stale version conflict, delete 실패 시 전체 rollback 시나리오를 추가했다.
+
+## Step 8. block delete 결과 반환 책임을 BlockService로 이동
+
+- `deletedAt` 생성과 삭제 결과 반환 책임은 transaction 서비스가 아니라 `BlockService.delete(...)`가 가져야 한다고 정리하고, 반환형을 `Block`으로 변경했다.
+- `BlockService.delete(...)`는 삭제 전에 조회한 루트 block에 자신이 만든 `deletedAt`과 `updatedBy`를 반영해 그대로 반환하고, 추가 PK 재조회 없이 delete 결과를 응답에 쓸 수 있게 바꿨다.
+- `DocumentTransactionServiceImpl`은 `BlockService.delete(...)`가 돌려준 삭제된 루트 block에서 `deletedAt`을 응답에 사용하도록 단순화했다.
+- 단건 block delete API와 transaction delete가 같은 서비스 delete 경로를 그대로 공유하도록 맞췄다.
+- 검증은 `:documents-infrastructure:test --tests 'com.documents.service.BlockServiceImplTest' --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-api:test --tests 'com.documents.api.block.BlockControllerWebMvcTest' --tests 'com.documents.api.document.DocumentControllerWebMvcTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest' --tests 'com.documents.api.block.BlockApiIntegrationTest'`로 확인했다.

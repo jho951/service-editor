@@ -24,7 +24,7 @@ public interface BlockService {
 
     void move(UUID blockId, UUID parentId, UUID afterBlockId, UUID beforeBlockId, Integer version, String actorId);
 
-    void delete(UUID blockId, String actorId);
+    Block delete(UUID blockId, String actorId);
 
     void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt);
 

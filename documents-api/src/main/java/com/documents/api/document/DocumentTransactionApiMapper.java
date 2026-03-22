@@ -60,6 +60,7 @@ public class DocumentTransactionApiMapper {
                 .blockId(result.blockId())
                 .version(version)
                 .sortKey(result.sortKey())
+                .deletedAt(result.deletedAt())
                 .build();
     }
 }

@@ -137,7 +137,8 @@ class DocumentControllerWebMvcTest {
 						"tmp:block:1",
 						blockId,
 						0,
-						"000000000001000000000000"
+						"000000000001000000000000",
+						null
 					),
 					new DocumentTransactionAppliedOperationResult(
 						"op-2",
@@ -145,7 +146,8 @@ class DocumentControllerWebMvcTest {
 						null,
 						blockId,
 						1,
-						"000000000001000000000000"
+						"000000000001000000000000",
+						null
 					)
 				)
 			));
@@ -195,6 +197,55 @@ class DocumentControllerWebMvcTest {
 			.andExpect(jsonPath("$.data.appliedOperations[1].status").value("APPLIED"))
 			.andExpect(jsonPath("$.data.appliedOperations[1].blockId").value(blockId.toString()))
 			.andExpect(jsonPath("$.data.appliedOperations[1].version").value(1));
+	}
+
+	@Test
+	@DisplayName("성공_block_delete transaction 요청에 대해 삭제 시각을 포함한 적용 응답을 반환한다")
+	void applyTransactionsReturnsAppliedOperationsForBlockDelete() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+		LocalDateTime deletedAt = LocalDateTime.of(2026, 3, 22, 22, 0);
+
+		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
+			.thenReturn(new DocumentTransactionResult(
+				documentId,
+				"batch-delete",
+				List.of(
+					new DocumentTransactionAppliedOperationResult(
+						"op-1",
+						DocumentTransactionOperationStatus.APPLIED,
+						null,
+						blockId,
+						null,
+						null,
+						deletedAt
+					)
+				)
+			));
+
+		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "clientId": "web-editor",
+					  "batchId": "batch-delete",
+					  "operations": [
+					    {
+					      "opId": "op-1",
+					      "type": "BLOCK_DELETE",
+					      "blockRef": "%s",
+					      "version": 4
+					    }
+					  ]
+					}
+					""".formatted(blockId)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.batchId").value("batch-delete"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[0].deletedAt").exists());
 	}
 
 	@Test
@@ -325,6 +376,29 @@ class DocumentControllerWebMvcTest {
 				          }
 				        ]
 				      }
+				    }
+				  ]
+				}
+				""".formatted(UUID.randomUUID())));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_block_delete에 version이 없으면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsBlockDeleteWithoutVersion() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_DELETE",
+				      "blockRef": "%s"
 				    }
 				  ]
 				}

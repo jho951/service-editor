@@ -20,6 +20,7 @@ import com.documents.service.transaction.DocumentTransactionCommand;
 import com.documents.service.transaction.DocumentTransactionOperationCommand;
 import com.documents.service.transaction.DocumentTransactionOperationType;
 import com.documents.service.transaction.DocumentTransactionResult;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -117,6 +118,48 @@ class DocumentTransactionServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_block_delete는 version 검증 후 블록 삭제와 삭제 시각 응답을 반환한다")
+    void applyDeletesBlock() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        LocalDateTime deletedAt = LocalDateTime.of(2026, 3, 22, 22, 0);
+
+        Block block = block(blockId, documentId, "000000000001000000000000", 4);
+        Block deletedBlock = block(blockId, documentId, "000000000001000000000000", 4);
+        deletedBlock.setDeletedAt(deletedAt);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(java.util.Optional.of(block));
+        when(blockService.delete(blockId, ACTOR_ID)).thenReturn(deletedBlock);
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        blockId.toString(),
+                                        4,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).hasSize(1);
+        assertThat(result.appliedOperations().get(0).blockId()).isEqualTo(blockId);
+        assertThat(result.appliedOperations().get(0).deletedAt()).isEqualTo(deletedAt);
+
+        verify(blockService).delete(blockId, ACTOR_ID);
+    }
+
+    @Test
     @DisplayName("실패_replace_content가 알 수 없는 tempId를 참조하면 잘못된 요청 예외를 던진다")
     void applyThrowsWhenReplaceContentReferencesUnknownBlockReference() {
         assertThatThrownBy(() -> documentTransactionService.apply(
@@ -142,6 +185,75 @@ class DocumentTransactionServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_block_delete가 다른 문서 블록을 참조하면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenDeleteReferencesBlockFromOtherDocument() {
+        UUID documentId = UUID.randomUUID();
+        UUID otherDocumentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block otherDocumentBlock = block(blockId, otherDocumentId, "000000000001000000000000", 0);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(java.util.Optional.of(otherDocumentBlock));
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        blockId.toString(),
+                                        0,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_block_delete에 낡은 version이 오면 충돌 예외를 던진다")
+    void applyThrowsWhenDeleteUsesStaleVersion() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(blockId, documentId, "000000000001000000000000", 3);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(java.util.Optional.of(block));
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        blockId.toString(),
+                                        2,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.CONFLICT);
     }
 
     @Test

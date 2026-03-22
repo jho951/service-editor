@@ -54,6 +54,15 @@ public class DocumentTransactionOperationRequest {
                     && beforeRef == null;
         }
 
+        if (type == DocumentTransactionOperationType.BLOCK_DELETE) {
+            return hasText(blockRef)
+                    && version != null
+                    && content == null
+                    && parentRef == null
+                    && afterRef == null
+                    && beforeRef == null;
+        }
+
         return false;
     }
 

@@ -44,6 +44,9 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                 case BLOCK_REPLACE_CONTENT -> appliedOperations.add(
                         applyReplaceContent(operation, actorId, tempBlockContexts)
                 );
+                case BLOCK_DELETE -> appliedOperations.add(
+                        applyDelete(documentId, operation, actorId)
+                );
                 default -> throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
             }
         }
@@ -79,7 +82,8 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                 operation.blockReference(),
                 createdBlock.getId(),
                 createdBlock.getVersion(),
-                createdBlock.getSortKey()
+                createdBlock.getSortKey(),
+                null
         );
     }
 
@@ -118,7 +122,27 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                 null,
                 updatedBlock.getId(),
                 updatedBlock.getVersion(),
-                updatedBlock.getSortKey()
+                updatedBlock.getSortKey(),
+                null
+        );
+    }
+
+    private DocumentTransactionAppliedOperationResult applyDelete(
+            UUID documentId,
+            DocumentTransactionOperationCommand operation,
+            String actorId
+    ) {
+        Block block = resolveExistingBlock(documentId, operation);
+        Block deletedBlock = blockService.delete(block.getId(), actorId);
+
+        return new DocumentTransactionAppliedOperationResult(
+                operation.opId(),
+                DocumentTransactionOperationStatus.APPLIED,
+                null,
+                deletedBlock.getId(),
+                null,
+                null,
+                deletedBlock.getDeletedAt()
         );
     }
 
@@ -186,6 +210,30 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
     private void validateVersionIsPresent(Integer version) {
         if (version == null) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private Block resolveExistingBlock(UUID documentId, DocumentTransactionOperationCommand operation) {
+        UUID blockId = parseRealBlockId(operation.blockReference());
+        validateVersionIsPresent(operation.version());
+
+        Block block = blockRepository.findByIdAndDeletedAtIsNull(blockId)
+                .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
+
+        validateBlockBelongsToDocument(documentId, block);
+        validateBlockVersion(operation.version(), block);
+        return block;
+    }
+
+    private void validateBlockBelongsToDocument(UUID documentId, Block block) {
+        if (!documentId.equals(block.getDocumentId())) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private void validateBlockVersion(Integer version, Block block) {
+        if (!block.getVersion().equals(version)) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
         }
     }
 
