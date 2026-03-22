@@ -127,7 +127,7 @@ class DocumentTransactionServiceImplTest {
         deletedBlock.setDeletedAt(deletedAt);
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
-        when(blockService.delete(blockId, ACTOR_ID)).thenReturn(deletedBlock);
+        when(blockService.delete(blockId, 4, ACTOR_ID)).thenReturn(deletedBlock);
 
         DocumentTransactionResult result = documentTransactionService.apply(
                 documentId,
@@ -154,7 +154,7 @@ class DocumentTransactionServiceImplTest {
         assertThat(result.appliedOperations().get(0).blockId()).isEqualTo(blockId);
         assertThat(result.appliedOperations().get(0).deletedAt()).isEqualTo(deletedAt);
 
-        verify(blockService).delete(blockId, ACTOR_ID);
+        verify(blockService).delete(blockId, 4, ACTOR_ID);
     }
 
     @Test
@@ -830,7 +830,7 @@ class DocumentTransactionServiceImplTest {
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
                 .thenReturn(Optional.of(block))
                 .thenReturn(Optional.empty());
-        when(blockService.delete(blockId, ACTOR_ID)).thenReturn(deletedBlock);
+        when(blockService.delete(blockId, 2, ACTOR_ID)).thenReturn(deletedBlock);
 
         assertThatThrownBy(() -> documentTransactionService.apply(
                 documentId,
@@ -879,7 +879,7 @@ class DocumentTransactionServiceImplTest {
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
                 .thenReturn(Optional.of(block))
                 .thenReturn(Optional.empty());
-        when(blockService.delete(blockId, ACTOR_ID)).thenReturn(deletedBlock);
+        when(blockService.delete(blockId, 2, ACTOR_ID)).thenReturn(deletedBlock);
 
         assertThatThrownBy(() -> documentTransactionService.apply(
                 documentId,
@@ -917,8 +917,8 @@ class DocumentTransactionServiceImplTest {
     }
 
     @Test
-    @DisplayName("실패_real block replace_content 뒤 같은 stale version move는 충돌 예외를 던진다")
-    void applyThrowsWhenMoveUsesStaleVersionAfterReplaceContentOnSameRealBlock() {
+    @DisplayName("성공_real block replace_content 뒤 같은 base version move는 서버 내부 최신 version으로 이어서 처리한다")
+    void applyUsesServerManagedVersionAfterReplaceContentOnSameRealBlock() {
         UUID documentId = UUID.randomUUID();
         UUID blockId = UUID.randomUUID();
         UUID parentId = UUID.randomUUID();
@@ -926,14 +926,16 @@ class DocumentTransactionServiceImplTest {
         Block existingBlock = block(blockId, documentId, "000000000001000000000000", 3);
         Block updatedBlock = block(blockId, documentId, "000000000001000000000000", 4);
         updatedBlock.setContent(REPLACED_CONTENT);
+        Block movedBlock = block(blockId, documentId, "000000000001I00000000000", 5);
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
                 .thenReturn(Optional.of(existingBlock))
                 .thenReturn(Optional.of(updatedBlock));
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
+        when(blockService.move(blockId, parentId, null, null, 4, ACTOR_ID)).thenReturn(movedBlock);
         doNothing().when(blockRepository).flush();
 
-        assertThatThrownBy(() -> documentTransactionService.apply(
+        DocumentTransactionResult result = documentTransactionService.apply(
                 documentId,
                 new DocumentTransactionCommand(
                         "web-editor",
@@ -954,6 +956,210 @@ class DocumentTransactionServiceImplTest {
                                         DocumentTransactionOperationType.BLOCK_MOVE,
                                         blockId.toString(),
                                         3,
+                                        null,
+                                        parentId.toString(),
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::version)
+                .containsExactly(4, 5);
+
+        verify(blockService).update(blockId, REPLACED_CONTENT, 3, ACTOR_ID);
+        verify(blockService).move(blockId, parentId, null, null, 4, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_real block replace_content, move, replace_content는 같은 base version으로 이어서 처리한다")
+    void applyUsesServerManagedVersionAcrossReplaceMoveReplaceOnSameRealBlock() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        String replacedAgainContent =
+                "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"다시 수정\",\"marks\":[]}]}";
+
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 3);
+        Block updatedBlock = block(blockId, documentId, "000000000001000000000000", 4);
+        updatedBlock.setContent(REPLACED_CONTENT);
+        Block movedBlock = block(blockId, documentId, "000000000001I00000000000", 5);
+        movedBlock.setContent(REPLACED_CONTENT);
+        Block replacedAgainBlock = block(blockId, documentId, "000000000001I00000000000", 6);
+        replacedAgainBlock.setContent(replacedAgainContent);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
+                .thenReturn(Optional.of(existingBlock))
+                .thenReturn(Optional.of(movedBlock));
+        when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
+        when(blockService.move(blockId, parentId, null, null, 4, ACTOR_ID)).thenReturn(movedBlock);
+        when(blockService.update(blockId, replacedAgainContent, 5, ACTOR_ID)).thenReturn(replacedAgainBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-real-block-chain",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        blockId.toString(),
+                                        3,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        3,
+                                        null,
+                                        parentId.toString(),
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-3",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        blockId.toString(),
+                                        3,
+                                        replacedAgainContent,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::version)
+                .containsExactly(4, 5, 6);
+
+        verify(blockService).update(blockId, REPLACED_CONTENT, 3, ACTOR_ID);
+        verify(blockService).move(blockId, parentId, null, null, 4, ACTOR_ID);
+        verify(blockService).update(blockId, replacedAgainContent, 5, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_real block replace_content, move 뒤 delete는 같은 base version으로 이어서 처리한다")
+    void applyUsesServerManagedVersionForDeleteAfterReplaceAndMoveOnSameRealBlock() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 3);
+        Block updatedBlock = block(blockId, documentId, "000000000001000000000000", 4);
+        updatedBlock.setContent(REPLACED_CONTENT);
+        Block movedBlock = block(blockId, documentId, "000000000001I00000000000", 5);
+        movedBlock.setContent(REPLACED_CONTENT);
+        Block deletedBlock = block(blockId, documentId, "000000000001I00000000000", 5);
+        deletedBlock.setDeletedAt(LocalDateTime.now());
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
+                .thenReturn(Optional.of(existingBlock))
+                .thenReturn(Optional.of(movedBlock));
+        when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
+        when(blockService.move(blockId, parentId, null, null, 4, ACTOR_ID)).thenReturn(movedBlock);
+        when(blockService.delete(blockId, 5, ACTOR_ID)).thenReturn(deletedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-real-block-delete-chain",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        blockId.toString(),
+                                        3,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        3,
+                                        null,
+                                        parentId.toString(),
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-3",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        blockId.toString(),
+                                        3,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::status)
+                .containsExactly(
+                        DocumentTransactionOperationStatus.APPLIED,
+                        DocumentTransactionOperationStatus.APPLIED,
+                        DocumentTransactionOperationStatus.APPLIED
+                );
+
+        verify(blockService).update(blockId, REPLACED_CONTENT, 3, ACTOR_ID);
+        verify(blockService).move(blockId, parentId, null, null, 4, ACTOR_ID);
+        verify(blockService).delete(blockId, 5, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("실패_real block이 같은 batch 안에서 다른 base version을 섞어 보내면 충돌 예외를 던진다")
+    void applyThrowsWhenRealBlockUsesDifferentBaseVersionInsideBatch() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 3);
+        Block updatedBlock = block(blockId, documentId, "000000000001000000000000", 4);
+        updatedBlock.setContent(REPLACED_CONTENT);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
+                .thenReturn(Optional.of(existingBlock));
+        when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
+        doNothing().when(blockRepository).flush();
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-inconsistent-base-version",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        blockId.toString(),
+                                        3,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        4,
                                         null,
                                         parentId.toString(),
                                         null,
@@ -1048,6 +1254,574 @@ class DocumentTransactionServiceImplTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_existing block move에 version이 없으면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenMoveOmitsVersionForExistingBlock() {
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                UUID.randomUUID(),
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-1",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        UUID.randomUUID().toString(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("성공_create 뒤 temp block delete는 version 없이 같은 batch에서 처리한다")
+    void applyDeletesCreatedTempBlockWithoutVersion() {
+        UUID documentId = UUID.randomUUID();
+        UUID createdBlockId = UUID.randomUUID();
+
+        Block createdBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+        Block deletedBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+        deletedBlock.setDeletedAt(LocalDateTime.now());
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdBlock);
+        when(blockRepository.findByIdAndDeletedAtIsNull(createdBlockId)).thenReturn(Optional.of(createdBlock));
+        when(blockService.delete(createdBlockId, 0, ACTOR_ID)).thenReturn(deletedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-temp-delete",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::status)
+                .containsExactly(DocumentTransactionOperationStatus.APPLIED, DocumentTransactionOperationStatus.APPLIED);
+        verify(blockService).delete(createdBlockId, 0, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_create 뒤 replace_content 후 temp block delete는 currentVersion으로 처리한다")
+    void applyDeletesCreatedTempBlockAfterReplaceContent() {
+        UUID documentId = UUID.randomUUID();
+        UUID createdBlockId = UUID.randomUUID();
+
+        Block createdBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+        Block updatedBlock = block(createdBlockId, documentId, "000000000001000000000000", 1);
+        updatedBlock.setContent(REPLACED_CONTENT);
+        Block deletedBlock = block(createdBlockId, documentId, "000000000001000000000000", 1);
+        deletedBlock.setDeletedAt(LocalDateTime.now());
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdBlock);
+        when(blockService.update(createdBlockId, REPLACED_CONTENT, 0, ACTOR_ID)).thenReturn(updatedBlock);
+        when(blockRepository.findByIdAndDeletedAtIsNull(createdBlockId)).thenReturn(Optional.of(updatedBlock));
+        when(blockService.delete(createdBlockId, 1, ACTOR_ID)).thenReturn(deletedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-temp-replace-delete",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        "tmp:block:1",
+                                        null,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-3",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::status)
+                .containsExactly(
+                        DocumentTransactionOperationStatus.APPLIED,
+                        DocumentTransactionOperationStatus.APPLIED,
+                        DocumentTransactionOperationStatus.APPLIED
+                );
+        verify(blockService).delete(createdBlockId, 1, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_create 뒤 move 후 temp block delete는 currentVersion으로 처리한다")
+    void applyDeletesCreatedTempBlockAfterMove() {
+        UUID documentId = UUID.randomUUID();
+        UUID createdBlockId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+
+        Block createdBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+        Block movedBlock = block(createdBlockId, documentId, "000000000001I00000000000", 1);
+        Block deletedBlock = block(createdBlockId, documentId, "000000000001I00000000000", 1);
+        deletedBlock.setDeletedAt(LocalDateTime.now());
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdBlock);
+        when(blockService.move(createdBlockId, parentId, null, null, 0, ACTOR_ID)).thenReturn(movedBlock);
+        when(blockRepository.findByIdAndDeletedAtIsNull(createdBlockId)).thenReturn(Optional.of(movedBlock));
+        when(blockService.delete(createdBlockId, 1, ACTOR_ID)).thenReturn(deletedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-temp-move-delete",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        parentId.toString(),
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-3",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::status)
+                .containsExactly(
+                        DocumentTransactionOperationStatus.APPLIED,
+                        DocumentTransactionOperationStatus.APPLIED,
+                        DocumentTransactionOperationStatus.APPLIED
+                );
+        verify(blockService).delete(createdBlockId, 1, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("실패_temp block delete에 version이 오면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenTempDeleteIncludesVersion() {
+        UUID documentId = UUID.randomUUID();
+        UUID createdBlockId = UUID.randomUUID();
+        Block createdBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdBlock);
+        doNothing().when(blockRepository).flush();
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-temp-delete-with-version",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        "tmp:block:1",
+                                        0,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_existing block delete에 version이 없으면 잘못된 요청 예외를 던진다")
+    void applyThrowsWhenDeleteOmitsVersionForExistingBlock() {
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                UUID.randomUUID(),
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-delete-without-version",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        UUID.randomUUID().toString(),
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+    }
+
+    @Test
+    @DisplayName("실패_temp block delete 뒤 같은 temp replace_content를 참조하면 블록 없음 예외를 던진다")
+    void applyThrowsWhenReplaceContentReferencesTempBlockDeletedEarlierInBatch() {
+        UUID documentId = UUID.randomUUID();
+        UUID createdBlockId = UUID.randomUUID();
+        Block createdBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+        Block deletedBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+        deletedBlock.setDeletedAt(LocalDateTime.now());
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdBlock);
+        when(blockRepository.findByIdAndDeletedAtIsNull(createdBlockId))
+                .thenReturn(Optional.of(createdBlock))
+                .thenReturn(Optional.empty());
+        when(blockService.delete(createdBlockId, 0, ACTOR_ID)).thenReturn(deletedBlock);
+        when(blockService.update(createdBlockId, REPLACED_CONTENT, 0, ACTOR_ID))
+                .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
+        doNothing().when(blockRepository).flush();
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-temp-delete-then-replace",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-3",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        "tmp:block:1",
+                                        null,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("실패_temp block delete 뒤 같은 temp move를 참조하면 블록 없음 예외를 던진다")
+    void applyThrowsWhenMoveReferencesTempBlockDeletedEarlierInBatch() {
+        UUID documentId = UUID.randomUUID();
+        UUID createdBlockId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        Block createdBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+        Block deletedBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
+        deletedBlock.setDeletedAt(LocalDateTime.now());
+
+        when(blockService.create(
+                eq(documentId),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(EMPTY_BLOCK_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdBlock);
+        when(blockRepository.findByIdAndDeletedAtIsNull(createdBlockId))
+                .thenReturn(Optional.of(createdBlock))
+                .thenReturn(Optional.empty());
+        when(blockService.delete(createdBlockId, 0, ACTOR_ID)).thenReturn(deletedBlock);
+        when(blockService.move(createdBlockId, parentId, null, null, 0, ACTOR_ID))
+                .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
+        doNothing().when(blockRepository).flush();
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-temp-delete-then-move",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-3",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        "tmp:block:1",
+                                        null,
+                                        null,
+                                        parentId.toString(),
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        ))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("성공_replace_content no-op 뒤 real block delete는 증가하지 않은 version으로 처리한다")
+    void applyDeletesExistingBlockAfterReplaceContentNoOp() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 3);
+        existingBlock.setContent(REPLACED_CONTENT);
+        Block deletedBlock = block(blockId, documentId, "000000000001000000000000", 3);
+        deletedBlock.setDeletedAt(LocalDateTime.now());
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
+                .thenReturn(Optional.of(existingBlock))
+                .thenReturn(Optional.of(existingBlock));
+        when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(existingBlock);
+        when(blockService.delete(blockId, 3, ACTOR_ID)).thenReturn(deletedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-replace-no-op-delete",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        blockId.toString(),
+                                        3,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        blockId.toString(),
+                                        3,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::status)
+                .containsExactly(DocumentTransactionOperationStatus.NO_OP, DocumentTransactionOperationStatus.APPLIED);
+        verify(blockService).delete(blockId, 3, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_move no-op 뒤 real block delete는 증가하지 않은 version으로 처리한다")
+    void applyDeletesExistingBlockAfterMoveNoOp() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 4);
+        Block deletedBlock = block(blockId, documentId, "000000000001000000000000", 4);
+        deletedBlock.setDeletedAt(LocalDateTime.now());
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
+                .thenReturn(Optional.of(existingBlock))
+                .thenReturn(Optional.of(existingBlock));
+        when(blockService.move(blockId, null, null, null, 4, ACTOR_ID)).thenReturn(existingBlock);
+        when(blockService.delete(blockId, 4, ACTOR_ID)).thenReturn(deletedBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-move-no-op-delete",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        4,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ),
+                                new DocumentTransactionOperationCommand(
+                                        "op-2",
+                                        DocumentTransactionOperationType.BLOCK_DELETE,
+                                        blockId.toString(),
+                                        4,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::status)
+                .containsExactly(DocumentTransactionOperationStatus.NO_OP, DocumentTransactionOperationStatus.APPLIED);
+        verify(blockService).delete(blockId, 4, ACTOR_ID);
     }
 
     @Test

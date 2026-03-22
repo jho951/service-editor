@@ -299,6 +299,53 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("성공_block_move는 version 없이도 request shape 검증을 통과한다")
+	void applyTransactionsAllowsBlockMoveWithoutVersion() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+
+		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
+			.thenReturn(new DocumentTransactionResult(
+				documentId,
+				"batch-move-no-version",
+				List.of(
+					new DocumentTransactionAppliedOperationResult(
+						"op-1",
+						DocumentTransactionOperationStatus.APPLIED,
+						null,
+						blockId,
+						1,
+						"000000000001I00000000000",
+						null
+					)
+				)
+			));
+
+		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "clientId": "web-editor",
+					  "batchId": "batch-move-no-version",
+					  "operations": [
+					    {
+					      "opId": "op-1",
+					      "type": "BLOCK_MOVE",
+					      "blockRef": "%s",
+					      "parentRef": null,
+					      "afterRef": "%s",
+					      "beforeRef": null
+					    }
+					  ]
+					}
+					""".formatted(blockId, UUID.randomUUID())))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(1));
+	}
+
+	@Test
 	@DisplayName("성공_block_move no-op transaction 요청에 대해 NO_OP status 응답을 반환한다")
 	void applyTransactionsReturnsNoOpStatusForBlockMove() throws Exception {
 		UUID documentId = UUID.randomUUID();
@@ -535,26 +582,48 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
-	@DisplayName("실패_block_delete에 version이 없으면 유효성 검사 오류를 반환한다")
-	void applyTransactionsRejectsBlockDeleteWithoutVersion() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
-			.contentType("application/json")
-			.header(USER_ID_HEADER, ACTOR_ID)
-			.content("""
-				{
-				  "clientId": "web-editor",
-				  "batchId": "batch-1",
-				  "operations": [
-				    {
-				      "opId": "op-1",
-				      "type": "BLOCK_DELETE",
-				      "blockRef": "%s"
-				    }
-				  ]
-				}
-				""".formatted(UUID.randomUUID())));
+	@DisplayName("성공_block_delete는 version 없이도 request shape 검증을 통과한다")
+	void applyTransactionsAllowsBlockDeleteWithoutVersion() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+		LocalDateTime deletedAt = LocalDateTime.now();
 
-		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
+			.thenReturn(new DocumentTransactionResult(
+				documentId,
+				"batch-delete-no-version",
+				List.of(
+					new DocumentTransactionAppliedOperationResult(
+						"op-1",
+						DocumentTransactionOperationStatus.APPLIED,
+						null,
+						blockId,
+						null,
+						null,
+						deletedAt
+					)
+				)
+			));
+
+		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "clientId": "web-editor",
+					  "batchId": "batch-delete-no-version",
+					  "operations": [
+					    {
+					      "opId": "op-1",
+					      "type": "BLOCK_DELETE",
+					      "blockRef": "tmp:block:1"
+					    }
+					  ]
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[0].deletedAt").exists());
 	}
 
 	@Test

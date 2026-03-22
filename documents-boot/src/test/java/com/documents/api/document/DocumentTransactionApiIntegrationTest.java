@@ -243,7 +243,6 @@ class DocumentTransactionApiIntegrationTest {
                                       "opId": "op-3",
                                       "type": "BLOCK_MOVE",
                                       "blockRef": "tmp:block:1",
-                                      "version": 0,
                                       "parentRef": "tmp:parent"
                                     },
                                     {
@@ -423,7 +422,6 @@ class DocumentTransactionApiIntegrationTest {
                                       "opId": "op-4",
                                       "type": "BLOCK_MOVE",
                                       "blockRef": "tmp:block:1",
-                                      "version": 1,
                                       "parentRef": "tmp:parent"
                                     },
                                     {
@@ -444,8 +442,7 @@ class DocumentTransactionApiIntegrationTest {
                                     {
                                       "opId": "op-6",
                                       "type": "BLOCK_MOVE",
-                                      "blockRef": "tmp:block:1",
-                                      "version": 3
+                                      "blockRef": "tmp:block:1"
                                     }
                                   ]
                                 }
@@ -647,8 +644,8 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("실패_real block replace_content 뒤 같은 stale version move는 전체 transaction을 rollback한다")
-    void applyTransactionsRollsBackReplaceWhenLaterMoveUsesStaleVersionOnSameRealBlock() throws Exception {
+    @DisplayName("성공_real block replace_content 뒤 같은 base version move는 서버 내부 최신 version으로 이어서 처리한다")
+    void applyTransactionsUsesServerManagedVersionAfterReplaceContentOnSameRealBlock() throws Exception {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
         Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
@@ -687,6 +684,194 @@ class DocumentTransactionApiIntegrationTest {
                                   ]
                                 }
                                 """.formatted(existingBlock.getId(), existingBlock.getId(), targetParent.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(1))
+                .andExpect(jsonPath("$.data.appliedOperations[1].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(2));
+
+        Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
+        assertThat(reloadedBlock.getContent()).isEqualTo(content("먼저 수정"));
+        assertThat(reloadedBlock.getVersion()).isEqualTo(2);
+        assertThat(reloadedBlock.getParentId()).isEqualTo(targetParent.getId());
+    }
+
+    @Test
+    @DisplayName("성공_real block replace_content, move, replace_content는 같은 base version으로 이어서 처리한다")
+    void applyTransactionsUsesServerManagedVersionAcrossReplaceMoveReplaceOnSameRealBlock() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+        Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-real-block-chain",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "먼저 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "parentRef": "%s"
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "마지막 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(
+                                existingBlock.getId(),
+                                existingBlock.getId(),
+                                targetParent.getId(),
+                                existingBlock.getId()
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(1))
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(2))
+                .andExpect(jsonPath("$.data.appliedOperations[2].version").value(3));
+
+        Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
+        assertThat(reloadedBlock.getContent()).isEqualTo(content("마지막 수정"));
+        assertThat(reloadedBlock.getVersion()).isEqualTo(3);
+        assertThat(reloadedBlock.getParentId()).isEqualTo(targetParent.getId());
+    }
+
+    @Test
+    @DisplayName("성공_real block replace_content, move 뒤 delete는 같은 base version으로 이어서 처리한다")
+    void applyTransactionsUsesServerManagedVersionForDeleteAfterReplaceAndMoveOnSameRealBlock() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+        Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-real-block-delete-chain",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "먼저 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "parentRef": "%s"
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    }
+                                  ]
+                                }
+                                """.formatted(
+                                existingBlock.getId(),
+                                existingBlock.getId(),
+                                targetParent.getId(),
+                                existingBlock.getId()
+                        )))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(1))
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(2))
+                .andExpect(jsonPath("$.data.appliedOperations[2].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[2].deletedAt").isNotEmpty());
+
+        Block deletedBlock = blockRepository.findById(existingBlock.getId()).orElseThrow();
+        assertThat(deletedBlock.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("실패_real block이 같은 batch 안에서 다른 base version을 섞어 보내면 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackWhenRealBlockUsesDifferentBaseVersionInsideBatch() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+        Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-inconsistent-base-version",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "먼저 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 1,
+                                      "parentRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), existingBlock.getId(), targetParent.getId())))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
                 .andExpect(jsonPath("$.code").value(9005))
@@ -696,6 +881,431 @@ class DocumentTransactionApiIntegrationTest {
         assertThat(reloadedBlock.getContent()).isEqualTo(content("기존 블록"));
         assertThat(reloadedBlock.getVersion()).isEqualTo(0);
         assertThat(reloadedBlock.getParentId()).isNull();
+    }
+
+    @Test
+    @DisplayName("실패_existing block replace_content에 version이 없으면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenExistingReplaceContentOmitsVersion() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-missing-version-replace",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015));
+    }
+
+    @Test
+    @DisplayName("실패_existing block move에 version이 없으면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenExistingMoveOmitsVersion() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+        Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-missing-version-move",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "parentRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), targetParent.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015));
+    }
+
+    @Test
+    @DisplayName("성공_create 뒤 temp block delete는 version 없이 같은 batch에서 처리한다")
+    void applyTransactionsDeletesCreatedTempBlockWithoutVersion() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-temp-delete",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "tmp:block:1"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[1].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[1].deletedAt").isNotEmpty());
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("성공_create 뒤 replace_content 후 temp block delete는 currentVersion으로 같은 batch에서 처리한다")
+    void applyTransactionsDeletesCreatedTempBlockAfterReplaceContent() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-temp-replace-delete",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "생성 후 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "tmp:block:1"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(1))
+                .andExpect(jsonPath("$.data.appliedOperations[2].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[2].deletedAt").isNotEmpty());
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("성공_create 뒤 move 후 temp block delete는 currentVersion으로 같은 batch에서 처리한다")
+    void applyTransactionsDeletesCreatedTempBlockAfterMove() throws Exception {
+        Document document = document("문서");
+        Block parentBlock = block(document, null, "부모 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-temp-move-delete",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "tmp:block:1",
+                                      "parentRef": "%s"
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "tmp:block:1"
+                                    }
+                                  ]
+                                }
+                                """.formatted(parentBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(1))
+                .andExpect(jsonPath("$.data.appliedOperations[2].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[2].deletedAt").isNotEmpty());
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("실패_temp block delete에 version이 오면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenTempDeleteIncludesVersion() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-temp-delete-with-version",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "tmp:block:1",
+                                      "version": 0
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015));
+    }
+
+    @Test
+    @DisplayName("실패_existing block delete에 version이 없으면 잘못된 요청 응답을 반환한다")
+    void applyTransactionsReturnsBadRequestWhenExistingDeleteOmitsVersion() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-existing-delete-without-version",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015));
+    }
+
+    @Test
+    @DisplayName("실패_temp block delete 뒤 같은 temp replace_content를 참조하면 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackWhenLaterReplaceReferencesDeletedTempBlock() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-temp-delete-then-replace",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "삭제 후 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("실패_temp block delete 뒤 같은 temp move를 참조하면 전체 transaction을 rollback한다")
+    void applyTransactionsRollsBackWhenLaterMoveReferencesDeletedTempBlock() throws Exception {
+        Document document = document("문서");
+        Block parentBlock = block(document, null, "부모 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-temp-delete-then-move",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "tmp:block:1"
+                                    },
+                                    {
+                                      "opId": "op-3",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "tmp:block:1",
+                                      "parentRef": "%s"
+                                    }
+                                  ]
+                                }
+                                """.formatted(parentBlock.getId())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("성공_replace_content no-op 뒤 real block delete는 증가하지 않은 version으로 처리한다")
+    void applyTransactionsDeletesExistingBlockAfterReplaceContentNoOp() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-replace-no-op-delete",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "기존 블록",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), existingBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0))
+                .andExpect(jsonPath("$.data.appliedOperations[1].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[1].deletedAt").isNotEmpty());
+
+        Block deletedBlock = blockRepository.findById(existingBlock.getId()).orElseThrow();
+        assertThat(deletedBlock.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("성공_move no-op 뒤 real block delete는 증가하지 않은 version으로 처리한다")
+    void applyTransactionsDeletesExistingBlockAfterMoveNoOp() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-move-no-op-delete",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId(), existingBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0))
+                .andExpect(jsonPath("$.data.appliedOperations[1].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[1].deletedAt").isNotEmpty());
+
+        Block deletedBlock = blockRepository.findById(existingBlock.getId()).orElseThrow();
+        assertThat(deletedBlock.getDeletedAt()).isNotNull();
     }
 
     @Test

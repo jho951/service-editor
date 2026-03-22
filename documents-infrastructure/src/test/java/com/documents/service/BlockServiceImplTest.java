@@ -672,11 +672,23 @@ class BlockServiceImplTest {
                 .thenReturn(List.of());
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
-        Block result = blockService.delete(rootId, ACTOR_ID);
+        rootBlock.setVersion(0);
+
+        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
+                eq(List.of(rootId, childId, grandChildId)),
+                eq(rootId),
+                eq(0),
+                eq(ACTOR_ID),
+                any(LocalDateTime.class)
+        )).thenReturn(3);
+
+        Block result = blockService.delete(rootId, 0, ACTOR_ID);
 
         ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(blockRepository).softDeleteActiveByIds(
+        verify(blockRepository).softDeleteActiveByIdsWithRootVersion(
                 eq(List.of(rootId, childId, grandChildId)),
+                eq(rootId),
+                eq(0),
                 eq(ACTOR_ID),
                 deletedAtCaptor.capture()
         );
@@ -692,11 +704,38 @@ class BlockServiceImplTest {
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> blockService.delete(blockId, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.delete(blockId, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청한 블록을 찾을 수 없습니다.")
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("실패_삭제 직전 root version이 바뀌면 충돌 예외를 던진다")
+    void deleteThrowsWhenRootVersionChangesBeforeSoftDelete() {
+        UUID documentId = UUID.randomUUID();
+        UUID rootId = UUID.randomUUID();
+        Block rootBlock = block(documentId, null, "000000000001000000000000");
+        rootBlock.setId(rootId);
+        rootBlock.setVersion(0);
+
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+        when(blockRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootBlock));
+        when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of());
+        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
+                eq(List.of(rootId)),
+                eq(rootId),
+                eq(0),
+                eq(ACTOR_ID),
+                any(LocalDateTime.class)
+        )).thenReturn(0);
+
+        assertThatThrownBy(() -> blockService.delete(rootId, 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.CONFLICT);
     }
 
     private Document document(UUID documentId) {

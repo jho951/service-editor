@@ -107,3 +107,9 @@
 - 하지만 collapse 실패나 경계 케이스까지 고려하면 temp delete를 전체 batch 에러로 터뜨리기보다, version 없이 자연스럽게 처리하는 쪽이 더 안전하다고 보고 `BLOCK_DELETE` request shape를 완화했다.
 - transaction 서비스는 기존 temp context/currentVersion 흐름을 그대로 사용해 create 직후의 temp block delete를 처리하고, real block delete만 base version을 요구하도록 유지했다.
 - 서비스/WebMvc/boot 통합 테스트에 `create -> delete(temp)` 성공 시나리오와 관련 request shape 통과를 추가했고, guide/explainer도 temp delete 허용 기준으로 갱신했다.
+
+## Step 16. transaction delete/no-op mixed edge case 보강
+
+- temp delete 허용 이후의 경계를 다시 점검해 `create -> replace -> delete(temp)`, `create -> move -> delete(temp)`, temp delete에 version 포함, existing delete missing version, temp delete 뒤 후속 replace/move, replace no-op 뒤 delete, move no-op 뒤 delete 시나리오를 추가로 고정했다.
+- 서비스 테스트는 currentVersion 전달과 예외 종류를, boot 통합 테스트는 실제 rollback과 최종 DB 상태를 함께 검증하도록 보강했다.
+- 검증은 `:documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.

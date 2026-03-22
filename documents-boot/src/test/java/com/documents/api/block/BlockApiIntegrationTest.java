@@ -290,6 +290,7 @@ class BlockApiIntegrationTest {
         Block otherRootBlock = saveBlock(document, null, "보존 대상", "000000000002000000000000");
 
         mockMvc.perform(delete("/v1/blocks/{blockId}", rootBlock.getId())
+                        .param("version", "0")
                         .header("X-User-Id", "user-123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -311,12 +312,37 @@ class BlockApiIntegrationTest {
     @DisplayName("실패_존재하지 않는 블록을 삭제하면 블록 없음 응답을 반환한다")
     void deleteBlockReturnsNotFoundWhenBlockMissing() throws Exception {
         var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID())
+                        .param("version", "0")
                         .header("X-User-Id", "user-123"));
 
         result.andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
                 .andExpect(jsonPath("$.code").value(9006))
                 .andExpect(jsonPath("$.message").value("요청한 블록을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("실패_삭제 version이 낡으면 충돌 응답을 반환한다")
+    void deleteBlockReturnsConflictWhenVersionIsStale() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block rootBlock = saveBlock(document, null, "삭제 대상 루트", "000000000001000000000000");
+
+        mockMvc.perform(delete("/v1/blocks/{blockId}", rootBlock.getId())
+                        .param("version", "-1")
+                        .header("X-User-Id", "user-123"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
+                .andExpect(jsonPath("$.code").value(9005))
+                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."));
     }
 
     @Test
