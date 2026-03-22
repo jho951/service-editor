@@ -73,3 +73,11 @@
 - 테스트 보강 과정에서 `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`가 요청 `documentId` 소속이 아닌 real blockRef를 통과시키는 구멍을 확인했고, 두 경로도 `resolveExistingBlock(...)`를 거쳐 문서 소속과 version을 함께 검증하도록 보정했다.
 - boot 통합 테스트에는 temp block move 후 replace 누적 반영, temp block delete 거절 및 rollback, move/replace의 다른 문서 블록 참조 거절, move no-op version 유지, unknown/future temp anchor 거절 시나리오를 추가했다.
 - 검증은 `:documents-infrastructure:test --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`, `:documents-api:test --tests 'com.documents.api.document.DocumentControllerWebMvcTest'`로 확인했다.
+
+## Step 11. transaction no-op status 분리
+
+- `BLOCK_MOVE`는 요청이 유효하지만 실제 parent/sortKey 변화가 없는 경우, `BLOCK_REPLACE_CONTENT`는 현재 저장 문자열과 요청 문자열이 같은 경우를 no-op으로 보고 `APPLIED`와 구분해 응답하도록 `DocumentTransactionOperationStatus`에 `NO_OP`를 추가했다.
+- transaction request의 `content`는 이미 `BlockJsonCodec.write(...)`를 거쳐 저장 문자열 포맷으로 정규화되므로, `BlockService.update(...)`는 동일 문자열이면 no-op으로 바로 반환하고 `updatedBy`와 version을 유지하도록 조정했다.
+- `DocumentTransactionServiceImpl`는 move/replace 공통 no-op 판정 규칙을 `resolveAppliedStatus(...)` 메서드로 올리고, operation type 기준 `switch`에서 현재는 `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`만 `NO_OP` 후보로 처리하고 `BLOCK_CREATE`, `BLOCK_DELETE`는 항상 `APPLIED`로 고정했다.
+- 서비스 테스트, WebMvc 테스트, boot 통합 테스트에 move/replace no-op status, version 유지, replace 시 updatedBy 유지 검증을 추가했다.
+- 검증은 `:documents-infrastructure:test --tests 'com.documents.service.BlockServiceImplTest' --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-api:test --tests 'com.documents.api.document.DocumentControllerWebMvcTest'`, `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest'`로 확인했다.

@@ -24,6 +24,7 @@ import com.documents.repository.BlockRepository;
 import com.documents.service.transaction.DocumentTransactionAppliedOperationResult;
 import com.documents.service.transaction.DocumentTransactionCommand;
 import com.documents.service.transaction.DocumentTransactionOperationCommand;
+import com.documents.service.transaction.DocumentTransactionOperationStatus;
 import com.documents.service.transaction.DocumentTransactionOperationType;
 import com.documents.service.transaction.DocumentTransactionResult;
 
@@ -196,6 +197,43 @@ class DocumentTransactionServiceImplTest {
         assertThat(result.appliedOperations().get(0).sortKey()).isEqualTo("000000000001I00000000000");
 
         verify(blockService).move(blockId, null, afterBlockId, null, 4, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_move가 no-op이면 NO_OP status와 기존 version을 반환한다")
+    void applyReturnsNoOpStatusWhenMoveDoesNotChangeBlockState() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 4);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(java.util.Optional.of(existingBlock));
+        when(blockService.move(blockId, null, null, null, 4, ACTOR_ID)).thenReturn(existingBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-no-op",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_MOVE,
+                                        blockId.toString(),
+                                        4,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).hasSize(1);
+        assertThat(result.appliedOperations().get(0).status()).isEqualTo(DocumentTransactionOperationStatus.NO_OP);
+        assertThat(result.appliedOperations().get(0).version()).isEqualTo(4);
     }
 
     @Test
@@ -856,6 +894,43 @@ class DocumentTransactionServiceImplTest {
         assertThat(result.appliedOperations().get(0).version()).isEqualTo(4);
 
         verify(blockService).update(blockId, REPLACED_CONTENT, 3, ACTOR_ID);
+    }
+
+    @Test
+    @DisplayName("성공_replace_content가 no-op이면 NO_OP status와 기존 version을 반환한다")
+    void applyReturnsNoOpStatusWhenReplaceContentDoesNotChangeBlockState() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block existingBlock = block(blockId, documentId, "000000000001000000000000", 3);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(java.util.Optional.of(existingBlock));
+        when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(existingBlock);
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-no-op",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        blockId.toString(),
+                                        3,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).hasSize(1);
+        assertThat(result.appliedOperations().get(0).status()).isEqualTo(DocumentTransactionOperationStatus.NO_OP);
+        assertThat(result.appliedOperations().get(0).version()).isEqualTo(3);
     }
 
     @Test

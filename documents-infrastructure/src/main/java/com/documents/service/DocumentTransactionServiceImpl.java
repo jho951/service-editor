@@ -118,13 +118,15 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
         );
         blockRepository.flush();
 
+        DocumentTransactionOperationStatus status = resolveAppliedStatus(resolvedBlockReference.version(), updatedBlock);
+
         if (isTempBlockReference(resolvedBlockReference)) {
             registerTempBlockContext(resolvedBlockReference.tempId(), updatedBlock, tempBlockContexts);
         }
 
         return new DocumentTransactionAppliedOperationResult(
                 operation.opId(),
-                DocumentTransactionOperationStatus.APPLIED,
+                status,
                 null,
                 updatedBlock.getId(),
                 updatedBlock.getVersion(),
@@ -171,13 +173,15 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
         );
         blockRepository.flush();
 
+        DocumentTransactionOperationStatus status = resolveAppliedStatus(resolvedBlockReference.version(), movedBlock);
+
         if (isTempBlockReference(resolvedBlockReference)) {
             registerTempBlockContext(resolvedBlockReference.tempId(), movedBlock, tempBlockContexts);
         }
 
         return new DocumentTransactionAppliedOperationResult(
                 operation.opId(),
-                DocumentTransactionOperationStatus.APPLIED,
+                status,
                 null,
                 movedBlock.getId(),
                 movedBlock.getVersion(),
@@ -282,6 +286,12 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
 
     private boolean isTempBlockReference(TempBlockContext tempBlockContext) {
         return tempBlockContext != null;
+    }
+
+    private DocumentTransactionOperationStatus resolveAppliedStatus(Integer requestedVersion, Block block) {
+        return block.getVersion().equals(requestedVersion)
+                ? DocumentTransactionOperationStatus.NO_OP
+                : DocumentTransactionOperationStatus.APPLIED;
     }
 
     private record TempBlockContext(UUID realBlockId, Integer version) {

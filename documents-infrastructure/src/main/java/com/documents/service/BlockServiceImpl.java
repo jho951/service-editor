@@ -89,12 +89,16 @@ public class BlockServiceImpl implements BlockService {
         Block block = blockRepository.findByIdAndDeletedAtIsNull(blockId)
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
 
+        if (!block.getVersion().equals(version)) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+        if (Objects.equals(block.getContent(), content)) {
+            return block;
+        }
+
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
         if (normalizedActorId == null) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
-        }
-        if (!block.getVersion().equals(version)) {
-            throw new BusinessException(BusinessErrorCode.CONFLICT);
         }
 
         block.setContent(content);

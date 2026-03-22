@@ -561,6 +561,7 @@ class DocumentTransactionApiIntegrationTest {
                                 }
                                 """.formatted(movingBlock.getId())))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
                 .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0));
 
         Block reloadedMovingBlock = blockRepository.findByIdAndDeletedAtIsNull(movingBlock.getId()).orElseThrow();
@@ -609,6 +610,49 @@ class DocumentTransactionApiIntegrationTest {
         assertThat(updatedBlock.getContent()).isEqualTo(content("수정된 블록"));
         assertThat(updatedBlock.getUpdatedBy()).isEqualTo("user-456");
         assertThat(updatedBlock.getVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("성공_replace_content가 no-op이면 NO_OP status를 반환하고 version과 updatedBy를 유지한다")
+    void applyTransactionsKeepsVersionWhenReplaceContentIsNoOp() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-no-op-replace",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "기존 블록",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0));
+
+        Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
+        assertThat(reloadedBlock.getContent()).isEqualTo(content("기존 블록"));
+        assertThat(reloadedBlock.getVersion()).isEqualTo(0);
+        assertThat(reloadedBlock.getUpdatedBy()).isEqualTo("user-123");
     }
 
     @Test

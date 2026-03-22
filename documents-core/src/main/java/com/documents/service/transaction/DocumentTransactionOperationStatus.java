@@ -1,5 +1,6 @@
 package com.documents.service.transaction;
 
 public enum DocumentTransactionOperationStatus {
-    APPLIED
+    APPLIED,
+    NO_OP
 }

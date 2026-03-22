@@ -299,6 +299,106 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("성공_block_move no-op transaction 요청에 대해 NO_OP status 응답을 반환한다")
+	void applyTransactionsReturnsNoOpStatusForBlockMove() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+
+		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
+			.thenReturn(new DocumentTransactionResult(
+				documentId,
+				"batch-no-op",
+				List.of(
+					new DocumentTransactionAppliedOperationResult(
+						"op-1",
+						DocumentTransactionOperationStatus.NO_OP,
+						null,
+						blockId,
+						4,
+						"000000000001000000000000",
+						null
+					)
+				)
+			));
+
+		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "clientId": "web-editor",
+					  "batchId": "batch-no-op",
+					  "operations": [
+					    {
+					      "opId": "op-1",
+					      "type": "BLOCK_MOVE",
+					      "blockRef": "%s",
+					      "version": 4
+					    }
+					  ]
+					}
+					""".formatted(blockId)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(4));
+	}
+
+	@Test
+	@DisplayName("성공_replace_content no-op transaction 요청에 대해 NO_OP status 응답을 반환한다")
+	void applyTransactionsReturnsNoOpStatusForReplaceContent() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+
+		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
+			.thenReturn(new DocumentTransactionResult(
+				documentId,
+				"batch-no-op-replace",
+				List.of(
+					new DocumentTransactionAppliedOperationResult(
+						"op-1",
+						DocumentTransactionOperationStatus.NO_OP,
+						null,
+						blockId,
+						3,
+						"000000000001000000000000",
+						null
+					)
+				)
+			));
+
+		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "clientId": "web-editor",
+					  "batchId": "batch-no-op-replace",
+					  "operations": [
+					    {
+					      "opId": "op-1",
+					      "type": "BLOCK_REPLACE_CONTENT",
+					      "blockRef": "%s",
+					      "version": 3,
+					      "content": {
+					        "format": "rich_text",
+					        "schemaVersion": 1,
+					        "segments": [
+					          {
+					            "text": "수정된 블록",
+					            "marks": []
+					          }
+					        ]
+					      }
+					    }
+					  ]
+					}
+					""".formatted(blockId)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(3));
+	}
+
+	@Test
 	@DisplayName("실패_replace_content에 content가 없으면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsReplaceContentWithoutContent() throws Exception {
 		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())

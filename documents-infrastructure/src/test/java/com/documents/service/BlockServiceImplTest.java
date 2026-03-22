@@ -221,6 +221,26 @@ class BlockServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_수정 내용이 기존과 같으면 no-op으로 성공 처리하고 변경하지 않는다")
+    void updateDoesNothingWhenContentIsSame() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(0);
+        block.setUpdatedBy("old-user");
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+
+        Block updated = blockService.update(blockId, toContent("기존 블록"), 0, ACTOR_ID);
+
+        assertThat(updated).isSameAs(block);
+        assertThat(block.getContent()).isEqualTo(toContent("기존 블록"));
+        assertThat(block.getUpdatedBy()).isEqualTo("old-user");
+        verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+    }
+
+    @Test
     @DisplayName("실패_수정 대상 블록이 없으면 블록 없음 예외를 던진다")
     void updateBlockThrowsWhenBlockMissing() {
         UUID blockId = UUID.randomUUID();
@@ -264,8 +284,6 @@ class BlockServiceImplTest {
         block.setVersion(1);
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
-        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
-
         assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
