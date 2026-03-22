@@ -707,6 +707,164 @@ class BlockControllerWebMvcTest {
         ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
     }
 
+    @Test
+    @DisplayName("성공_루트로 이동 요청 시 성공 응답을 반환한다")
+    void moveBlockReturnsSuccessEnvelopeForRootMove() throws Exception {
+        UUID blockId = UUID.randomUUID();
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 3
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("요청 응답 성공"))
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(blockService).move(blockId, null, null, null, 3, "user-123");
+    }
+
+    @Test
+    @DisplayName("성공_다른 부모 아래 특정 형제 뒤로 이동 요청 시 전달값을 그대로 서비스에 넘긴다")
+    void moveBlockPassesAnchorsToService() throws Exception {
+        UUID blockId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        UUID afterBlockId = UUID.randomUUID();
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s",
+                                  "afterBlockId": "%s",
+                                  "beforeBlockId": null,
+                                  "version": 4
+                                }
+                                """.formatted(parentId, afterBlockId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(blockService).move(blockId, parentId, afterBlockId, null, 4, "user-123");
+    }
+
+    @Test
+    @DisplayName("실패_인증 헤더가 없으면 블록 이동 API는 인증 오류를 반환한다")
+    void moveBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+        UUID blockId = UUID.randomUUID();
+
+        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+        verify(blockService, never()).move(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("실패_version이 없으면 블록 이동 API는 유효성 검사 오류를 반환한다")
+    void moveBlockReturnsValidationErrorWhenVersionMissing() throws Exception {
+        UUID blockId = UUID.randomUUID();
+
+        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+        verify(blockService, never()).move(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("실패_존재하지 않는 블록 이동 요청은 블록 없음 응답을 반환한다")
+    void moveBlockReturnsNotFoundWhenBlockMissing() throws Exception {
+        UUID blockId = UUID.randomUUID();
+        doThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND))
+                .when(blockService).move(blockId, null, null, null, 0, "user-123");
+
+        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("실패_version이 현재 블록 상태와 충돌하면 블록 이동 API는 충돌 응답을 반환한다")
+    void moveBlockReturnsConflictWhenVersionMismatched() throws Exception {
+        UUID blockId = UUID.randomUUID();
+        doThrow(new BusinessException(BusinessErrorCode.CONFLICT))
+                .when(blockService).move(blockId, null, null, null, 0, "user-123");
+
+        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": null,
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
+    }
+
+    @Test
+    @DisplayName("실패_잘못된 위치 요청이면 블록 이동 API는 잘못된 요청 응답을 반환한다")
+    void moveBlockReturnsBadRequestWhenRequestInvalid() throws Exception {
+        UUID blockId = UUID.randomUUID();
+        doThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST))
+                .when(blockService).move(blockId, blockId, null, null, 0, "user-123");
+
+        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s",
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """.formatted(blockId)));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+    }
+
     private Block block(UUID blockId, UUID documentId, UUID parentId, String sortKey, int version, String text) {
         Block block = Block.builder()
                 .id(blockId)
