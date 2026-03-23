@@ -22,6 +22,7 @@ public class DocumentTransactionApiMapper {
         return new DocumentTransactionCommand(
                 request.getClientId(),
                 request.getBatchId(),
+                request.getDocumentVersion(),
                 request.getOperations().stream()
                         .map(this::toCommand)
                         .toList()
@@ -29,8 +30,10 @@ public class DocumentTransactionApiMapper {
     }
 
     public DocumentTransactionResponse toResponse(DocumentTransactionResult result) {
+        Long documentVersion = result.documentVersion() == null ? null : result.documentVersion().longValue();
         return DocumentTransactionResponse.builder()
                 .documentId(result.documentId())
+                .documentVersion(documentVersion)
                 .batchId(result.batchId())
                 .appliedOperations(result.appliedOperations().stream()
                         .map(this::toResponse)

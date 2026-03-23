@@ -3,6 +3,7 @@ package com.documents.api.document.dto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,6 +19,9 @@ public class DocumentTransactionRequest {
 
     @NotBlank
     private String batchId;
+
+    @NotNull
+    private Integer documentVersion;
 
     @Valid
     @NotEmpty

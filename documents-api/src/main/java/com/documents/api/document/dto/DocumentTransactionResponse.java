@@ -10,6 +10,7 @@ import lombok.Getter;
 public class DocumentTransactionResponse {
 
     private UUID documentId;
+    private Long documentVersion;
     private String batchId;
     private List<DocumentTransactionAppliedOperationResponse> appliedOperations;
 }

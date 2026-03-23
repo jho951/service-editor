@@ -1,5 +1,6 @@
 package com.documents.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -11,9 +12,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
+import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.BlockRepository;
+import com.documents.repository.DocumentRepository;
 import com.documents.service.transaction.DocumentTransactionAppliedOperationResult;
 import com.documents.service.transaction.DocumentTransactionCommand;
 import com.documents.service.transaction.DocumentTransactionOperationCommand;
@@ -31,17 +34,21 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
 
     private final BlockService blockService;
     private final BlockRepository blockRepository;
+    private final DocumentRepository documentRepository;
 
     @Override
     @Transactional
     public DocumentTransactionResult apply(UUID documentId, DocumentTransactionCommand command, String actorId) {
+        Document document = findActiveDocument(documentId);
+        validateDocumentVersion(command.documentVersion(), document);
+
         Map<String, BlockReferenceContext> blockReferenceContexts = new HashMap<>();
         List<DocumentTransactionAppliedOperationResult> appliedOperations = new ArrayList<>();
 
         for (DocumentTransactionOperationCommand operation : command.operations()) {
             switch (operation.type()) {
                 case BLOCK_CREATE -> appliedOperations.add(
-                        applyCreate(documentId, operation, actorId, blockReferenceContexts)
+                        applyCreate(document, operation, actorId, blockReferenceContexts)
                 );
                 case BLOCK_REPLACE_CONTENT -> appliedOperations.add(
                         applyReplaceContent(documentId, operation, actorId, blockReferenceContexts)
@@ -56,11 +63,16 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
             }
         }
 
-        return new DocumentTransactionResult(documentId, command.batchId(), appliedOperations);
+        Integer documentVersion = document.getVersion();
+        if (hasEditorChange(appliedOperations)) {
+            documentVersion = incrementDocumentVersion(documentId, documentVersion, actorId);
+        }
+
+        return new DocumentTransactionResult(documentId, documentVersion, command.batchId(), appliedOperations);
     }
 
     private DocumentTransactionAppliedOperationResult applyCreate(
-            UUID documentId,
+            Document document,
             DocumentTransactionOperationCommand operation,
             String actorId,
             Map<String, BlockReferenceContext> blockReferenceContexts
@@ -69,7 +81,7 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
         ResolvedPositionReferences resolvedCreatePosition = resolvePositionReferences(operation, blockReferenceContexts);
 
         Block createdBlock = blockService.create(
-                documentId,
+                document,
                 resolvedCreatePosition.parentId(),
                 BlockType.TEXT,
                 EMPTY_TEXT_BLOCK_CONTENT,
@@ -341,6 +353,35 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
         return block.getVersion().equals(requestedVersion)
                 ? DocumentTransactionOperationStatus.NO_OP
                 : DocumentTransactionOperationStatus.APPLIED;
+    }
+
+    private Document findActiveDocument(UUID documentId) {
+        return documentRepository.findByIdAndDeletedAtIsNull(documentId)
+                .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+    }
+
+    private void validateDocumentVersion(Integer documentVersion, Document document) {
+        if (documentVersion == null) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
+        if (!document.getVersion().equals(documentVersion)) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+    }
+
+    private boolean hasEditorChange(List<DocumentTransactionAppliedOperationResult> appliedOperations) {
+        return appliedOperations.stream()
+                .anyMatch(result -> result.status() == DocumentTransactionOperationStatus.APPLIED);
+    }
+
+    private Integer incrementDocumentVersion(UUID documentId, Integer currentVersion, String actorId) {
+        int updatedRowCount = documentRepository.incrementVersion(documentId, currentVersion, actorId, LocalDateTime.now());
+        if (updatedRowCount != 1) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+
+        return currentVersion + 1;
     }
 
     private record BlockReferenceContext(

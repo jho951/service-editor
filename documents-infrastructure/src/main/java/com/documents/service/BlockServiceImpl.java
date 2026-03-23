@@ -55,6 +55,21 @@ public class BlockServiceImpl implements BlockService {
             String actorId
     ) {
         Document document = findActiveDocument(documentId);
+        return create(document, parentId, type, content, afterBlockId, beforeBlockId, actorId);
+    }
+
+    @Override
+    @Transactional
+    public Block create(
+            Document document,
+            UUID parentId,
+            BlockType type,
+            String content,
+            UUID afterBlockId,
+            UUID beforeBlockId,
+            String actorId
+    ) {
+        UUID documentId = document.getId();
         validateSupportedType(type);
         validateBlockLimit(documentId);
 

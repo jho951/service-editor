@@ -120,3 +120,16 @@
 - 동시성 테스트 과정에서 soft delete bulk update가 version을 올리지 않으면 동시에 열린 update/move가 삭제된 row의 `deletedAt`을 다시 덮어써 block이 되살아날 수 있는 경쟁 조건을 확인했고, delete query가 삭제되는 subtree의 version도 함께 증가시키도록 보강했다.
 - API 레이어는 optimistic lock 예외 체인도 `409 CONFLICT`로 응답하도록 정리해 실제 경합에서 수동 conflict와 JPA conflict가 같은 계약으로 내려가게 맞췄다.
 - 검증은 `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`, `:documents-infrastructure:test --tests 'com.documents.service.BlockServiceImplTest' --tests 'com.documents.service.DocumentTransactionServiceImplTest'`, `:documents-api:test --tests 'com.documents.api.block.BlockControllerWebMvcTest' --tests 'com.documents.api.document.DocumentControllerWebMvcTest'`, `:documents-boot:test --tests 'com.documents.api.block.BlockApiIntegrationTest' --tests 'com.documents.api.document.DocumentTransactionApiIntegrationTest' --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`로 확인했다.
+
+## Step 18. documentVersion 선검증과 응답 반환 추가
+
+- transaction request top-level에 `documentVersion`을 추가하고, `DocumentTransactionServiceImpl`이 block 단위 version 검사 전에 현재 `Document.version`과 먼저 비교하도록 바꿨다.
+- batch 안에 실제 editor 변경이 하나라도 적용되면 `documents.version`을 정확히 1 증가시키고, transaction 응답에도 최신 `documentVersion`을 함께 포함하도록 확장했다.
+- `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`가 모두 no-op인 batch는 기존처럼 block version과 함께 `documentVersion`도 올리지 않도록 유지했다.
+- service/WebMvc/boot 통합 테스트와 동시성 테스트를 새 문서 version 계약 기준으로 갱신했다.
+
+## Step 19. transaction create 경로의 document 중복 조회 제거
+
+- `DocumentTransactionServiceImpl`은 batch 시작 시 조회한 `Document`를 `BLOCK_CREATE` 경로까지 그대로 전달하고, `BlockService`에는 `create(Document, ...)` 오버로드를 추가해 transaction 안에서 같은 문서를 다시 조회하지 않도록 정리했다.
+- 기존 단건 block create API는 그대로 `create(UUID documentId, ...)`를 사용하고, 내부에서만 새 오버로드로 위임하도록 유지해 외부 호출부 가독성과 기존 테스트 계약은 유지했다.
+- service 테스트에는 transaction create 시 `documentRepository.findByIdAndDeletedAtIsNull(...)`가 한 번만 호출되는 검증을 추가했다.

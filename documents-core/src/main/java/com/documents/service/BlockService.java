@@ -6,12 +6,23 @@ import java.util.UUID;
 
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
+import com.documents.domain.Document;
 
 public interface BlockService {
     List<Block> getAllByDocumentId(UUID documentId);
 
     Block create(
             UUID documentId,
+            UUID parentId,
+            BlockType type,
+            String content,
+            UUID afterBlockId,
+            UUID beforeBlockId,
+            String actorId
+    );
+
+    Block create(
+            Document document,
             UUID parentId,
             BlockType type,
             String content,

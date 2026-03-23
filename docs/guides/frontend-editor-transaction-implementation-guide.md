@@ -43,6 +43,7 @@
 ### 문서 로컬 상태
 
 - 현재 화면에 보이는 block tree
+- 현재 문서의 `documentVersion`
 - 각 block의 현재 content
 - 각 block의 현재 parent/정렬 위치
 - 각 block의 현재 version
@@ -126,6 +127,12 @@
 ### 쓰기
 
 - `POST /v1/documents/{documentId}/transactions`
+
+주의:
+
+- 모든 transaction request top-level에는 현재 로컬 snapshot이 기준으로 삼은 `documentVersion`을 넣어야 한다.
+- 서버 응답의 `documentVersion`이 증가하면 프론트는 로컬 문서 기준 version도 즉시 갱신해야 한다.
+- no-op 응답이면 `documentVersion`은 유지될 수 있다.
 
 프론트 에디터의 일반 편집 흐름은 이 두 개가 표준이다.
 
