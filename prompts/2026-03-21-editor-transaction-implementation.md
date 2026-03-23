@@ -133,3 +133,19 @@
 - `DocumentTransactionServiceImpl`은 batch 시작 시 조회한 `Document`를 `BLOCK_CREATE` 경로까지 그대로 전달하고, `BlockService`에는 `create(Document, ...)` 오버로드를 추가해 transaction 안에서 같은 문서를 다시 조회하지 않도록 정리했다.
 - 기존 단건 block create API는 그대로 `create(UUID documentId, ...)`를 사용하고, 내부에서만 새 오버로드로 위임하도록 유지해 외부 호출부 가독성과 기존 테스트 계약은 유지했다.
 - service 테스트에는 transaction create 시 `documentRepository.findByIdAndDeletedAtIsNull(...)`가 한 번만 호출되는 검증을 추가했다.
+
+## Step 20. transaction 동시성 테스트 확장
+
+- `DocumentTransactionConcurrencyIntegrationTest`를 같은 block 경쟁만 보는 수준에서 넓혀, 서로 다른 block `move/delete`, `create`, `create vs replace`, 같은 block 3-way replace, 서로 다른 block 3-way replace 시나리오를 추가했다.
+- `serializingAnswer(...)` 기반의 결정적 경합 테스트로는 같은 변경 메서드 지점까지 동시에 들어온 뒤 하나만 먼저 실행되는 상황을 고정하고, `documentVersion` 정책 때문에 "같은 documentVersion이면 block이 달라도 하나만 성공"하는 규칙과 create가 끼어도 commit/rollback 경계가 깨지지 않는지까지 검증했다.
+- 별도로 `CountDownLatch ready/start` 기반 경쟁형 헬퍼를 추가해 호출 순서를 통제하지 않고 요청 10개를 실제로 동시에 발사하는 테스트도 넣었다.
+- 경쟁형 시나리오는 같은 block `replace_content` 10개, 같은 block `move` 10개, 같은 block `delete` 10개, 서로 다른 block `replace_content` 10개, 서로 다른 block `move` 10개, 서로 다른 block `delete` 10개, `BLOCK_CREATE` 10개, `create 5개 + replace 5개` mixed 요청 10개를 같은 `documentVersion`으로 동시에 보내는 경우를 포함한다.
+- 검증은 각 시나리오에서 성공 개수/충돌 개수와 최종 DB 상태가 정책대로 유지되는지에 집중했고, 대표적으로 "오직 하나만 commit", "나머지는 `409` 또는 delete 경합 시 `404/409`", "최종 block/document 상태는 정확히 한 요청만 반영"을 확인했다.
+- 검증은 `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`로 확인했다.
+
+## Step 21. transaction 동시성 응답 계약과 retry/no-op 검증 추가
+
+- 경쟁형 same-block replace 테스트에 성공 응답 `documentVersion=1`, 실패 응답 `code=9005` 검증을 추가해 동시성 상황에서도 API 응답 계약이 유지되는지 확인했다.
+- same-block replace 경쟁에서 충돌 후 최신 block version과 최신 `documentVersion`으로 다시 요청하면 성공하는 retry 시나리오를 추가했다.
+- same-content replace 10건, same-position move 10건 no-op 경쟁 시나리오를 추가해 모든 요청이 `200`, operation `status=NO_OP`, block version / `documentVersion` 미증가로 유지되는지 확인했다.
+- 검증은 `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`로 확인했다.
