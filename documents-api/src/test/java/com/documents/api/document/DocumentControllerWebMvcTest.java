@@ -47,7 +47,6 @@ class DocumentControllerWebMvcTest {
 	private static final String CHILD_DOCUMENT_TITLE = "하위 문서";
 	private static final String PARENT_DOCUMENT_TITLE = "부모 문서";
 	private static final String ICON_DOC_JSON = "{\"type\":\"emoji\",\"value\":\"📄\"}";
-	private static final String ICON_SMILE_JSON = "{\"type\":\"emoji\",\"value\":\"😀\"}";
 	private static final String COVER_1_JSON = "{\"type\":\"image\",\"value\":\"cover-1\"}";
 	private static final String COVER_2_JSON = "{\"type\":\"image\",\"value\":\"cover-2\"}";
 	private static final LocalDateTime FIXTURE_TIME = LocalDateTime.of(2026, 3, 16, 0, 0);
@@ -129,6 +128,7 @@ class DocumentControllerWebMvcTest {
 		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
 			.thenReturn(new DocumentTransactionResult(
 				documentId,
+				1,
 				"batch-1",
 				List.of(
 					new DocumentTransactionAppliedOperationResult(
@@ -158,6 +158,7 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
+                      "documentVersion": 0,
 					  "batchId": "batch-1",
 					  "operations": [
 						    {
@@ -188,6 +189,7 @@ class DocumentControllerWebMvcTest {
 					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.documentVersion").value(1))
 			.andExpect(jsonPath("$.data.batchId").value("batch-1"))
 			.andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"))
 			.andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"))
@@ -209,6 +211,7 @@ class DocumentControllerWebMvcTest {
 		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
 			.thenReturn(new DocumentTransactionResult(
 				documentId,
+				1,
 				"batch-delete",
 				List.of(
 					new DocumentTransactionAppliedOperationResult(
@@ -229,6 +232,7 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
+                      "documentVersion": 0,
 					  "batchId": "batch-delete",
 					  "operations": [
 					    {
@@ -242,6 +246,7 @@ class DocumentControllerWebMvcTest {
 					""".formatted(blockId)))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.documentVersion").value(1))
 			.andExpect(jsonPath("$.data.batchId").value("batch-delete"))
 			.andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"))
 			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
@@ -257,6 +262,7 @@ class DocumentControllerWebMvcTest {
 		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
 			.thenReturn(new DocumentTransactionResult(
 				documentId,
+				1,
 				"batch-move",
 				List.of(
 					new DocumentTransactionAppliedOperationResult(
@@ -277,6 +283,7 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
+                      "documentVersion": 0,
 					  "batchId": "batch-move",
 					  "operations": [
 					    {
@@ -293,6 +300,7 @@ class DocumentControllerWebMvcTest {
 					""".formatted(blockId, UUID.randomUUID())))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.documentVersion").value(1))
 			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
 			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(5))
 			.andExpect(jsonPath("$.data.appliedOperations[0].sortKey").value("000000000001I00000000000"));
@@ -307,6 +315,7 @@ class DocumentControllerWebMvcTest {
 		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
 			.thenReturn(new DocumentTransactionResult(
 				documentId,
+				1,
 				"batch-move-no-version",
 				List.of(
 					new DocumentTransactionAppliedOperationResult(
@@ -327,6 +336,7 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
+                      "documentVersion": 0,
 					  "batchId": "batch-move-no-version",
 					  "operations": [
 					    {
@@ -341,6 +351,7 @@ class DocumentControllerWebMvcTest {
 					}
 					""".formatted(blockId, UUID.randomUUID())))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.documentVersion").value(1))
 			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
 			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(1));
 	}
@@ -354,6 +365,7 @@ class DocumentControllerWebMvcTest {
 		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
 			.thenReturn(new DocumentTransactionResult(
 				documentId,
+				0,
 				"batch-no-op",
 				List.of(
 					new DocumentTransactionAppliedOperationResult(
@@ -374,6 +386,7 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
+                      "documentVersion": 0,
 					  "batchId": "batch-no-op",
 					  "operations": [
 					    {
@@ -386,6 +399,7 @@ class DocumentControllerWebMvcTest {
 					}
 					""".formatted(blockId)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.documentVersion").value(0))
 			.andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
 			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(4));
 	}
@@ -399,6 +413,7 @@ class DocumentControllerWebMvcTest {
 		when(documentTransactionService.apply(eq(documentId), any(), eq(ACTOR_ID)))
 			.thenReturn(new DocumentTransactionResult(
 				documentId,
+				0,
 				"batch-no-op-replace",
 				List.of(
 					new DocumentTransactionAppliedOperationResult(
@@ -419,6 +434,7 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
+                      "documentVersion": 0,
 					  "batchId": "batch-no-op-replace",
 					  "operations": [
 					    {
@@ -441,8 +457,32 @@ class DocumentControllerWebMvcTest {
 					}
 					""".formatted(blockId)))
 			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.documentVersion").value(0))
 			.andExpect(jsonPath("$.data.appliedOperations[0].status").value("NO_OP"))
 			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(3));
+	}
+
+	@Test
+	@DisplayName("실패_documentVersion이 없으면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsMissingDocumentVersion() throws Exception {
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE",
+				      "blockRef": "tmp:block:1"
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
 	}
 
 	@Test
@@ -454,6 +494,7 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
+                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -477,6 +518,7 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
+                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -510,6 +552,7 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
+                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -534,6 +577,7 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
+                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -556,6 +600,7 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
+                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -611,6 +656,7 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
+                      "documentVersion": 0,
 					  "batchId": "batch-delete-no-version",
 					  "operations": [
 					    {
@@ -635,6 +681,7 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
+                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -672,6 +719,7 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
+                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -708,6 +756,7 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
+                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {

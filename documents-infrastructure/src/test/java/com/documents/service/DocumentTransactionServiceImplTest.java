@@ -18,9 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
+import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.BlockRepository;
+import com.documents.repository.DocumentRepository;
 import com.documents.service.transaction.DocumentTransactionAppliedOperationResult;
 import com.documents.service.transaction.DocumentTransactionCommand;
 import com.documents.service.transaction.DocumentTransactionOperationCommand;
@@ -44,11 +46,18 @@ class DocumentTransactionServiceImplTest {
     @Mock
     private BlockRepository blockRepository;
 
+    @Mock
+    private DocumentRepository documentRepository;
+
     private DocumentTransactionServiceImpl documentTransactionService;
 
     @BeforeEach
     void setUp() {
-        documentTransactionService = new DocumentTransactionServiceImpl(blockService, blockRepository);
+        documentTransactionService = new DocumentTransactionServiceImpl(blockService, blockRepository, documentRepository);
+        lenient().when(documentRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
+                .thenAnswer(invocation -> Optional.of(document(invocation.getArgument(0), 0)));
+        lenient().when(documentRepository.incrementVersion(any(UUID.class), anyInt(), anyString(), any(LocalDateTime.class)))
+                .thenReturn(1);
     }
 
     @Test
@@ -62,7 +71,7 @@ class DocumentTransactionServiceImplTest {
         updatedBlock.setContent(REPLACED_CONTENT);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -107,12 +116,15 @@ class DocumentTransactionServiceImplTest {
         assertThat(result.batchId()).isEqualTo("batch-1");
         assertThat(result.appliedOperations()).extracting(DocumentTransactionAppliedOperationResult::opId)
                 .containsExactly("op-1", "op-2");
+        assertThat(result.documentVersion()).isEqualTo(1);
         assertThat(result.appliedOperations().get(0).tempId()).isEqualTo("tmp:block:1");
         assertThat(result.appliedOperations().get(0).blockId()).isEqualTo(blockId);
         assertThat(result.appliedOperations().get(1).blockId()).isEqualTo(blockId);
         assertThat(result.appliedOperations().get(1).version()).isEqualTo(1);
 
         verify(blockService).update(blockId, REPLACED_CONTENT, 0, ACTOR_ID);
+        verify(documentRepository, times(1)).findByIdAndDeletedAtIsNull(documentId);
+        verify(documentRepository).incrementVersion(eq(documentId), eq(0), eq(ACTOR_ID), any(LocalDateTime.class));
     }
 
     @Test
@@ -234,6 +246,45 @@ class DocumentTransactionServiceImplTest {
         assertThat(result.appliedOperations()).hasSize(1);
         assertThat(result.appliedOperations().get(0).status()).isEqualTo(DocumentTransactionOperationStatus.NO_OP);
         assertThat(result.appliedOperations().get(0).version()).isEqualTo(4);
+        assertThat(result.documentVersion()).isEqualTo(0);
+
+        verify(documentRepository, never()).incrementVersion(any(UUID.class), anyInt(), anyString(), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("실패_document version이 현재 문서와 다르면 블록 검증 전에 충돌 예외를 던진다")
+    void applyRejectsWhenDocumentVersionIsStale() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId, 3)));
+
+        assertThatThrownBy(() -> documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-stale-document",
+                        2,
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
+                                        blockId.toString(),
+                                        0,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        )).isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.CONFLICT);
+
+        verifyNoInteractions(blockService);
+        verify(blockRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
     }
 
     @Test
@@ -248,7 +299,7 @@ class DocumentTransactionServiceImplTest {
         Block movedBlock = block(existingBlockId, documentId, "000000000001I00000000000", 2);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -313,7 +364,7 @@ class DocumentTransactionServiceImplTest {
         updatedBlock.setContent(movedContent);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -441,7 +492,7 @@ class DocumentTransactionServiceImplTest {
         secondMovedBlock.setParent(com.documents.domain.Block.builder().id(secondParentId).build());
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -1181,7 +1232,7 @@ class DocumentTransactionServiceImplTest {
         Block createdBlock = block(UUID.randomUUID(), documentId, "000000000001000000000000", 0);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -1295,7 +1346,7 @@ class DocumentTransactionServiceImplTest {
         deletedBlock.setDeletedAt(LocalDateTime.now());
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -1356,7 +1407,7 @@ class DocumentTransactionServiceImplTest {
         deletedBlock.setDeletedAt(LocalDateTime.now());
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -1432,7 +1483,7 @@ class DocumentTransactionServiceImplTest {
         deletedBlock.setDeletedAt(LocalDateTime.now());
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -1503,7 +1554,7 @@ class DocumentTransactionServiceImplTest {
         Block createdBlock = block(createdBlockId, documentId, "000000000001000000000000", 0);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -1586,7 +1637,7 @@ class DocumentTransactionServiceImplTest {
         deletedBlock.setDeletedAt(LocalDateTime.now());
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -1658,7 +1709,7 @@ class DocumentTransactionServiceImplTest {
         deletedBlock.setDeletedAt(LocalDateTime.now());
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -1860,7 +1911,7 @@ class DocumentTransactionServiceImplTest {
         Block createdBlock = block(blockId, documentId, "000000000001000000000000", 0);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -2055,7 +2106,7 @@ class DocumentTransactionServiceImplTest {
         secondUpdatedBlock.setContent(secondContent);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -2126,7 +2177,7 @@ class DocumentTransactionServiceImplTest {
         Block createdChildBlock = block(childBlockId, documentId, "000000000001I00000000000", 0);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -2135,7 +2186,7 @@ class DocumentTransactionServiceImplTest {
                 eq(ACTOR_ID)
         )).thenReturn(createdParentBlock);
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(parentBlockId),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -2193,7 +2244,7 @@ class DocumentTransactionServiceImplTest {
         Block createdBeforeBlock = block(beforeBlockId, documentId, "000000000001Q00000000000", 0);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -2202,7 +2253,7 @@ class DocumentTransactionServiceImplTest {
                 eq(ACTOR_ID)
         )).thenReturn(createdFirstBlock, createdBeforeBlock);
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -2391,7 +2442,7 @@ class DocumentTransactionServiceImplTest {
         Block createdMiddleBlock = block(middleBlockId, documentId, "000000000001I00000000000", 0);
 
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -2400,7 +2451,7 @@ class DocumentTransactionServiceImplTest {
                 eq(ACTOR_ID)
         )).thenReturn(createdTempBeforeBlock);
         when(blockService.create(
-                eq(documentId),
+                any(Document.class),
                 eq(null),
                 eq(BlockType.TEXT),
                 eq(EMPTY_BLOCK_CONTENT),
@@ -2457,5 +2508,15 @@ class DocumentTransactionServiceImplTest {
                 .build();
         block.setVersion(version);
         return block;
+    }
+
+    private Document document(UUID documentId, int version) {
+        Document document = Document.builder()
+                .id(documentId)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build();
+        document.setVersion(version);
+        return document;
     }
 }

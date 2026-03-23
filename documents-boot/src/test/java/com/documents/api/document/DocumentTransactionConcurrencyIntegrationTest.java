@@ -167,6 +167,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
                 """
                         {
                           "clientId": "web-editor",
+                          "documentVersion": 0,
                           "batchId": "batch-chain",
                           "operations": [
                             {
@@ -273,8 +274,8 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     @Test
-    @DisplayName("동시성_서로 다른 block replace_content 요청은 동시에 와도 둘 다 성공한다")
-    void concurrentReplaceOnDifferentBlocksBothSucceed() throws Exception {
+    @DisplayName("동시성_서로 다른 block replace_content 요청도 같은 documentVersion이면 하나만 성공하고 나머지는 충돌한다")
+    void concurrentReplaceOnDifferentBlocksOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
         Document document = document("문서");
         Block firstBlock = block(document, null, "첫 번째 블록", "000000000001000000000000");
         Block secondBlock = block(document, null, "두 번째 블록", "000000000002000000000000");
@@ -291,14 +292,13 @@ class DocumentTransactionConcurrencyIntegrationTest {
         );
 
         List<Integer> statuses = List.of(first.get().getResponse().getStatus(), second.get().getResponse().getStatus());
-        assertThat(statuses).containsExactlyInAnyOrder(200, 200);
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
 
         Block reloadedFirstBlock = blockRepository.findByIdAndDeletedAtIsNull(firstBlock.getId()).orElseThrow();
         Block reloadedSecondBlock = blockRepository.findByIdAndDeletedAtIsNull(secondBlock.getId()).orElseThrow();
-        assertThat(reloadedFirstBlock.getVersion()).isEqualTo(1);
-        assertThat(reloadedSecondBlock.getVersion()).isEqualTo(1);
-        assertThat(reloadedFirstBlock.getContent()).contains("\"text\":\"첫 번째 수정\"");
-        assertThat(reloadedSecondBlock.getContent()).contains("\"text\":\"두 번째 수정\"");
+        assertThat(reloadedFirstBlock.getVersion() + reloadedSecondBlock.getVersion()).isEqualTo(1);
+        assertThat(reloadedFirstBlock.getContent().contains("\"text\":\"첫 번째 수정\"")
+                || reloadedSecondBlock.getContent().contains("\"text\":\"두 번째 수정\"")).isTrue();
     }
 
     private void serializeConcurrentUpdates(int participants) throws Exception {
@@ -390,6 +390,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         return """
                 {
                   "clientId": "web-editor",
+                  "documentVersion": 0,
                   "batchId": "%s",
                   "operations": [
                     {
@@ -417,6 +418,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         return """
                 {
                   "clientId": "web-editor",
+                  "documentVersion": 0,
                   "batchId": "%s",
                   "operations": [
                     {
@@ -435,6 +437,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         return """
                 {
                   "clientId": "web-editor",
+                  "documentVersion": 0,
                   "batchId": "%s",
                   "operations": [
                     {
