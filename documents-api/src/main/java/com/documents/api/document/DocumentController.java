@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.documents.api.block.BlockApiMapper;
+import com.documents.api.block.dto.BlockResponse;
 import com.documents.api.code.SuccessCode;
 import com.documents.api.document.dto.CreateDocumentRequest;
 import com.documents.api.document.dto.DocumentResponse;
@@ -23,6 +25,7 @@ import com.documents.api.document.dto.DocumentTransactionResponse;
 import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Document;
+import com.documents.service.BlockService;
 import com.documents.service.DocumentService;
 import com.documents.service.DocumentTransactionService;
 
@@ -40,6 +43,8 @@ public class DocumentController {
 	// TODO: 임시 헤더 값. 인증 서버와 연동 후 수정 필요
 	private static final String USER_ID_HEADER = "X-User-Id";
 
+	private final BlockService blockService;
+	private final BlockApiMapper blockApiMapper;
 	private final DocumentService documentService;
 	private final DocumentApiMapper documentApiMapper;
 	private final DocumentTransactionService documentTransactionService;
@@ -83,6 +88,17 @@ public class DocumentController {
 	) {
 		Document document = documentService.getById(documentId);
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(document)));
+	}
+
+	@Operation(summary = "문서 블록 목록 조회")
+	@GetMapping("/documents/{documentId}/blocks")
+	public ResponseEntity<GlobalResponse<List<BlockResponse>>> getBlocks(
+		@PathVariable("documentId") UUID documentId
+	) {
+		List<BlockResponse> response = blockService.getAllByDocumentId(documentId).stream()
+			.map(blockApiMapper::toResponse)
+			.toList();
+		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
 	}
 
 	@Operation(summary = "문서 수정")

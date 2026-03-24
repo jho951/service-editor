@@ -12,12 +12,10 @@ import com.documents.service.BlockService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,28 +25,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Block", description = "블록 API")
+@Tag(name = "AdminBlock", description = "관리자 블록 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/v1")
-public class BlockController {
+@RequestMapping("/v1/admin")
+public class AdminBlockController {
 
     private static final String USER_ID_HEADER = "X-User-Id";
 
     private final BlockService blockService;
     private final BlockApiMapper blockApiMapper;
     private final BlockJsonCodec blockJsonCodec;
-
-    @Operation(summary = "문서 블록 목록 조회")
-    @GetMapping("/documents/{documentId}/blocks")
-    public ResponseEntity<GlobalResponse<List<BlockResponse>>> getBlocks(
-            @PathVariable("documentId") UUID documentId
-    ) {
-        List<BlockResponse> response = blockService.getAllByDocumentId(documentId).stream()
-                .map(blockApiMapper::toResponse)
-                .toList();
-        return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
-    }
 
     @Operation(summary = "텍스트 블록 생성")
     @PostMapping("/documents/{documentId}/blocks")

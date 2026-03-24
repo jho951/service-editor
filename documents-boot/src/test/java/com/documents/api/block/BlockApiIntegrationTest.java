@@ -120,7 +120,7 @@ class BlockApiIntegrationTest {
                 .sortKey("00000000000000000001")
                 .build());
 
-                mockMvc.perform(post("/v1/documents/{documentId}/blocks", document.getId())
+                mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -187,7 +187,7 @@ class BlockApiIntegrationTest {
                 .updatedBy("user-123")
                 .build());
 
-        mockMvc.perform(patch("/v1/blocks/{blockId}", block.getId())
+        mockMvc.perform(patch("/v1/admin/blocks/{blockId}", block.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -247,7 +247,7 @@ class BlockApiIntegrationTest {
         block.setContent(toContent("다른 사용자 수정"));
         blockRepository.save(block);
 
-        mockMvc.perform(patch("/v1/blocks/{blockId}", block.getId())
+        mockMvc.perform(patch("/v1/admin/blocks/{blockId}", block.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -289,7 +289,7 @@ class BlockApiIntegrationTest {
         Block grandChildBlock = saveBlock(document, childBlock, "삭제 대상 손자", "000000000001Q00000000000");
         Block otherRootBlock = saveBlock(document, null, "보존 대상", "000000000002000000000000");
 
-        mockMvc.perform(delete("/v1/blocks/{blockId}", rootBlock.getId())
+        mockMvc.perform(delete("/v1/admin/blocks/{blockId}", rootBlock.getId())
                         .param("version", "0")
                         .header("X-User-Id", "user-123"))
                 .andExpect(status().isOk())
@@ -311,7 +311,7 @@ class BlockApiIntegrationTest {
     @Test
     @DisplayName("실패_존재하지 않는 블록을 삭제하면 블록 없음 응답을 반환한다")
     void deleteBlockReturnsNotFoundWhenBlockMissing() throws Exception {
-        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID())
+        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", UUID.randomUUID())
                         .param("version", "0")
                         .header("X-User-Id", "user-123"));
 
@@ -336,7 +336,7 @@ class BlockApiIntegrationTest {
                 .build());
         Block rootBlock = saveBlock(document, null, "삭제 대상 루트", "000000000001000000000000");
 
-        mockMvc.perform(delete("/v1/blocks/{blockId}", rootBlock.getId())
+        mockMvc.perform(delete("/v1/admin/blocks/{blockId}", rootBlock.getId())
                         .param("version", "-1")
                         .header("X-User-Id", "user-123"))
                 .andExpect(status().isConflict())
@@ -377,7 +377,7 @@ class BlockApiIntegrationTest {
                 .updatedBy("user-123")
                 .build());
 
-        mockMvc.perform(post("/v1/documents/{documentId}/blocks", document.getId())
+        mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -406,7 +406,7 @@ class BlockApiIntegrationTest {
     @Test
     @DisplayName("실패_존재하지 않는 문서로 블록을 생성하면 문서 없음 응답을 반환한다")
     void createBlockReturnsNotFoundWhenDocumentMissing() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -448,7 +448,7 @@ class BlockApiIntegrationTest {
         Block moved = saveBlock(document, null, "이동 대상", "000000000002000000000000");
         Block third = saveBlock(document, null, "셋째 블록", "000000000003000000000000");
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", moved.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -490,7 +490,7 @@ class BlockApiIntegrationTest {
         saveBlock(document, parent, "기존 자식", "000000000001000000000000");
         Block moved = saveBlock(document, null, "이동 대상", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", moved.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -531,7 +531,7 @@ class BlockApiIntegrationTest {
         Block second = saveBlock(document, parent, "둘째 자식", "000000000002000000000000");
         Block moved = saveBlock(document, parent, "이동 대상", "000000000003000000000000");
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", moved.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -558,7 +558,7 @@ class BlockApiIntegrationTest {
     @Test
     @DisplayName("실패_존재하지 않는 블록 이동은 블록 없음 응답을 반환한다")
     void moveBlockReturnsNotFoundWhenBlockMissing() throws Exception {
-        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -600,7 +600,7 @@ class BlockApiIntegrationTest {
                 .deletedAt(java.time.LocalDateTime.of(2026, 3, 20, 0, 0))
                 .build());
 
-        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", deleted.getId())
+        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", deleted.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -635,7 +635,7 @@ class BlockApiIntegrationTest {
         block.setContent(toContent("다른 사용자 수정"));
         blockRepository.save(block);
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", block.getId())
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", block.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -667,7 +667,7 @@ class BlockApiIntegrationTest {
                 .build());
         Block block = saveBlock(document, null, "이동 대상", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", block.getId())
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", block.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -700,7 +700,7 @@ class BlockApiIntegrationTest {
         Block root = saveBlock(document, null, "루트", "000000000001000000000000");
         Block child = saveBlock(document, root, "자식", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", root.getId())
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", root.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -742,7 +742,7 @@ class BlockApiIntegrationTest {
         Block depth10 = saveBlock(document, depth9, "10", "000000000001000000000000");
         Block moved = saveBlock(document, null, "이동 대상", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", moved.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -782,7 +782,7 @@ class BlockApiIntegrationTest {
         Block otherParent = saveBlock(otherDocument, null, "다른 부모", "000000000001000000000000");
         Block otherAnchor = saveBlock(otherDocument, null, "다른 anchor", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", moved.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -813,7 +813,7 @@ class BlockApiIntegrationTest {
                 .sortKey("00000000000000000001")
                 .build());
 
-        mockMvc.perform(post("/v1/documents/{documentId}/blocks", document.getId())
+        mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -856,7 +856,7 @@ class BlockApiIntegrationTest {
                 .sortKey("00000000000000000001")
                 .build());
 
-        mockMvc.perform(post("/v1/documents/{documentId}/blocks", document.getId())
+        mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""

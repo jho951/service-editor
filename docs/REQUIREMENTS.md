@@ -570,7 +570,7 @@ Block {
 - conflict 후 pending 복구는 실패한 batch payload 복원이 아니라, 현재 로컬 문서 상태 기준 재조립을 원칙으로 한다.
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되고 있으면 다시 pending에 포함될 수 있다.
 - 같은 블록 안의 비중첩 수정도 v1에서는 block 단위 충돌로 처리할 수 있다.
-- `POST /v1/documents/{documentId}/blocks`, `PATCH /v1/blocks/{blockId}`, `DELETE /v1/blocks/{blockId}`는 에디터 표준 저장 경로가 아니라 운영/관리/비에디터 보조 경로로 둘 수 있다.
+- `POST /v1/admin/documents/{documentId}/blocks`, `PATCH /v1/admin/blocks/{blockId}`, `POST /v1/admin/blocks/{blockId}/move`, `DELETE /v1/admin/blocks/{blockId}`는 에디터 표준 저장 경로가 아니라 운영/관리/비에디터 보조 경로로 둘 수 있다.
 
 ## 10.2 향후 확장
 다음 기능은 v2 이후 별도 서비스 또는 확장 모듈로 분리 가능하다.
@@ -717,11 +717,14 @@ Block {
 
 ## 12.4 블록 API
 
+- 문서 단위 블록 목록 조회는 문서 API 책임으로 `GET /v1/documents/{documentId}/blocks` 경로를 사용한다.
+- 블록 생성, 수정, 이동, 삭제는 관리자 블록 API 책임으로 `/v1/admin/**` 경로를 사용한다.
+
 ### `GET /v1/documents/{documentId}/blocks`
 문서 내 블록 목록 조회.
 - 조회 결과는 soft delete되지 않은 블록만 포함하며 정렬 순서를 보장해야 한다.
 
-### `POST /v1/documents/{documentId}/blocks`
+### `POST /v1/admin/documents/{documentId}/blocks`
 TEXT 블록 생성.
 - 이 API는 운영/관리/비에디터 경로에서 사용할 수 있다.
 - 에디터 표준 생성/저장 경로는 `transactions`를 사용한다.
@@ -735,7 +738,7 @@ TEXT 블록 생성.
 }
 ```
 
-### `PATCH /v1/blocks/{blockId}`
+### `PATCH /v1/admin/blocks/{blockId}`
 블록 내용 또는 블록 자체 메타데이터 수정.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
 - 에디터 표준 본문 저장 경로는 `transactions`를 사용한다.
@@ -769,7 +772,22 @@ TEXT 블록 생성.
 }
 ```
 
-### `DELETE /v1/blocks/{blockId}`
+### `POST /v1/admin/blocks/{blockId}/move`
+단일 블록 이동.
+- 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
+- 에디터 표준 이동 경로는 `transactions`를 사용한다.
+
+위치 변경 예시:
+```json
+{
+  "parentId": "new-parent-block-id",
+  "afterBlockId": "blk-a",
+  "beforeBlockId": "blk-b",
+  "version": 3
+}
+```
+
+### `DELETE /v1/admin/blocks/{blockId}`
 블록 soft delete.
 - 지정 루트 블록과 하위 블록 subtree를 함께 soft delete 한다.
 - 이 API는 명시적 단일 삭제 액션 또는 운영/관리/비에디터 경로에서 사용할 수 있다.

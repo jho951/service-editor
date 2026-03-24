@@ -19,14 +19,18 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import com.documents.api.block.BlockApiMapper;
 import com.documents.api.block.support.BlockJsonCodec;
 import com.documents.api.document.support.DocumentJsonCodec;
 import com.documents.api.exception.GlobalExceptionHandler;
 import com.documents.api.support.ApiResponseAssertions;
+import com.documents.domain.Block;
+import com.documents.domain.BlockType;
 import com.documents.domain.Document;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
+import com.documents.service.BlockService;
 import com.documents.service.DocumentService;
 import com.documents.service.DocumentTransactionService;
 import com.documents.service.transaction.DocumentTransactionAppliedOperationResult;
@@ -49,7 +53,12 @@ class DocumentControllerWebMvcTest {
 	private static final String ICON_DOC_JSON = "{\"type\":\"emoji\",\"value\":\"📄\"}";
 	private static final String COVER_1_JSON = "{\"type\":\"image\",\"value\":\"cover-1\"}";
 	private static final String COVER_2_JSON = "{\"type\":\"image\",\"value\":\"cover-2\"}";
+	private static final String ROOT_BLOCK_CONTENT_JSON = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"루트 블록\",\"marks\":[]}]}";
+	private static final String CHILD_BLOCK_CONTENT_JSON = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"자식 블록\",\"marks\":[]}]}";
 	private static final LocalDateTime FIXTURE_TIME = LocalDateTime.of(2026, 3, 16, 0, 0);
+
+	@Mock
+	private BlockService blockService;
 
 	@Mock
 	private DocumentService documentService;
@@ -103,21 +112,74 @@ class DocumentControllerWebMvcTest {
 			.build();
 	}
 
+	private Block block(
+		UUID id,
+		UUID documentId,
+		UUID parentId,
+		String sortKey,
+		int version,
+		String content
+	) {
+		Block block = Block.builder()
+			.id(id)
+			.document(Document.builder().id(documentId).workspace(workspace(UUID.randomUUID())).title(ROOT_DOCUMENT_TITLE).build())
+			.parent(parentId == null ? null : Block.builder().id(parentId).build())
+			.type(BlockType.TEXT)
+			.sortKey(sortKey)
+			.content(content)
+			.createdBy(ACTOR_ID)
+			.updatedBy(ACTOR_ID)
+			.build();
+		block.setCreatedAt(FIXTURE_TIME);
+		block.setUpdatedAt(FIXTURE_TIME);
+		block.setVersion(version);
+		return block;
+	}
+
 	@BeforeEach
 	void setUp() {
 		LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
 		validator.afterPropertiesSet();
+		BlockJsonCodec blockJsonCodec = new BlockJsonCodec(new ObjectMapper());
 
-			mockMvc = MockMvcBuilders.standaloneSetup(new DocumentController(
-					documentService,
-					new DocumentApiMapper(new DocumentJsonCodec(new ObjectMapper())),
-					documentTransactionService,
-					new DocumentTransactionApiMapper(new BlockJsonCodec(new ObjectMapper()))
-				))
-				.setControllerAdvice(new GlobalExceptionHandler())
-				.setValidator(validator)
-				.build();
-		}
+		mockMvc = MockMvcBuilders.standaloneSetup(new DocumentController(
+				blockService,
+				new BlockApiMapper(blockJsonCodec),
+				documentService,
+				new DocumentApiMapper(new DocumentJsonCodec(new ObjectMapper())),
+				documentTransactionService,
+				new DocumentTransactionApiMapper(blockJsonCodec)
+			))
+			.setControllerAdvice(new GlobalExceptionHandler())
+			.setValidator(validator)
+			.build();
+	}
+
+	@Test
+	@DisplayName("성공_문서 블록 목록 조회 요청에 대해 활성 블록 전체를 반환한다")
+	void getBlocksReturnsAllActiveBlocks() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID rootBlockId = UUID.randomUUID();
+		UUID childBlockId = UUID.randomUUID();
+
+		when(blockService.getAllByDocumentId(documentId)).thenReturn(List.of(
+			block(rootBlockId, documentId, null, "000000000001000000000000", 0, ROOT_BLOCK_CONTENT_JSON),
+			block(childBlockId, documentId, rootBlockId, "000000000001I00000000000", 1, CHILD_BLOCK_CONTENT_JSON)
+		));
+
+		mockMvc.perform(get("/v1/documents/{documentId}/blocks", documentId))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data.length()").value(2))
+			.andExpect(jsonPath("$.data[0].id").value(rootBlockId.toString()))
+			.andExpect(jsonPath("$.data[0].content.format").value("rich_text"))
+			.andExpect(jsonPath("$.data[0].content.segments[0].text").value("루트 블록"))
+			.andExpect(jsonPath("$.data[1].parentId").value(rootBlockId.toString()))
+			.andExpect(jsonPath("$.data[1].content.format").value("rich_text"))
+			.andExpect(jsonPath("$.data[1].content.segments[0].text").value("자식 블록"));
+	}
 
 	@Test
 	@DisplayName("성공_create와 replace_content transaction 요청에 대해 매핑 응답을 반환한다")
