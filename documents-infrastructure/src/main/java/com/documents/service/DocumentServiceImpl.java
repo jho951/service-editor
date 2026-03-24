@@ -135,7 +135,10 @@ public class DocumentServiceImpl implements DocumentService {
 		documentRepository.softDeleteActiveByIds(documentIdsToDelete, normalizedActorId, deletedAt);
 
 		for (UUID currentDocumentId : documentIdsToDelete) {
-			blockService.softDeleteAllByDocumentId(currentDocumentId, normalizedActorId, deletedAt);
+			DocumentVersionIncrementContext.runWithoutIncrement(() -> {
+				blockService.softDeleteAllByDocumentId(currentDocumentId, normalizedActorId, deletedAt);
+				return null;
+			});
 		}
 	}
 
@@ -152,7 +155,10 @@ public class DocumentServiceImpl implements DocumentService {
 		documentRepository.restoreDeletedByIds(documentIdsToRestore, normalizedActorId, restoredAt);
 
 		for (UUID currentDocumentId : documentIdsToRestore) {
-			blockService.restoreAllByDocumentId(currentDocumentId, normalizedActorId, restoredAt);
+			DocumentVersionIncrementContext.runWithoutIncrement(() -> {
+				blockService.restoreAllByDocumentId(currentDocumentId, normalizedActorId, restoredAt);
+				return null;
+			});
 		}
 	}
 
