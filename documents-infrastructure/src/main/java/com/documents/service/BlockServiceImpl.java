@@ -95,7 +95,11 @@ public class BlockServiceImpl implements BlockService {
                 .updatedBy(normalizedActorId)
                 .build();
 
-        return blockRepository.save(newBlock);
+        Block createdBlock = blockRepository.save(newBlock);
+        if (DocumentVersionIncrementContext.shouldIncrement()) {
+            incrementActiveDocumentVersion(documentId, normalizedActorId);
+        }
+        return createdBlock;
     }
 
     @Override
@@ -118,6 +122,9 @@ public class BlockServiceImpl implements BlockService {
 
         block.setContent(content);
         block.setUpdatedBy(normalizedActorId);
+        if (DocumentVersionIncrementContext.shouldIncrement()) {
+            incrementActiveDocumentVersion(block.getDocumentId(), normalizedActorId);
+        }
         return block;
     }
 
@@ -152,6 +159,9 @@ public class BlockServiceImpl implements BlockService {
         block.setParent(targetParentBlock);
         block.setSortKey(nextSortKey);
         block.setUpdatedBy(normalizedActorId);
+        if (DocumentVersionIncrementContext.shouldIncrement()) {
+            incrementActiveDocumentVersion(block.getDocumentId(), normalizedActorId);
+        }
         return block;
     }
 
@@ -186,19 +196,36 @@ public class BlockServiceImpl implements BlockService {
         rootBlock.setUpdatedAt(deletedAt);
         rootBlock.setUpdatedBy(normalizedActorId);
         rootBlock.setVersion(version + 1);
+        if (DocumentVersionIncrementContext.shouldIncrement()) {
+            incrementActiveDocumentVersion(rootBlock.getDocumentId(), normalizedActorId);
+        }
         return rootBlock;
     }
 
     @Override
     @Transactional
     public void softDeleteAllByDocumentId(UUID documentId, String actorId, LocalDateTime deletedAt) {
+        if (blockRepository.countActiveByDocumentId(documentId) == 0) {
+            return;
+        }
+
         blockRepository.softDeleteActiveByDocumentId(documentId, actorId, deletedAt);
+        if (DocumentVersionIncrementContext.shouldIncrement()) {
+            incrementActiveDocumentVersion(documentId, actorId, deletedAt);
+        }
     }
 
     @Override
     @Transactional
     public void restoreAllByDocumentId(UUID documentId, String actorId, LocalDateTime updatedAt) {
+        if (blockRepository.countDeletedByDocumentId(documentId) == 0) {
+            return;
+        }
+
         blockRepository.restoreDeletedByDocumentId(documentId, actorId, updatedAt);
+        if (DocumentVersionIncrementContext.shouldIncrement()) {
+            incrementActiveDocumentVersion(documentId, actorId, updatedAt);
+        }
     }
 
     private Document findActiveDocument(UUID documentId) {
@@ -308,5 +335,16 @@ public class BlockServiceImpl implements BlockService {
         }
 
         return blockIds;
+    }
+
+    private void incrementActiveDocumentVersion(UUID documentId, String actorId, LocalDateTime updatedAt) {
+        int updatedRowCount = documentRepository.incrementVersion(documentId, actorId, updatedAt);
+        if (updatedRowCount != 1) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+    }
+
+    private void incrementActiveDocumentVersion(UUID documentId, String actorId) {
+        incrementActiveDocumentVersion(documentId, actorId, LocalDateTime.now());
     }
 }
