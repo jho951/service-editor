@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -32,14 +31,11 @@ import com.documents.service.BlockService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("Block 컨트롤러 빠른 검증")
-class BlockControllerWebMvcTest {
+@DisplayName("AdminBlock 컨트롤러 빠른 검증")
+class AdminBlockControllerWebMvcTest {
 
     private static final String SIMPLE_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}";
     private static final String UPDATED_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"수정된 블록\",\"marks\":[]}]}";
-    private static final String ROOT_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"루트 블록\",\"marks\":[]}]}";
-    private static final String CHILD_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"자식 블록\",\"marks\":[]}]}";
-
     @Mock
     private BlockService blockService;
 
@@ -51,7 +47,7 @@ class BlockControllerWebMvcTest {
         validator.afterPropertiesSet();
         BlockJsonCodec blockJsonCodec = new BlockJsonCodec(new ObjectMapper());
 
-        mockMvc = MockMvcBuilders.standaloneSetup(new BlockController(
+        mockMvc = MockMvcBuilders.standaloneSetup(new AdminBlockController(
                         blockService,
                         new BlockApiMapper(blockJsonCodec),
                         blockJsonCodec
@@ -59,32 +55,6 @@ class BlockControllerWebMvcTest {
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
                 .build();
-    }
-
-    @Test
-    @DisplayName("성공_문서 블록 목록 조회 요청에 대해 활성 블록 전체를 반환한다")
-    void getBlocksReturnsAllActiveBlocks() throws Exception {
-        UUID documentId = UUID.randomUUID();
-        UUID rootBlockId = UUID.randomUUID();
-        UUID childBlockId = UUID.randomUUID();
-
-        when(blockService.getAllByDocumentId(documentId)).thenReturn(List.of(
-                block(rootBlockId, documentId, null, "000000000001000000000000", 0, "루트 블록"),
-                block(childBlockId, documentId, rootBlockId, "000000000001I00000000000", 1, "자식 블록")
-        ));
-
-        mockMvc.perform(get("/v1/documents/{documentId}/blocks", documentId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.httpStatus").value("OK"))
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].id").value(rootBlockId.toString()))
-                .andExpect(jsonPath("$.data[0].content.format").value("rich_text"))
-                .andExpect(jsonPath("$.data[0].content.segments[0].text").value("루트 블록"))
-                .andExpect(jsonPath("$.data[1].parentId").value(rootBlockId.toString()))
-                .andExpect(jsonPath("$.data[1].content.format").value("rich_text"))
-                .andExpect(jsonPath("$.data[1].content.segments[0].text").value("자식 블록"));
     }
 
     @Test
@@ -114,7 +84,7 @@ class BlockControllerWebMvcTest {
                 eq("user-123")
         )).thenReturn(createdBlock);
 
-        mockMvc.perform(post("/v1/documents/{documentId}/blocks", documentId)
+        mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", documentId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -169,7 +139,7 @@ class BlockControllerWebMvcTest {
         when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
                 .thenReturn(updatedBlock);
 
-        mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
+        mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -205,7 +175,7 @@ class BlockControllerWebMvcTest {
 		when(blockService.delete(blockId, 3, "user-123"))
 				.thenReturn(block(blockId, UUID.randomUUID(), null, "000000000001000000000000", 0, "삭제 대상"));
 
-		mockMvc.perform(delete("/v1/blocks/{blockId}", blockId)
+		mockMvc.perform(delete("/v1/admin/blocks/{blockId}", blockId)
 						.param("version", "3")
                         .header("X-User-Id", "user-123"))
                 .andExpect(status().isOk())
@@ -221,7 +191,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_type이 없으면 유효성 검사 오류를 반환한다")
     void createBlockRejectsMissingType() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -258,7 +228,7 @@ class BlockControllerWebMvcTest {
                 eq("user-123")
         )).thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
 
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", documentId)
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", documentId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -284,7 +254,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_인증 헤더가 없으면 블록 생성 API는 인증 오류를 반환한다")
     void createBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .content("""
                                 {
@@ -308,7 +278,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_content가 없으면 유효성 검사 오류를 반환한다")
     void createBlockRejectsMissingContent() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -323,7 +293,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_content format이 다르면 유효성 검사 오류를 반환한다")
     void createBlockRejectsUnsupportedContentFormat() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -348,7 +318,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_mark 타입이 허용 목록이 아니면 유효성 검사 오류를 반환한다")
     void createBlockRejectsUnsupportedMarkType() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -378,7 +348,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_textColor 값이 hex 형식이 아니면 유효성 검사 오류를 반환한다")
     void createBlockRejectsInvalidTextColor() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -408,7 +378,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_같은 segment에 중복 mark 타입이 있으면 유효성 검사 오류를 반환한다")
     void createBlockRejectsDuplicateMarkType() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -436,7 +406,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_textColor 외 mark에 value가 있으면 유효성 검사 오류를 반환한다")
     void createBlockRejectsUnexpectedMarkValue() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -466,7 +436,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_segment에 허용되지 않은 필드가 있으면 유효성 검사 오류를 반환한다")
     void createBlockRejectsUnexpectedSegmentField() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -492,7 +462,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_빈 segment가 중간에 섞여 있으면 유효성 검사 오류를 반환한다")
     void createBlockRejectsEmptySegmentInMultiSegmentContent() throws Exception {
-        var result = mockMvc.perform(post("/v1/documents/{documentId}/blocks", UUID.randomUUID())
+        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -543,7 +513,7 @@ class BlockControllerWebMvcTest {
                 eq("user-123")
         )).thenReturn(createdBlock);
 
-        mockMvc.perform(post("/v1/documents/{documentId}/blocks", documentId)
+        mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", documentId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -568,7 +538,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_content가 없으면 블록 수정 요청은 유효성 검사 오류를 반환한다")
     void updateBlockRejectsMissingContent() throws Exception {
-        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", UUID.randomUUID())
+        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -588,7 +558,7 @@ class BlockControllerWebMvcTest {
         when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
                 .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
 
-        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
+        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -613,7 +583,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_인증 헤더가 없으면 블록 수정 API는 인증 오류를 반환한다")
     void updateBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", UUID.randomUUID())
+        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", UUID.randomUUID())
                         .contentType("application/json")
                         .content("""
                                 {
@@ -641,7 +611,7 @@ class BlockControllerWebMvcTest {
         doThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND))
                 .when(blockService).delete(blockId, 3, "user-123");
 
-        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", blockId)
+        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", blockId)
                         .param("version", "3")
                         .header("X-User-Id", "user-123"));
 
@@ -651,7 +621,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_version 없이 블록 삭제를 요청하면 유효성 오류를 반환한다")
     void deleteBlockReturnsBadRequestWhenVersionMissing() throws Exception {
-        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID())
+        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", UUID.randomUUID())
                         .header("X-User-Id", "user-123"));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
@@ -660,7 +630,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_인증 헤더가 없으면 블록 삭제 API는 인증 오류를 반환한다")
     void deleteBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID())
+        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", UUID.randomUUID())
                         .param("version", "0"));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
@@ -669,7 +639,7 @@ class BlockControllerWebMvcTest {
     @Test
     @DisplayName("실패_version이 없으면 유효성 검사 오류를 반환한다")
     void updateBlockRejectsMissingVersion() throws Exception {
-        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", UUID.randomUUID())
+        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -698,7 +668,7 @@ class BlockControllerWebMvcTest {
         when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
                 .thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
 
-        var result = mockMvc.perform(patch("/v1/blocks/{blockId}", blockId)
+        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -725,7 +695,7 @@ class BlockControllerWebMvcTest {
     void moveBlockReturnsSuccessEnvelopeForRootMove() throws Exception {
         UUID blockId = UUID.randomUUID();
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -753,7 +723,7 @@ class BlockControllerWebMvcTest {
         UUID parentId = UUID.randomUUID();
         UUID afterBlockId = UUID.randomUUID();
 
-        mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -777,7 +747,7 @@ class BlockControllerWebMvcTest {
     void moveBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
         UUID blockId = UUID.randomUUID();
 
-        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .content("""
                                 {
@@ -797,7 +767,7 @@ class BlockControllerWebMvcTest {
     void moveBlockReturnsValidationErrorWhenVersionMissing() throws Exception {
         UUID blockId = UUID.randomUUID();
 
-        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -819,7 +789,7 @@ class BlockControllerWebMvcTest {
         doThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND))
                 .when(blockService).move(blockId, null, null, null, 0, "user-123");
 
-        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -841,7 +811,7 @@ class BlockControllerWebMvcTest {
         doThrow(new BusinessException(BusinessErrorCode.CONFLICT))
                 .when(blockService).move(blockId, null, null, null, 0, "user-123");
 
-        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -863,7 +833,7 @@ class BlockControllerWebMvcTest {
         doThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST))
                 .when(blockService).move(blockId, blockId, null, null, 0, "user-123");
 
-        var result = mockMvc.perform(post("/v1/blocks/{blockId}/move", blockId)
+        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
