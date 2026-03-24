@@ -198,13 +198,15 @@ class BlockControllerWebMvcTest {
                 .andExpect(jsonPath("$.data.version").value(1));
     }
 
-    @Test
-    @DisplayName("성공_정상 삭제 요청에 대해 성공 응답을 반환한다")
-    void deleteBlockReturnsSuccessEnvelope() throws Exception {
-        UUID blockId = UUID.randomUUID();
-        doNothing().when(blockService).delete(blockId, "user-123");
+	@Test
+	@DisplayName("성공_정상 삭제 요청에 대해 성공 응답을 반환한다")
+	void deleteBlockReturnsSuccessEnvelope() throws Exception {
+		UUID blockId = UUID.randomUUID();
+		when(blockService.delete(blockId, 3, "user-123"))
+				.thenReturn(block(blockId, UUID.randomUUID(), null, "000000000001000000000000", 0, "삭제 대상"));
 
-        mockMvc.perform(delete("/v1/blocks/{blockId}", blockId)
+		mockMvc.perform(delete("/v1/blocks/{blockId}", blockId)
+						.param("version", "3")
                         .header("X-User-Id", "user-123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -213,8 +215,8 @@ class BlockControllerWebMvcTest {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data").doesNotExist());
 
-        verify(blockService).delete(blockId, "user-123");
-    }
+		verify(blockService).delete(blockId, 3, "user-123");
+	}
 
     @Test
     @DisplayName("실패_type이 없으면 유효성 검사 오류를 반환한다")
@@ -637,18 +639,29 @@ class BlockControllerWebMvcTest {
     void deleteBlockReturnsNotFoundWhenBlockMissing() throws Exception {
         UUID blockId = UUID.randomUUID();
         doThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND))
-                .when(blockService).delete(blockId, "user-123");
+                .when(blockService).delete(blockId, 3, "user-123");
 
         var result = mockMvc.perform(delete("/v1/blocks/{blockId}", blockId)
+                        .param("version", "3")
                         .header("X-User-Id", "user-123"));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
     }
 
     @Test
+    @DisplayName("실패_version 없이 블록 삭제를 요청하면 유효성 오류를 반환한다")
+    void deleteBlockReturnsBadRequestWhenVersionMissing() throws Exception {
+        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID())
+                        .header("X-User-Id", "user-123"));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+    }
+
+    @Test
     @DisplayName("실패_인증 헤더가 없으면 블록 삭제 API는 인증 오류를 반환한다")
     void deleteBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID()));
+        var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID())
+                        .param("version", "0"));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
     }

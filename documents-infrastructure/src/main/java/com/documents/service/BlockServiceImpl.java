@@ -55,6 +55,21 @@ public class BlockServiceImpl implements BlockService {
             String actorId
     ) {
         Document document = findActiveDocument(documentId);
+        return create(document, parentId, type, content, afterBlockId, beforeBlockId, actorId);
+    }
+
+    @Override
+    @Transactional
+    public Block create(
+            Document document,
+            UUID parentId,
+            BlockType type,
+            String content,
+            UUID afterBlockId,
+            UUID beforeBlockId,
+            String actorId
+    ) {
+        UUID documentId = document.getId();
         validateSupportedType(type);
         validateBlockLimit(documentId);
 
@@ -89,12 +104,16 @@ public class BlockServiceImpl implements BlockService {
         Block block = blockRepository.findByIdAndDeletedAtIsNull(blockId)
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
 
+        if (!block.getVersion().equals(version)) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+        if (Objects.equals(block.getContent(), content)) {
+            return block;
+        }
+
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
         if (normalizedActorId == null) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
-        }
-        if (!block.getVersion().equals(version)) {
-            throw new BusinessException(BusinessErrorCode.CONFLICT);
         }
 
         block.setContent(content);
@@ -104,7 +123,7 @@ public class BlockServiceImpl implements BlockService {
 
     @Override
     @Transactional
-    public void move(UUID blockId, UUID parentId, UUID afterBlockId, UUID beforeBlockId, Integer version, String actorId) {
+    public Block move(UUID blockId, UUID parentId, UUID afterBlockId, UUID beforeBlockId, Integer version, String actorId) {
         Block block = findActiveBlock(blockId);
 
         if (!block.getVersion().equals(version)) {
@@ -112,6 +131,7 @@ public class BlockServiceImpl implements BlockService {
         }
 
         Block targetParentBlock = findValidParentForMove(block, parentId);
+        validateDepth(targetParentBlock);
         List<Block> siblings = blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(block.getDocumentId(), parentId);
         List<Block> targetSiblings = siblings.stream()
                 .filter(sibling -> !blockId.equals(sibling.getId()))
@@ -121,7 +141,7 @@ public class BlockServiceImpl implements BlockService {
 
         if (Objects.equals(block.getParentId(), parentId)
                 && Objects.equals(block.getSortKey(), nextSortKey)) {
-            return;
+            return block;
         }
 
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
@@ -132,16 +152,41 @@ public class BlockServiceImpl implements BlockService {
         block.setParent(targetParentBlock);
         block.setSortKey(nextSortKey);
         block.setUpdatedBy(normalizedActorId);
+        return block;
     }
 
     @Override
     @Transactional
-    public void delete(UUID blockId, String actorId) {
+    public Block delete(UUID blockId, Integer version, String actorId) {
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
-        LocalDateTime deletedAt = LocalDateTime.now();
-        List<UUID> blockIdsToDelete = collectActiveDescendantBlockIdsForSoftDelete(findActiveBlock(blockId));
+        if (normalizedActorId == null) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
 
-        blockRepository.softDeleteActiveByIds(blockIdsToDelete, normalizedActorId, deletedAt);
+        LocalDateTime deletedAt = LocalDateTime.now();
+        Block rootBlock = findActiveBlock(blockId);
+        if (!rootBlock.getVersion().equals(version)) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+
+        List<UUID> blockIdsToDelete = collectActiveDescendantBlockIdsForSoftDelete(rootBlock);
+
+        int deletedCount = blockRepository.softDeleteActiveByIdsWithRootVersion(
+                blockIdsToDelete,
+                rootBlock.getId(),
+                version,
+                normalizedActorId,
+                deletedAt
+        );
+        if (deletedCount == 0) {
+            throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+
+        rootBlock.setDeletedAt(deletedAt);
+        rootBlock.setUpdatedAt(deletedAt);
+        rootBlock.setUpdatedBy(normalizedActorId);
+        rootBlock.setVersion(version + 1);
+        return rootBlock;
     }
 
     @Override

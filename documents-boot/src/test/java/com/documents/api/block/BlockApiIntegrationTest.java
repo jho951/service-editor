@@ -290,6 +290,7 @@ class BlockApiIntegrationTest {
         Block otherRootBlock = saveBlock(document, null, "보존 대상", "000000000002000000000000");
 
         mockMvc.perform(delete("/v1/blocks/{blockId}", rootBlock.getId())
+                        .param("version", "0")
                         .header("X-User-Id", "user-123"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -311,12 +312,37 @@ class BlockApiIntegrationTest {
     @DisplayName("실패_존재하지 않는 블록을 삭제하면 블록 없음 응답을 반환한다")
     void deleteBlockReturnsNotFoundWhenBlockMissing() throws Exception {
         var result = mockMvc.perform(delete("/v1/blocks/{blockId}", UUID.randomUUID())
+                        .param("version", "0")
                         .header("X-User-Id", "user-123"));
 
         result.andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
                 .andExpect(jsonPath("$.code").value(9006))
                 .andExpect(jsonPath("$.message").value("요청한 블록을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("실패_삭제 version이 낡으면 충돌 응답을 반환한다")
+    void deleteBlockReturnsConflictWhenVersionIsStale() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block rootBlock = saveBlock(document, null, "삭제 대상 루트", "000000000001000000000000");
+
+        mockMvc.perform(delete("/v1/blocks/{blockId}", rootBlock.getId())
+                        .param("version", "-1")
+                        .header("X-User-Id", "user-123"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
+                .andExpect(jsonPath("$.code").value(9005))
+                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."));
     }
 
     @Test
@@ -685,6 +711,48 @@ class BlockApiIntegrationTest {
                                   "version": 0
                                 }
                                 """.formatted(child.getId())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015))
+                .andExpect(jsonPath("$.message").value("잘못된 요청입니다."));
+    }
+
+    @Test
+    @DisplayName("실패_최대 깊이를 넘기는 부모로 블록 이동 요청 시 잘못된 요청 응답을 반환한다")
+    void moveBlockReturnsBadRequestWhenTargetParentDepthExceedsLimit() throws Exception {
+        Workspace workspace = workspaceRepository.save(Workspace.builder()
+                .id(UUID.randomUUID())
+                .name("Docs Root")
+                .build());
+        Document document = documentRepository.save(Document.builder()
+                .id(UUID.randomUUID())
+                .workspace(workspace)
+                .title("문서")
+                .sortKey("00000000000000000001")
+                .build());
+        Block depth1 = saveBlock(document, null, "1", "000000000001000000000000");
+        Block depth2 = saveBlock(document, depth1, "2", "000000000001000000000000");
+        Block depth3 = saveBlock(document, depth2, "3", "000000000001000000000000");
+        Block depth4 = saveBlock(document, depth3, "4", "000000000001000000000000");
+        Block depth5 = saveBlock(document, depth4, "5", "000000000001000000000000");
+        Block depth6 = saveBlock(document, depth5, "6", "000000000001000000000000");
+        Block depth7 = saveBlock(document, depth6, "7", "000000000001000000000000");
+        Block depth8 = saveBlock(document, depth7, "8", "000000000001000000000000");
+        Block depth9 = saveBlock(document, depth8, "9", "000000000001000000000000");
+        Block depth10 = saveBlock(document, depth9, "10", "000000000001000000000000");
+        Block moved = saveBlock(document, null, "이동 대상", "000000000002000000000000");
+
+        mockMvc.perform(post("/v1/blocks/{blockId}/move", moved.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "parentId": "%s",
+                                  "afterBlockId": null,
+                                  "beforeBlockId": null,
+                                  "version": 0
+                                }
+                                """.formatted(depth10.getId())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.code").value(9015))

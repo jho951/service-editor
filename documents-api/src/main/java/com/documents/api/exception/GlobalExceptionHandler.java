@@ -3,6 +3,7 @@ package com.documents.api.exception;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -39,6 +40,14 @@ public class GlobalExceptionHandler {
                 .body(GlobalResponse.fail(ErrorCode.UNAUTHORIZED));
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<GlobalResponse<Void>> handleMissingRequestParameterException(
+            MissingServletRequestParameterException ex
+    ) {
+        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus())
+                .body(GlobalResponse.fail(ErrorCode.VALIDATION_ERROR));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<GlobalResponse<Void>> handleIllegalArgumentException(IllegalArgumentException ex) {
         return ResponseEntity.status(ErrorCode.INVALID_REQUEST.getHttpStatus())
@@ -47,8 +56,27 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<GlobalResponse<Void>> handleException(Exception ex) {
+        if (hasOptimisticLockFailure(ex)) {
+            return ResponseEntity.status(ErrorCode.CONFLICT.getHttpStatus())
+                    .body(GlobalResponse.fail(ErrorCode.CONFLICT));
+        }
+
         return ResponseEntity.status(ErrorCode.FAIL.getHttpStatus())
                 .body(GlobalResponse.fail(ErrorCode.FAIL));
+    }
+
+    private boolean hasOptimisticLockFailure(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            String className = current.getClass().getName();
+            if (className.contains("OptimisticLock")
+                    || className.contains("StaleObjectState")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+
+        return false;
     }
 
     private ErrorCode mapBusinessError(String errorCodeName) {

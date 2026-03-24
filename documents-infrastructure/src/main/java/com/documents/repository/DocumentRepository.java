@@ -99,4 +99,19 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 		@Param("actorId") String actorId,
 		@Param("updatedAt") LocalDateTime updatedAt
 	);
+
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("""
+		update Document d
+		set d.version = d.version + 1,
+		    d.updatedBy = :actorId,
+		    d.updatedAt = :updatedAt
+		where d.id = :documentId
+		  and d.deletedAt is null
+		""")
+	int incrementVersion(
+		@Param("documentId") UUID documentId,
+		@Param("actorId") String actorId,
+		@Param("updatedAt") LocalDateTime updatedAt
+	);
 }

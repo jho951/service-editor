@@ -27,7 +27,10 @@ public class BlockContentValidator implements ConstraintValidator<ValidBlockCont
 
     @Override
     public boolean isValid(JsonNode value, ConstraintValidatorContext context) {
-        if (value == null || value.isNull() || !value.isObject()) {
+        if (value == null || value.isNull()) {
+            return true;
+        }
+        if (!value.isObject()) {
             return false;
         }
         if (!containsOnlyAllowedFields(value, ALLOWED_CONTENT_FIELDS)) {

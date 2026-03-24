@@ -73,12 +73,23 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
     @Query("""
             update Block b
             set b.deletedAt = :deletedAt,
-                b.updatedBy = :actorId
+                b.updatedAt = :deletedAt,
+                b.updatedBy = :actorId,
+                b.version = b.version + 1
             where b.id in :blockIds
               and b.deletedAt is null
+              and exists (
+                select 1
+                from Block root
+                where root.id = :rootId
+                  and root.deletedAt is null
+                  and root.version = :rootVersion
+              )
             """)
-    void softDeleteActiveByIds(
+    int softDeleteActiveByIdsWithRootVersion(
             @Param("blockIds") List<UUID> blockIds,
+            @Param("rootId") UUID rootId,
+            @Param("rootVersion") Integer rootVersion,
             @Param("actorId") String actorId,
             @Param("deletedAt") LocalDateTime deletedAt
     );

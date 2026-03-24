@@ -221,6 +221,26 @@ class BlockServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_수정 내용이 기존과 같으면 no-op으로 성공 처리하고 변경하지 않는다")
+    void updateDoesNothingWhenContentIsSame() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(0);
+        block.setUpdatedBy("old-user");
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+
+        Block updated = blockService.update(blockId, toContent("기존 블록"), 0, ACTOR_ID);
+
+        assertThat(updated).isSameAs(block);
+        assertThat(block.getContent()).isEqualTo(toContent("기존 블록"));
+        assertThat(block.getUpdatedBy()).isEqualTo("old-user");
+        verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+    }
+
+    @Test
     @DisplayName("실패_수정 대상 블록이 없으면 블록 없음 예외를 던진다")
     void updateBlockThrowsWhenBlockMissing() {
         UUID blockId = UUID.randomUUID();
@@ -264,8 +284,6 @@ class BlockServiceImplTest {
         block.setVersion(1);
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
-        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
-
         assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
@@ -489,6 +507,67 @@ class BlockServiceImplTest {
     }
 
     @Test
+    @DisplayName("실패_이동 대상 부모 깊이가 최대 깊이를 넘기면 잘못된 요청 예외를 던진다")
+    void moveThrowsWhenTargetParentDepthExceedsLimit() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        UUID parent1Id = UUID.randomUUID();
+        UUID parent2Id = UUID.randomUUID();
+        UUID parent3Id = UUID.randomUUID();
+        UUID parent4Id = UUID.randomUUID();
+        UUID parent5Id = UUID.randomUUID();
+        UUID parent6Id = UUID.randomUUID();
+        UUID parent7Id = UUID.randomUUID();
+        UUID parent8Id = UUID.randomUUID();
+        UUID parent9Id = UUID.randomUUID();
+        UUID parent10Id = UUID.randomUUID();
+
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+
+        Block parent1 = parentBlock(parent1Id, documentId);
+        Block parent2 = parentBlock(parent2Id, documentId);
+        parent2.setParent(parent1);
+        Block parent3 = parentBlock(parent3Id, documentId);
+        parent3.setParent(parent2);
+        Block parent4 = parentBlock(parent4Id, documentId);
+        parent4.setParent(parent3);
+        Block parent5 = parentBlock(parent5Id, documentId);
+        parent5.setParent(parent4);
+        Block parent6 = parentBlock(parent6Id, documentId);
+        parent6.setParent(parent5);
+        Block parent7 = parentBlock(parent7Id, documentId);
+        parent7.setParent(parent6);
+        Block parent8 = parentBlock(parent8Id, documentId);
+        parent8.setParent(parent7);
+        Block parent9 = parentBlock(parent9Id, documentId);
+        parent9.setParent(parent8);
+        Block parent10 = parentBlock(parent10Id, documentId);
+        parent10.setParent(parent9);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent10Id)).thenReturn(Optional.of(parent10));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent9Id)).thenReturn(Optional.of(parent9));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent8Id)).thenReturn(Optional.of(parent8));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent7Id)).thenReturn(Optional.of(parent7));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent6Id)).thenReturn(Optional.of(parent6));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent5Id)).thenReturn(Optional.of(parent5));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent4Id)).thenReturn(Optional.of(parent4));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent3Id)).thenReturn(Optional.of(parent3));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent2Id)).thenReturn(Optional.of(parent2));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parent1Id)).thenReturn(Optional.of(parent1));
+
+        assertThatThrownBy(() -> blockService.move(blockId, parent10Id, null, null, 1, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("잘못된 요청입니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+
+        verify(blockRepository, never()).findActiveByDocumentIdAndParentIdOrderBySortKey(any(), any());
+    }
+
+    @Test
     @DisplayName("실패_afterBlockId가 대상 부모의 형제가 아니면 잘못된 요청 예외를 던진다")
     void moveThrowsWhenAfterBlockIsNotSibling() {
         UUID documentId = UUID.randomUUID();
@@ -593,14 +672,29 @@ class BlockServiceImplTest {
                 .thenReturn(List.of());
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
-        blockService.delete(rootId, ACTOR_ID);
+        rootBlock.setVersion(0);
+
+        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
+                eq(List.of(rootId, childId, grandChildId)),
+                eq(rootId),
+                eq(0),
+                eq(ACTOR_ID),
+                any(LocalDateTime.class)
+        )).thenReturn(3);
+
+        Block result = blockService.delete(rootId, 0, ACTOR_ID);
 
         ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(blockRepository).softDeleteActiveByIds(
+        verify(blockRepository).softDeleteActiveByIdsWithRootVersion(
                 eq(List.of(rootId, childId, grandChildId)),
+                eq(rootId),
+                eq(0),
                 eq(ACTOR_ID),
                 deletedAtCaptor.capture()
         );
+        assertThat(result.getId()).isEqualTo(rootId);
+        assertThat(result.getDeletedAt()).isEqualTo(deletedAtCaptor.getValue());
+        assertThat(result.getUpdatedBy()).isEqualTo(ACTOR_ID);
     }
 
     @Test
@@ -610,11 +704,38 @@ class BlockServiceImplTest {
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> blockService.delete(blockId, ACTOR_ID))
+        assertThatThrownBy(() -> blockService.delete(blockId, 0, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("요청한 블록을 찾을 수 없습니다.")
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.BLOCK_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("실패_삭제 직전 root version이 바뀌면 충돌 예외를 던진다")
+    void deleteThrowsWhenRootVersionChangesBeforeSoftDelete() {
+        UUID documentId = UUID.randomUUID();
+        UUID rootId = UUID.randomUUID();
+        Block rootBlock = block(documentId, null, "000000000001000000000000");
+        rootBlock.setId(rootId);
+        rootBlock.setVersion(0);
+
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+        when(blockRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootBlock));
+        when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of());
+        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
+                eq(List.of(rootId)),
+                eq(rootId),
+                eq(0),
+                eq(ACTOR_ID),
+                any(LocalDateTime.class)
+        )).thenReturn(0);
+
+        assertThatThrownBy(() -> blockService.delete(rootId, 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.CONFLICT);
     }
 
     private Document document(UUID documentId) {
