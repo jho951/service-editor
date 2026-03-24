@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.documents.domain.Document;
+import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
@@ -49,6 +50,7 @@ public class DocumentServiceImpl implements DocumentService {
 			.title(normalizedTitle)
 			.iconJson(iconJson)
 			.coverJson(coverJson)
+			.visibility(DocumentVisibility.PRIVATE)
 			.sortKey(nextSortKey)
 			.createdBy(normalizedActorId)
 			.updatedBy(normalizedActorId)
@@ -101,6 +103,25 @@ public class DocumentServiceImpl implements DocumentService {
 		document.setParent(parentDocument);
 		document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
 
+		return document;
+	}
+
+	@Override
+	@Transactional
+	public Document updateVisibility(UUID documentId, DocumentVisibility visibility, Integer version, String actorId) {
+		Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
+			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+
+		if (!Objects.equals(document.getVersion(), version)) {
+			throw new BusinessException(BusinessErrorCode.CONFLICT);
+		}
+
+		if (document.getVisibility() == visibility) {
+			return document;
+		}
+
+		document.setVisibility(visibility);
+		document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
 		return document;
 	}
 

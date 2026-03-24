@@ -27,6 +27,7 @@ import com.documents.api.support.ApiResponseAssertions;
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
 import com.documents.domain.Document;
+import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
@@ -1490,6 +1491,149 @@ class DocumentControllerWebMvcTest {
 				"""));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+	}
+
+	@Test
+	@DisplayName("성공_PRIVATE 문서 공개 상태를 PUBLIC으로 수정하면 수정 응답을 반환한다")
+	void updateDocumentVisibilityReturnsEnvelope() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 4,
+			"00000000000000000007",
+			ICON_DOC_JSON,
+			COVER_1_JSON);
+		document.setVisibility(DocumentVisibility.PUBLIC);
+
+		when(documentService.updateVisibility(
+			eq(documentId),
+			eq(DocumentVisibility.PUBLIC),
+			eq(3),
+			eq(ACTOR_ID)
+		)).thenReturn(document);
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "visibility": "PUBLIC",
+					  "version": 3
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.visibility").value("PUBLIC"))
+			.andExpect(jsonPath("$.data.version").value(4));
+	}
+
+	@Test
+	@DisplayName("성공_PUBLIC 문서 공개 상태를 PRIVATE로 수정하면 수정 응답을 반환한다")
+	void updateDocumentVisibilityReturnsEnvelopeWhenChangingPublicToPrivate() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 6,
+			"00000000000000000007",
+			ICON_DOC_JSON,
+			COVER_1_JSON);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+
+		when(documentService.updateVisibility(
+			eq(documentId),
+			eq(DocumentVisibility.PRIVATE),
+			eq(5),
+			eq(ACTOR_ID)
+		)).thenReturn(document);
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "visibility": "PRIVATE",
+					  "version": 5
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+			.andExpect(jsonPath("$.data.version").value(6));
+	}
+
+	@Test
+	@DisplayName("성공_동일 공개 상태 요청이면 기존 version을 유지한 응답을 반환한다")
+	void updateDocumentVisibilityReturnsSameVersionWhenRequestedStateIsSame() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 7,
+			"00000000000000000007",
+			ICON_DOC_JSON,
+			COVER_1_JSON);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+
+		when(documentService.updateVisibility(
+			eq(documentId),
+			eq(DocumentVisibility.PRIVATE),
+			eq(7),
+			eq(ACTOR_ID)
+		)).thenReturn(document);
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "visibility": "PRIVATE",
+					  "version": 7
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+			.andExpect(jsonPath("$.data.version").value(7));
+	}
+
+	@Test
+	@DisplayName("실패_공개 상태 변경 요청 version이 현재 문서와 다르면 충돌 응답을 반환한다")
+	void updateDocumentVisibilityReturnsConflictWhenVersionMismatch() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		when(documentService.updateVisibility(
+			eq(documentId),
+			eq(DocumentVisibility.PRIVATE),
+			eq(2),
+			eq(ACTOR_ID)
+		)).thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "visibility": "PRIVATE",
+				  "version": 2
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
+	}
+
+	@Test
+	@DisplayName("실패_허용되지 않은 공개 상태값이면 유효성 검사 오류를 반환한다")
+	void updateDocumentVisibilityRejectsInvalidVisibility() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "visibility": "INTERNAL",
+				  "version": 2
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+		verifyNoInteractions(documentService);
 	}
 
 	@Test

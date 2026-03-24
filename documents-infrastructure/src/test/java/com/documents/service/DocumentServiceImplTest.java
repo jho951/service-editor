@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.documents.domain.Document;
+import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
@@ -468,6 +469,80 @@ class DocumentServiceImplTest {
 		assertThat(document.getTitle()).isEqualTo("기존 제목");
 		assertThat(document.getUpdatedBy()).isEqualTo("old-user");
 		verify(textNormalizer, never()).normalizeRequired(anyString());
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("성공_PUBLIC 문서를 PRIVATE로 변경하면 version 증가 대상 상태로 갱신한다")
+	void updateVisibilityChangesPublicToPrivate() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "문서", "00000000000000000001");
+		document.setVersion(3);
+		document.setVisibility(DocumentVisibility.PUBLIC);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
+
+		Document result = documentService.updateVisibility(documentId, DocumentVisibility.PRIVATE, 3, " user-456 ");
+
+		assertThat(result).isSameAs(document);
+		assertThat(result.getVisibility()).isEqualTo(DocumentVisibility.PRIVATE);
+		assertThat(result.getUpdatedBy()).isEqualTo("user-456");
+	}
+
+	@Test
+	@DisplayName("성공_PRIVATE 문서를 PUBLIC으로 변경하면 version 증가 대상 상태로 갱신한다")
+	void updateVisibilityChangesPrivateToPublic() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "문서", "00000000000000000001");
+		document.setVersion(4);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		Document result = documentService.updateVisibility(documentId, DocumentVisibility.PUBLIC, 4, ACTOR_ID);
+
+		assertThat(result).isSameAs(document);
+		assertThat(result.getVisibility()).isEqualTo(DocumentVisibility.PUBLIC);
+		assertThat(result.getUpdatedBy()).isEqualTo(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("성공_동일 공개 상태 요청이면 no-op으로 처리하고 updatedBy를 바꾸지 않는다")
+	void updateVisibilityDoesNothingWhenRequestedStateIsSame() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "문서", "00000000000000000001");
+		document.setVersion(5);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+		Document result = documentService.updateVisibility(documentId, DocumentVisibility.PRIVATE, 5, ACTOR_ID);
+
+		assertThat(result).isSameAs(document);
+		assertThat(result.getVisibility()).isEqualTo(DocumentVisibility.PRIVATE);
+		assertThat(result.getUpdatedBy()).isEqualTo("old-user");
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_공개 상태 변경 요청 version이 현재 문서와 다르면 충돌 예외를 던진다")
+	void updateVisibilityThrowsWhenVersionMismatch() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "문서", "00000000000000000001");
+		document.setVersion(6);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+		assertThatThrownBy(() -> documentService.updateVisibility(documentId, DocumentVisibility.PUBLIC, 5, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.CONFLICT);
+
+		assertThat(document.getVisibility()).isEqualTo(DocumentVisibility.PRIVATE);
+		assertThat(document.getUpdatedBy()).isEqualTo("old-user");
 		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
 	}
 
