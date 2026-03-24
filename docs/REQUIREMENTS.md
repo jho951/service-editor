@@ -371,11 +371,14 @@ Block {
 ## 8.3 문서 수정
 ### 요구사항
 - 문서 제목, 아이콘, 커버를 수정할 수 있어야 한다.
+- 문서 공개 상태를 `PUBLIC`, `PRIVATE` 두 값으로 수정할 수 있어야 한다.
 - 낡은 버전으로 수정 요청 시 `409 Conflict`를 반환해야 한다.
 
 ### 결과 조건
 - 문서 수정 API는 메타데이터 수정만 담당해야 한다.
 - 부모 변경, 형제 순서 변경, 구조 이동은 별도 move API에서 처리해야 한다.
+- 제목, 아이콘, 커버, 공개 상태가 실제로 변경되면 `Document.version`은 정확히 `1` 증가해야 한다.
+- 요청 내용이 현재 상태와 완전히 같으면 no-op으로 처리하고 `Document.version`을 증가시키지 않아야 한다.
 
 ## 8.4 문서 이동 / 순서 변경
 ### 요구사항
@@ -475,10 +478,23 @@ Block {
 ## 8.11 버전 관리
 ### 요구사항
 - 문서와 블록은 각각 `version` 필드를 가져야 한다.
-- 수정 시 버전이 증가해야 한다.
+- `Document.version`은 문서 메타데이터, 문서 내부 block tree, 공개 상태를 포함한 문서 전체 상태의 대표 버전이어야 한다.
+- `Block.version`은 개별 block 동시성 검사용 버전으로 유지해야 한다.
+- 제목, 아이콘, 커버, 부모, 공개 상태가 실제로 바뀌면 `Document.version`이 증가해야 한다.
+- 블록 생성, 수정, 이동, 삭제가 실제로 반영되면 해당 문서의 `Document.version`이 증가해야 한다.
+- 한 요청 안에서 문서에 실제 반영된 변경이 하나 이상 있으면 `Document.version`은 정확히 `1`만 증가해야 한다.
+- no-op 요청이면 `Document.version`과 `Block.version`을 증가시키지 않아야 한다.
 - stale version 요청은 `409 Conflict`를 반환해야 한다.
 - 충돌 검출이 필요한 저장 또는 구조 변경 요청은 클라이언트가 기준으로 삼은 `version`을 함께 전달해야 한다.
 - 서버는 요청의 `version`과 현재 저장된 `version`을 비교해 stale update를 검출할 수 있어야 한다.
+
+### 버전 역할 분리
+- `Document.version`은 프론트가 문서 전체 freshness를 판단하는 기준값이다.
+- `Block.version`은 특정 block 하나의 수정 또는 이동 충돌을 검출하는 기준값이다.
+- 프론트는 문서 진입 시 문서 조회 응답의 `Document.version`을 기준값으로 저장해야 한다.
+- 문서 메타 수정 성공 시에는 응답의 최신 `Document.version`으로 기준값을 갱신해야 한다.
+- transaction 저장 성공 시에는 응답의 `documentVersion`으로 기준값을 갱신해야 한다.
+- 단건 block API 응답이 최신 `Document.version`을 포함하지 않는 경우 프론트는 문서 조회 응답 또는 transaction 응답의 문서 version을 기준값으로 사용해야 한다.
 
 ### 버전 충돌 예시 시나리오
 1. 현재 DB의 block version이 `5`이고 content는 `"오늘 회의"`를 표현하는 JSON이다.
@@ -488,6 +504,14 @@ Block {
 5. 사용자 B는 여전히 예전 화면 `"오늘 회의"`를 보고 content를 `"오늘 회의 취소"`가 되도록 바꾼 뒤 몇 초 후 저장한다.
 6. 사용자 B가 version 없이 저장하면 서버는 최신 row를 다시 읽어 `"오늘 회의 취소"`를 덮어쓸 수 있고, 사용자 A의 `"3시"` 수정이 조용히 사라질 수 있다.
 7. 사용자 B가 충돌 검출용 request에 version `5`를 함께 보내면 서버는 현재 DB version `6`과 비교해 stale update로 판단하고 `409 Conflict`를 반환할 수 있다.
+
+### 문서 전체 version 예시 시나리오
+1. 사용자가 문서 조회 응답에서 `Document.version = 10`을 받는다.
+2. 다른 사용자가 같은 문서의 제목을 수정하면 문서 메타데이터가 바뀌므로 `Document.version`은 `11`이 된다.
+3. 다른 사용자가 블록을 하나 수정해도 문서 내부 block tree가 바뀌므로 `Document.version`은 다시 `12`가 된다.
+4. 다른 사용자가 공개 상태를 `PRIVATE`에서 `PUBLIC`으로 바꿔도 문서 전체 상태가 바뀌므로 `Document.version`은 다시 `13`이 된다.
+5. 반대로 같은 공개 상태를 다시 요청하거나 실제 위치가 바뀌지 않는 block move처럼 no-op이면 `Document.version`은 유지된다.
+6. 프론트는 자신이 보관한 기준값과 최신 응답의 `Document.version`이 다르면 현재 화면을 stale 상태로 판단할 수 있어야 한다.
 
 ---
 
@@ -697,6 +721,14 @@ Block {
 ### `PATCH /v1/documents/{documentId}`
 문서 메타데이터 수정.
 
+### `PATCH /v1/documents/{documentId}/visibility`
+문서 공개 상태 수정.
+- 요청 body는 `visibility`, `version`을 포함해야 한다.
+- `visibility`는 `PUBLIC`, `PRIVATE`만 허용해야 한다.
+- 요청의 `version`이 현재 `Document.version`과 다르면 `409 Conflict`를 반환해야 한다.
+- 상태가 실제로 바뀌면 `Document.version`을 `1` 증가시켜야 한다.
+- 같은 상태를 다시 요청하면 no-op으로 처리하고 `Document.version`을 증가시키지 않아야 한다.
+
 ### `POST /v1/documents/{documentId}/move`
 문서 부모 변경 및 형제 순서 변경.
 
@@ -806,7 +838,7 @@ TEXT 블록 생성.
 - 기존 block 수정/이동/삭제 operation의 `blockRef`에는 서버가 내려준 실제 `blockId`를 넣어야 한다.
 - 새 block은 request에서 `blockRef=tempId`로 참조하고, 성공 응답에서 서버가 생성한 실제 `blockId`와 `tempId -> blockId` 매핑을 반환해야 한다.
 - 서버는 request 순서대로 `blockRef`, `parentRef`, `afterRef`, `beforeRef`의 temp 참조를 해석할 수 있어야 한다.
-- 동시성 검사는 block별 `version`으로만 처리해야 한다.
+- 동시성 검사는 `Document.version`과 block별 `version`을 함께 사용해야 한다.
 - 서버는 batch 안에 실제 editor 변경이 하나라도 적용되면 `Document.version`을 증가시키고, 응답에 최신 `documentVersion`을 포함해야 한다.
 - `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`가 모두 no-op이면 block version과 `documentVersion`을 올리지 않아야 한다.
 - 하나의 operation이라도 실패하면 전체 rollback을 적용해야 한다.
