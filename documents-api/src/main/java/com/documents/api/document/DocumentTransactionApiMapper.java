@@ -22,7 +22,6 @@ public class DocumentTransactionApiMapper {
         return new DocumentTransactionCommand(
                 request.getClientId(),
                 request.getBatchId(),
-                request.getDocumentVersion(),
                 request.getOperations().stream()
                         .map(this::toCommand)
                         .toList()

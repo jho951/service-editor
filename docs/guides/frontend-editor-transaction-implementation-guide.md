@@ -130,9 +130,8 @@
 
 주의:
 
-- transaction top-level에는 `clientId`, `batchId`, `documentVersion`, `operations`를 담는다.
+- transaction top-level에는 `clientId`, `batchId`, `operations`를 담는다.
 - 동시성 기준은 문서 전체 snapshot이 아니라 각 block operation의 `version`이다.
-- 서버는 request의 `documentVersion`이 현재 문서와 같다고 선검증하지 않는다.
 - 성공 응답의 `documentVersion`은 최신 문서 snapshot으로 갱신해 로컬 상태에 반영한다.
 - temp block 대상 `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`에는 여전히 `version`을 넣지 않는다.
 

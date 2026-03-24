@@ -163,3 +163,10 @@
 - mixed/batch 요청에서 latch가 "요청 수"가 아니라 "내부 service method invocation 수"를 세던 취약점을 없애고, 실제 API 1회 호출 기준 transaction 전체 순서를 검증하도록 정리했다.
 - 더 이상 쓰지 않는 `blockService` spy와 `serializeConcurrentUpdates/Moves/Deletes/...` 헬퍼를 제거하고, 모든 결정적 동시성 테스트가 `serializeConcurrentTransactions(...)`만 사용하도록 단순화했다.
 - 검증은 `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`로 확인한다.
+
+## Step 24. transaction request에서 documentVersion 제거
+
+- transaction request top-level에서는 더 이상 `documentVersion`을 받지 않고, `clientId`, `batchId`, `operations`만 사용하도록 DTO와 command 매핑을 정리했다.
+- 응답의 `documentVersion`과 성공 시 `Document.version` 증가 로직은 그대로 유지해, 서버가 확정한 최신 문서 snapshot만 클라이언트에 내려주도록 유지했다.
+- WebMvc, service, boot 통합 테스트의 request JSON과 helper 시그니처에서 `documentVersion` 입력을 제거하고, 관련 validation 테스트도 삭제했다.
+- 요구사항, save model explainer, frontend guide를 같은 계약으로 갱신했다.

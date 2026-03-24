@@ -60,7 +60,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -111,7 +110,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-delete",
                                   "operations": [
                                     {
@@ -149,7 +147,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-move",
                                   "operations": [
                                     {
@@ -187,7 +184,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-temp-move",
                                   "operations": [
                                     {
@@ -230,7 +226,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-temp-move-replace",
                                   "operations": [
                                     {
@@ -294,7 +289,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-no-op-then-replace",
                                   "operations": [
                                     {
@@ -346,7 +340,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-no-op-replace-then-move",
                                   "operations": [
                                     {
@@ -397,7 +390,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-mixed-sequence",
                                   "operations": [
                                     {
@@ -485,7 +477,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-delete-temp",
                                   "operations": [
                                     {
@@ -522,7 +513,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-delete-then-replace",
                                   "operations": [
                                     {
@@ -572,7 +562,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-delete-then-move",
                                   "operations": [
                                     {
@@ -613,7 +602,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-delete-child-then-replace",
                                   "operations": [
                                     {
@@ -667,7 +655,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-stale-real-block",
                                   "operations": [
                                     {
@@ -721,7 +708,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-real-block-chain",
                                   "operations": [
                                     {
@@ -795,7 +781,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-real-block-delete-chain",
                                   "operations": [
                                     {
@@ -858,7 +843,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-inconsistent-base-version",
                                   "operations": [
                                     {
@@ -910,7 +894,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-missing-version-replace",
                                   "operations": [
                                     {
@@ -949,7 +932,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-missing-version-move",
                                   "operations": [
                                     {
@@ -977,7 +959,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-temp-delete",
                                   "operations": [
                                     {
@@ -1012,7 +993,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-temp-replace-delete",
                                   "operations": [
                                     {
@@ -1063,7 +1043,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-temp-move-delete",
                                   "operations": [
                                     {
@@ -1104,7 +1083,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-temp-delete-with-version",
                                   "operations": [
                                     {
@@ -1138,7 +1116,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-existing-delete-without-version",
                                   "operations": [
                                     {
@@ -1165,7 +1142,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-temp-delete-then-replace",
                                   "operations": [
                                     {
@@ -1215,7 +1191,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-temp-delete-then-move",
                                   "operations": [
                                     {
@@ -1256,7 +1231,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-replace-no-op-delete",
                                   "operations": [
                                     {
@@ -1306,7 +1280,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-move-no-op-delete",
                                   "operations": [
                                     {
@@ -1349,7 +1322,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-delete-conflict",
                                   "operations": [
                                     {
@@ -1390,7 +1362,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1434,7 +1405,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1467,7 +1437,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-move-conflict",
                                   "operations": [
                                     {
@@ -1508,7 +1477,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1539,7 +1507,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1575,7 +1542,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1608,7 +1574,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1641,7 +1606,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1675,7 +1639,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1708,7 +1671,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1739,7 +1701,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-no-op-move",
                                   "operations": [
                                     {
@@ -1772,7 +1733,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1816,7 +1776,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-no-op-replace",
                                   "operations": [
                                     {
@@ -1857,7 +1816,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1887,7 +1845,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1916,7 +1873,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1945,7 +1901,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -1975,7 +1930,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2005,7 +1959,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2069,7 +2022,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2109,7 +2061,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2201,7 +2152,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2230,7 +2180,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2259,7 +2208,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2288,7 +2236,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2324,7 +2271,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {
@@ -2354,7 +2300,6 @@ class DocumentTransactionApiIntegrationTest {
                         .content("""
                                 {
                                   "clientId": "web-editor",
-                      "documentVersion": 0,
                                   "batchId": "batch-1",
                                   "operations": [
                                     {

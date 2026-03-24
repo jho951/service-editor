@@ -158,7 +158,6 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
-                      "documentVersion": 0,
 					  "batchId": "batch-1",
 					  "operations": [
 						    {
@@ -232,7 +231,6 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
-                      "documentVersion": 0,
 					  "batchId": "batch-delete",
 					  "operations": [
 					    {
@@ -283,7 +281,6 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
-                      "documentVersion": 0,
 					  "batchId": "batch-move",
 					  "operations": [
 					    {
@@ -336,7 +333,6 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
-                      "documentVersion": 0,
 					  "batchId": "batch-move-no-version",
 					  "operations": [
 					    {
@@ -386,7 +382,6 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
-                      "documentVersion": 0,
 					  "batchId": "batch-no-op",
 					  "operations": [
 					    {
@@ -434,7 +429,6 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
-                      "documentVersion": 0,
 					  "batchId": "batch-no-op-replace",
 					  "operations": [
 					    {
@@ -463,29 +457,6 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
-	@DisplayName("실패_documentVersion이 없으면 유효성 검사 오류를 반환한다")
-	void applyTransactionsRejectsMissingDocumentVersion() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
-			.contentType("application/json")
-			.header(USER_ID_HEADER, ACTOR_ID)
-			.content("""
-				{
-				  "clientId": "web-editor",
-				  "batchId": "batch-1",
-				  "operations": [
-				    {
-				      "opId": "op-1",
-				      "type": "BLOCK_CREATE",
-				      "blockRef": "tmp:block:1"
-				    }
-				  ]
-				}
-				"""));
-
-		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-	}
-
-	@Test
 	@DisplayName("실패_replace_content에 content가 없으면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsReplaceContentWithoutContent() throws Exception {
 		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
@@ -494,7 +465,6 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
-                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -518,7 +488,6 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
-                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -552,7 +521,6 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
-                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -577,7 +545,6 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
-                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -600,7 +567,6 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
-                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -656,7 +622,6 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "clientId": "web-editor",
-                      "documentVersion": 0,
 					  "batchId": "batch-delete-no-version",
 					  "operations": [
 					    {
@@ -681,7 +646,6 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
-                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -719,7 +683,6 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
-                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {
@@ -756,7 +719,6 @@ class DocumentControllerWebMvcTest {
 			.content("""
 				{
 				  "clientId": "web-editor",
-                      "documentVersion": 0,
 				  "batchId": "batch-1",
 				  "operations": [
 				    {

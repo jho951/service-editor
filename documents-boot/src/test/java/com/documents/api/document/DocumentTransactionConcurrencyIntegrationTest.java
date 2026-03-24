@@ -174,7 +174,6 @@ class DocumentTransactionConcurrencyIntegrationTest {
                 """
                         {
                           "clientId": "web-editor",
-                          "documentVersion": 0,
                           "batchId": "batch-chain",
                           "operations": [
                             {
@@ -875,14 +874,9 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     private String replaceContentRequest(String batchId, UUID blockId, int version, String text) {
-        return replaceContentRequest(batchId, 0, blockId, version, text);
-    }
-
-    private String replaceContentRequest(String batchId, int documentVersion, UUID blockId, int version, String text) {
         return """
                 {
                   "clientId": "web-editor",
-                  "documentVersion": %d,
                   "batchId": "%s",
                   "operations": [
                     {
@@ -903,7 +897,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
                     }
                   ]
                 }
-                """.formatted(documentVersion, batchId, blockId, version, text);
+                """.formatted(batchId, blockId, version, text);
     }
 
     private String moveRequest(String batchId, UUID blockId, int version, UUID parentId) {
@@ -913,7 +907,6 @@ class DocumentTransactionConcurrencyIntegrationTest {
         return """
                 {
                   "clientId": "web-editor",
-                  "documentVersion": 0,
                   "batchId": "%s",
                   "operations": [
                     {
@@ -931,7 +924,6 @@ class DocumentTransactionConcurrencyIntegrationTest {
         return """
                 {
                   "clientId": "web-editor",
-                  "documentVersion": 0,
                   "batchId": "%s",
                   "operations": [
                     {
@@ -948,7 +940,6 @@ class DocumentTransactionConcurrencyIntegrationTest {
         return """
                 {
                   "clientId": "web-editor",
-                  "documentVersion": 0,
                   "batchId": "%s",
                   "operations": [
                     {

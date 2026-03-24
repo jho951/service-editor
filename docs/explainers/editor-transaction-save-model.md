@@ -72,8 +72,7 @@
 - `GET /v1/documents/{documentId}/blocks`
 - `POST /v1/documents/{documentId}/transactions`
 
-쓰기 요청 top-level은 `clientId`, `batchId`, `documentVersion`, `operations`를 사용한다.
-다만 서버는 transaction 시작 시 request `documentVersion`과 현재 문서 version의 일치 여부를 선검증하지 않는다.
+쓰기 요청 top-level은 `clientId`, `batchId`, `operations`를 사용한다.
 동시성 검사는 transaction 전체의 문서 snapshot이 아니라 각 block operation의 `version`으로 처리한다.
 batch 안에 실제 editor 변경이 하나라도 반영되면 응답에는 증가한 최신 `documentVersion`이 내려간다.
 
