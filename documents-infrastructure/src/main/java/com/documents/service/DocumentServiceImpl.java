@@ -74,13 +74,30 @@ public class DocumentServiceImpl implements DocumentService {
 	@Override
 	@Transactional
 	public Document update(UUID documentId, String title, String iconJson, String coverJson, UUID parentId,
-		String actorId) {
+		Integer version, String actorId) {
 		Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
 			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
+		if (!Objects.equals(document.getVersion(), version)) {
+			throw new BusinessException(BusinessErrorCode.CONFLICT);
+		}
+
 		Document parentDocument = findValidParentForUpdate(document, documentId, parentId);
-		applyTitle(document, title);
-		applyMetadata(document, iconJson, coverJson);
+
+		String nextTitle = title == null ? document.getTitle() : textNormalizer.normalizeRequired(title);
+		String nextIconJson = normalizeNullableMetaJson(iconJson);
+		String nextCoverJson = normalizeNullableMetaJson(coverJson);
+
+		if (Objects.equals(document.getTitle(), nextTitle)
+			&& Objects.equals(document.getIconJson(), nextIconJson)
+			&& Objects.equals(document.getCoverJson(), nextCoverJson)
+			&& Objects.equals(document.getParentId(), parentId)) {
+			return document;
+		}
+
+		document.setTitle(nextTitle);
+		document.setIconJson(nextIconJson);
+		document.setCoverJson(nextCoverJson);
 		document.setParent(parentDocument);
 		document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
 
@@ -211,19 +228,6 @@ public class DocumentServiceImpl implements DocumentService {
 
 		validateNoCycle(document.getId(), parentDocument);
 		return parentDocument;
-	}
-
-	private void applyTitle(Document document, String title) {
-		if (title == null) {
-			return;
-		}
-
-		document.setTitle(textNormalizer.normalizeRequired(title));
-	}
-
-	private void applyMetadata(Document document, String iconJson, String coverJson) {
-		document.setIconJson(normalizeNullableMetaJson(iconJson));
-		document.setCoverJson(normalizeNullableMetaJson(coverJson));
 	}
 
 	private void validateNoCycle(UUID documentId, Document parentDocument) {

@@ -114,6 +114,7 @@ public class DocumentController {
 			documentApiMapper.serializeIcon(request),
 			documentApiMapper.serializeCover(request),
 			request.getParentId(),
+			request.getVersion(),
 			userId
 		);
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,4 +34,8 @@ public class UpdateDocumentRequest {
 
 	@Schema(description = "부모 문서 ID", nullable = true)
 	private UUID parentId;
+
+	@NotNull
+	@Schema(description = "클라이언트가 기준으로 삼은 문서 버전", example = "3", nullable = false)
+	private Integer version;
 }

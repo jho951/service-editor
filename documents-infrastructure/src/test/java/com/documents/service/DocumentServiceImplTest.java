@@ -230,6 +230,7 @@ class DocumentServiceImplTest {
 		UUID documentId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		document.setVersion(3);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
 		document.setUpdatedBy("old-user");
@@ -246,6 +247,7 @@ class DocumentServiceImplTest {
 			null,
 			null,
 			parentId,
+			3,
 			" user-456 "
 		);
 
@@ -263,6 +265,7 @@ class DocumentServiceImplTest {
 		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		document.setVersion(4);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
 		document.setUpdatedBy("old-user");
@@ -280,6 +283,7 @@ class DocumentServiceImplTest {
 			"{\"type\":\"emoji\",\"value\":\"😀\"}",
 			"{\"type\":\"image\",\"value\":\"cover-1\"}",
 			null,
+			4,
 			ACTOR_ID
 		);
 
@@ -296,6 +300,7 @@ class DocumentServiceImplTest {
 		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		Document document = document(documentId, workspaceId, UUID.randomUUID(), "기존 제목", "00000000000000000001");
+		document.setVersion(5);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
 		document.setUpdatedBy("old-user");
@@ -306,7 +311,7 @@ class DocumentServiceImplTest {
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
 		Document result = documentService.update(documentId, null, "{\"type\":\"emoji\",\"value\":\"📄\"}", null, null,
-			ACTOR_ID);
+			5, ACTOR_ID);
 
 		assertThat(result.getTitle()).isEqualTo("기존 제목");
 		assertThat(result.getParentId()).isNull();
@@ -320,6 +325,7 @@ class DocumentServiceImplTest {
 	void updateDocumentStoresNullUpdatedByWhenActorBlank() {
 		UUID documentId = UUID.randomUUID();
 		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
+		document.setVersion(6);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
 		document.setUpdatedBy("old-user");
@@ -337,6 +343,7 @@ class DocumentServiceImplTest {
 			"{\"type\":\"emoji\",\"value\":\"😀\"}",
 			"{\"type\":\"image\",\"value\":\"cover-1\"}",
 			null,
+			6,
 			" "
 		);
 
@@ -345,13 +352,49 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("성공_변경 내용이 모두 같으면 no-op으로 처리하고 updatedBy를 바꾸지 않는다")
+	void updateDocumentDoesNothingWhenRequestedStateIsSame() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		document.setVersion(7);
+		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
+		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(textNormalizer.normalizeRequired("기존 제목")).thenReturn("기존 제목");
+		when(textNormalizer.normalizeNullable("{\"type\":\"emoji\",\"value\":\"😀\"}"))
+			.thenReturn("{\"type\":\"emoji\",\"value\":\"😀\"}");
+		when(textNormalizer.normalizeNullable("{\"type\":\"image\",\"value\":\"cover-1\"}"))
+			.thenReturn("{\"type\":\"image\",\"value\":\"cover-1\"}");
+
+		Document result = documentService.update(
+			documentId,
+			"기존 제목",
+			"{\"type\":\"emoji\",\"value\":\"😀\"}",
+			"{\"type\":\"image\",\"value\":\"cover-1\"}",
+			null,
+			7,
+			ACTOR_ID
+		);
+
+		assertThat(result).isSameAs(document);
+		assertThat(result.getTitle()).isEqualTo("기존 제목");
+		assertThat(result.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"😀\"}");
+		assertThat(result.getCoverJson()).isEqualTo("{\"type\":\"image\",\"value\":\"cover-1\"}");
+		assertThat(result.getUpdatedBy()).isEqualTo("old-user");
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+	}
+
+	@Test
 	@DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 예외를 던진다")
 	void updateDocumentThrowsWhenParentIsSelf() {
 		UUID documentId = UUID.randomUUID();
 		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
+		document.setVersion(1);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 
-		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, documentId, ACTOR_ID))
+		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, documentId, 1, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
@@ -363,11 +406,12 @@ class DocumentServiceImplTest {
 		UUID documentId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
+		document.setVersion(1);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId))
 			.thenReturn(Optional.of(parentDocument(parentId, UUID.randomUUID())));
 
-		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, parentId, ACTOR_ID))
+		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, parentId, 1, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
@@ -379,10 +423,11 @@ class DocumentServiceImplTest {
 		UUID documentId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
+		document.setVersion(1);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, parentId, ACTOR_ID))
+		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, parentId, 1, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
@@ -395,14 +440,35 @@ class DocumentServiceImplTest {
 		UUID documentId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
 		Document document = document(documentId, workspaceId, null, "루트 문서", "00000000000000000001");
+		document.setVersion(2);
 		Document childDocument = document(childId, workspaceId, documentId, "하위 문서", "00000000000000000002");
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(childId)).thenReturn(Optional.of(childDocument));
 
-		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, childId, ACTOR_ID))
+		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, childId, 2, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
 			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+	}
+
+	@Test
+	@DisplayName("실패_요청 version이 현재 문서 version과 다르면 충돌 예외를 던진다")
+	void updateDocumentThrowsWhenVersionMismatch() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
+		document.setVersion(3);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+		assertThatThrownBy(() -> documentService.update(documentId, "새 제목", null, null, null, 2, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.CONFLICT);
+
+		assertThat(document.getTitle()).isEqualTo("기존 제목");
+		assertThat(document.getUpdatedBy()).isEqualTo("old-user");
+		verify(textNormalizer, never()).normalizeRequired(anyString());
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
 	}
 
 	@Test
