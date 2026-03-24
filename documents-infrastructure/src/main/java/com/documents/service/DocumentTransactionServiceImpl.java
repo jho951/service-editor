@@ -40,7 +40,6 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
     @Transactional
     public DocumentTransactionResult apply(UUID documentId, DocumentTransactionCommand command, String actorId) {
         Document document = findActiveDocument(documentId);
-        validateDocumentVersion(command.documentVersion(), document);
 
         Map<String, BlockReferenceContext> blockReferenceContexts = new HashMap<>();
         List<DocumentTransactionAppliedOperationResult> appliedOperations = new ArrayList<>();
@@ -65,7 +64,7 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
 
         Integer documentVersion = document.getVersion();
         if (hasEditorChange(appliedOperations)) {
-            documentVersion = incrementDocumentVersion(documentId, documentVersion, actorId);
+            documentVersion = incrementDocumentVersion(documentId, actorId);
         }
 
         return new DocumentTransactionResult(documentId, documentVersion, command.batchId(), appliedOperations);
@@ -360,28 +359,18 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
     }
 
-    private void validateDocumentVersion(Integer documentVersion, Document document) {
-        if (documentVersion == null) {
-            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
-        }
-
-        if (!document.getVersion().equals(documentVersion)) {
-            throw new BusinessException(BusinessErrorCode.CONFLICT);
-        }
-    }
-
     private boolean hasEditorChange(List<DocumentTransactionAppliedOperationResult> appliedOperations) {
         return appliedOperations.stream()
                 .anyMatch(result -> result.status() == DocumentTransactionOperationStatus.APPLIED);
     }
 
-    private Integer incrementDocumentVersion(UUID documentId, Integer currentVersion, String actorId) {
-        int updatedRowCount = documentRepository.incrementVersion(documentId, currentVersion, actorId, LocalDateTime.now());
+    private Integer incrementDocumentVersion(UUID documentId, String actorId) {
+        int updatedRowCount = documentRepository.incrementVersion(documentId, actorId, LocalDateTime.now());
         if (updatedRowCount != 1) {
             throw new BusinessException(BusinessErrorCode.CONFLICT);
         }
 
-        return currentVersion + 1;
+        return findActiveDocument(documentId).getVersion();
     }
 
     private record BlockReferenceContext(

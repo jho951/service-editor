@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.documents.domain.Workspace;
+import com.documents.repository.BlockRepository;
+import com.documents.repository.DocumentRepository;
 import com.documents.repository.WorkspaceRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,8 +29,16 @@ class WorkspaceApiIntegrationTest {
     @Autowired
     private WorkspaceRepository workspaceRepository;
 
+    @Autowired
+    private DocumentRepository documentRepository;
+
+    @Autowired
+    private BlockRepository blockRepository;
+
     @BeforeEach
     void setUp() {
+        blockRepository.deleteAll();
+        documentRepository.deleteAll();
         workspaceRepository.deleteAll();
     }
 

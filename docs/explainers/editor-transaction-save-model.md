@@ -9,7 +9,7 @@
 - 에디터 표준 읽기/쓰기 API 경계
 - `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`의 역할
 - debounce autosave와 `Ctrl+S` flush
-- documentVersion 선검증 + block version 기반 동시성
+- block version 기반 동시성
 - 충돌 응답과 복구 방향
 
 관련 문서:
@@ -72,8 +72,9 @@
 - `GET /v1/documents/{documentId}/blocks`
 - `POST /v1/documents/{documentId}/transactions`
 
-쓰기 요청에는 top-level `documentVersion`이 들어가야 한다.
-서버는 이 값을 먼저 검증한 뒤 각 block operation의 version 검증으로 들어간다.
+쓰기 요청 top-level은 `clientId`, `batchId`, `documentVersion`, `operations`를 사용한다.
+다만 서버는 transaction 시작 시 request `documentVersion`과 현재 문서 version의 일치 여부를 선검증하지 않는다.
+동시성 검사는 transaction 전체의 문서 snapshot이 아니라 각 block operation의 `version`으로 처리한다.
 batch 안에 실제 editor 변경이 하나라도 반영되면 응답에는 증가한 최신 `documentVersion`이 내려간다.
 
 ### 보조 API

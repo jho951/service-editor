@@ -148,4 +148,18 @@
 - 경쟁형 same-block replace 테스트에 성공 응답 `documentVersion=1`, 실패 응답 `code=9005` 검증을 추가해 동시성 상황에서도 API 응답 계약이 유지되는지 확인했다.
 - same-block replace 경쟁에서 충돌 후 최신 block version과 최신 `documentVersion`으로 다시 요청하면 성공하는 retry 시나리오를 추가했다.
 - same-content replace 10건, same-position move 10건 no-op 경쟁 시나리오를 추가해 모든 요청이 `200`, operation `status=NO_OP`, block version / `documentVersion` 미증가로 유지되는지 확인했다.
+
+## Step 22. documentVersion 선검증 제거
+
+- transaction top-level `documentVersion` 필드와 응답 `documentVersion` 필드는 유지하되, 시작 시 현재 문서 version과 같다고 선검증하던 로직만 제거했다.
+- `DocumentTransactionServiceImpl`은 문서 활성 상태만 확인하고, 동시성 검사는 각 block operation의 `version`으로만 처리한다.
+- batch 안에 실제 editor 변경이 있으면 `Document.version`은 계속 증가시키고, 응답에도 최신 `documentVersion`을 내려주도록 유지했다.
+- 서로 다른 block 대상 동시 transaction은 더 이상 문서 단위 충돌로 막지 않고, 각 block version 충돌이 없는 한 함께 성공하도록 테스트를 다시 고정했다.
 - 검증은 `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`로 확인했다.
+
+## Step 23. 동시성 통합 테스트 직렬화 기준을 apply 단위로 통일
+
+- `DocumentTransactionConcurrencyIntegrationTest`의 결정적 경합 헬퍼를 `blockService` 개별 메서드가 아니라 `DocumentTransactionServiceImpl.apply(...)` 단위 하나로 통일했다.
+- mixed/batch 요청에서 latch가 "요청 수"가 아니라 "내부 service method invocation 수"를 세던 취약점을 없애고, 실제 API 1회 호출 기준 transaction 전체 순서를 검증하도록 정리했다.
+- 더 이상 쓰지 않는 `blockService` spy와 `serializeConcurrentUpdates/Moves/Deletes/...` 헬퍼를 제거하고, 모든 결정적 동시성 테스트가 `serializeConcurrentTransactions(...)`만 사용하도록 단순화했다.
+- 검증은 `:documents-boot:test --tests 'com.documents.api.document.DocumentTransactionConcurrencyIntegrationTest'`로 확인한다.

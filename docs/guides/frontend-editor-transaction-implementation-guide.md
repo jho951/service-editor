@@ -130,9 +130,11 @@
 
 주의:
 
-- 모든 transaction request top-level에는 현재 로컬 snapshot이 기준으로 삼은 `documentVersion`을 넣어야 한다.
-- 서버 응답의 `documentVersion`이 증가하면 프론트는 로컬 문서 기준 version도 즉시 갱신해야 한다.
-- no-op 응답이면 `documentVersion`은 유지될 수 있다.
+- transaction top-level에는 `clientId`, `batchId`, `documentVersion`, `operations`를 담는다.
+- 동시성 기준은 문서 전체 snapshot이 아니라 각 block operation의 `version`이다.
+- 서버는 request의 `documentVersion`이 현재 문서와 같다고 선검증하지 않는다.
+- 성공 응답의 `documentVersion`은 최신 문서 snapshot으로 갱신해 로컬 상태에 반영한다.
+- temp block 대상 `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`에는 여전히 `version`을 넣지 않는다.
 
 프론트 에디터의 일반 편집 흐름은 이 두 개가 표준이다.
 

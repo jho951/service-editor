@@ -34,7 +34,7 @@ import com.documents.domain.Workspace;
 import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
 import com.documents.repository.WorkspaceRepository;
-import com.documents.service.BlockServiceImpl;
+import com.documents.service.DocumentTransactionServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -59,19 +59,19 @@ class DocumentTransactionConcurrencyIntegrationTest {
     private ObjectMapper objectMapper;
 
     @MockitoSpyBean
-    private BlockServiceImpl blockService;
+    private DocumentTransactionServiceImpl documentTransactionService;
 
     @BeforeEach
     void setUp() {
         blockRepository.deleteAll();
         documentRepository.deleteAll();
         workspaceRepository.deleteAll();
-        Mockito.reset(blockService);
+        Mockito.reset(documentTransactionService);
     }
 
     @AfterEach
     void tearDown() {
-        Mockito.reset(blockService);
+        Mockito.reset(documentTransactionService);
     }
 
     @Test
@@ -80,7 +80,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         Document document = document("문서");
         Block block = block(document, null, "기존 블록", "000000000001000000000000");
 
-        serializeConcurrentUpdates(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> first = submitTransaction(document.getId(), replaceContentRequest("batch-a", block.getId(), 0, "첫 번째 수정"));
         Future<MvcResult> second = submitTransaction(document.getId(), replaceContentRequest("batch-b", block.getId(), 0, "두 번째 수정"));
@@ -100,7 +100,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         Block targetParent = block(document, null, "대상 부모", "000000000001000000000000");
         Block movingBlock = block(document, null, "이동 대상", "000000000002000000000000");
 
-        serializeConcurrentMoves(2);
+        serializeConcurrentTransactions(2);
 
         String requestBody = moveRequest("batch-move", movingBlock.getId(), 0, targetParent.getId());
         Future<MvcResult> first = submitTransaction(document.getId(), requestBody);
@@ -120,7 +120,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         Document document = document("문서");
         Block rootBlock = block(document, null, "삭제 대상", "000000000001000000000000");
 
-        serializeConcurrentDeletes(2);
+        serializeConcurrentTransactions(2);
 
         String requestBody = deleteRequest("batch-delete", rootBlock.getId(), 0);
         Future<MvcResult> first = submitTransaction(document.getId(), requestBody);
@@ -140,7 +140,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         Block targetParent = block(document, null, "대상 부모", "000000000001000000000000");
         Block block = block(document, null, "기존 블록", "000000000002000000000000");
 
-        serializeConcurrentUpdateAndMove(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> replace = submitTransaction(
                 document.getId(),
@@ -167,7 +167,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         Block targetParent = block(document, null, "대상 부모", "000000000001000000000000");
         Block block = block(document, null, "기존 블록", "000000000002000000000000");
 
-        serializeConcurrentUpdates(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> chainedBatch = submitTransaction(
                 document.getId(),
@@ -223,7 +223,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         Document document = document("문서");
         Block block = block(document, null, "기존 블록", "000000000001000000000000");
 
-        serializeConcurrentUpdateAndDelete(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> replace = submitTransaction(
                 document.getId(),
@@ -255,7 +255,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         Block targetParent = block(document, null, "대상 부모", "000000000001000000000000");
         Block movingBlock = block(document, null, "이동 대상", "000000000002000000000000");
 
-        serializeConcurrentMoveAndDelete(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> move = submitTransaction(
                 document.getId(),
@@ -281,13 +281,13 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     @Test
-    @DisplayName("동시성_서로 다른 block replace_content 요청도 같은 documentVersion이면 하나만 성공하고 나머지는 충돌한다")
-    void concurrentReplaceOnDifferentBlocksOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("동시성_서로 다른 block replace_content 요청은 동시에 와도 각각 성공한다")
+    void concurrentReplaceOnDifferentBlocksBothSucceed() throws Exception {
         Document document = document("문서");
         Block firstBlock = block(document, null, "첫 번째 블록", "000000000001000000000000");
         Block secondBlock = block(document, null, "두 번째 블록", "000000000002000000000000");
 
-        serializeConcurrentUpdates(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> first = submitTransaction(
                 document.getId(),
@@ -299,24 +299,25 @@ class DocumentTransactionConcurrencyIntegrationTest {
         );
 
         List<Integer> statuses = List.of(first.get().getResponse().getStatus(), second.get().getResponse().getStatus());
-        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(statuses).containsOnly(200);
 
         Block reloadedFirstBlock = blockRepository.findByIdAndDeletedAtIsNull(firstBlock.getId()).orElseThrow();
         Block reloadedSecondBlock = blockRepository.findByIdAndDeletedAtIsNull(secondBlock.getId()).orElseThrow();
-        assertThat(reloadedFirstBlock.getVersion() + reloadedSecondBlock.getVersion()).isEqualTo(1);
-        assertThat(reloadedFirstBlock.getContent().contains("\"text\":\"첫 번째 수정\"")
-                || reloadedSecondBlock.getContent().contains("\"text\":\"두 번째 수정\"")).isTrue();
+        assertThat(reloadedFirstBlock.getVersion()).isEqualTo(1);
+        assertThat(reloadedSecondBlock.getVersion()).isEqualTo(1);
+        assertThat(reloadedFirstBlock.getContent()).contains("\"text\":\"첫 번째 수정\"");
+        assertThat(reloadedSecondBlock.getContent()).contains("\"text\":\"두 번째 수정\"");
     }
 
     @Test
-    @DisplayName("동시성_서로 다른 block move 요청도 같은 documentVersion이면 하나만 성공하고 나머지는 충돌한다")
-    void concurrentMoveOnDifferentBlocksOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("동시성_서로 다른 block move 요청은 동시에 와도 각각 성공한다")
+    void concurrentMoveOnDifferentBlocksBothSucceed() throws Exception {
         Document document = document("문서");
         Block targetParent = block(document, null, "대상 부모", "000000000001000000000000");
         Block firstBlock = block(document, null, "첫 번째 이동 대상", "000000000002000000000000");
         Block secondBlock = block(document, null, "두 번째 이동 대상", "000000000003000000000000");
 
-        serializeConcurrentMoves(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> first = submitTransaction(
                 document.getId(),
@@ -328,25 +329,26 @@ class DocumentTransactionConcurrencyIntegrationTest {
         );
 
         List<Integer> statuses = List.of(first.get().getResponse().getStatus(), second.get().getResponse().getStatus());
-        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(statuses).containsOnly(200);
 
         Block reloadedFirstBlock = blockRepository.findByIdAndDeletedAtIsNull(firstBlock.getId()).orElseThrow();
         Block reloadedSecondBlock = blockRepository.findByIdAndDeletedAtIsNull(secondBlock.getId()).orElseThrow();
         long movedCount = List.of(reloadedFirstBlock, reloadedSecondBlock).stream()
                 .filter(block -> targetParent.getId().equals(block.getParentId()))
                 .count();
-        assertThat(movedCount).isEqualTo(1);
-        assertThat(reloadedFirstBlock.getVersion() + reloadedSecondBlock.getVersion()).isEqualTo(1);
+        assertThat(movedCount).isEqualTo(2);
+        assertThat(reloadedFirstBlock.getVersion()).isEqualTo(1);
+        assertThat(reloadedSecondBlock.getVersion()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("동시성_서로 다른 block delete 요청도 같은 documentVersion이면 하나만 성공하고 나머지는 충돌한다")
-    void concurrentDeleteOnDifferentBlocksOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("동시성_서로 다른 block delete 요청은 동시에 와도 각각 성공한다")
+    void concurrentDeleteOnDifferentBlocksBothSucceed() throws Exception {
         Document document = document("문서");
         Block firstBlock = block(document, null, "첫 번째 삭제 대상", "000000000001000000000000");
         Block secondBlock = block(document, null, "두 번째 삭제 대상", "000000000002000000000000");
 
-        serializeConcurrentDeletes(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> first = submitTransaction(
                 document.getId(),
@@ -358,46 +360,43 @@ class DocumentTransactionConcurrencyIntegrationTest {
         );
 
         List<Integer> statuses = List.of(first.get().getResponse().getStatus(), second.get().getResponse().getStatus());
-        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(statuses).containsOnly(200);
 
         Block reloadedFirstBlock = blockRepository.findById(firstBlock.getId()).orElseThrow();
         Block reloadedSecondBlock = blockRepository.findById(secondBlock.getId()).orElseThrow();
         long deletedCount = List.of(reloadedFirstBlock, reloadedSecondBlock).stream()
                 .filter(block -> block.getDeletedAt() != null)
                 .count();
-        assertThat(deletedCount).isEqualTo(1);
-        assertThat(List.of(reloadedFirstBlock, reloadedSecondBlock).stream()
-                .filter(block -> block.getDeletedAt() == null)
-                .findFirst()
-                .orElseThrow()
-                .getVersion()).isEqualTo(0);
+        assertThat(deletedCount).isEqualTo(2);
+        assertThat(reloadedFirstBlock.getVersion()).isEqualTo(1);
+        assertThat(reloadedSecondBlock.getVersion()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("동시성_새 block create 요청 2개가 같은 documentVersion으로 동시에 오면 하나만 성공하고 나머지는 충돌한다")
-    void concurrentCreateOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("동시성_새 block create 요청 2개는 동시에 와도 각각 성공한다")
+    void concurrentCreateBothSucceed() throws Exception {
         Document document = document("문서");
 
-        serializeConcurrentCreates(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> first = submitTransaction(document.getId(), createRequest("batch-create-first", "tmp:block:first"));
         Future<MvcResult> second = submitTransaction(document.getId(), createRequest("batch-create-second", "tmp:block:second"));
 
         List<Integer> statuses = List.of(first.get().getResponse().getStatus(), second.get().getResponse().getStatus());
-        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(statuses).containsOnly(200);
 
         List<Block> activeBlocks = blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId());
-        assertThat(activeBlocks).hasSize(1);
+        assertThat(activeBlocks).hasSize(2);
         assertThat(activeBlocks.get(0).getVersion()).isEqualTo(0);
     }
 
     @Test
-    @DisplayName("동시성_새 block create와 기존 block replace_content가 같은 documentVersion으로 동시에 오면 하나만 성공한다")
-    void concurrentCreateAndReplaceOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("동시성_새 block create와 기존 block replace_content는 동시에 와도 각각 성공한다")
+    void concurrentCreateAndReplaceBothSucceed() throws Exception {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        serializeConcurrentCreateAndUpdate(2);
+        serializeConcurrentTransactions(2);
 
         Future<MvcResult> create = submitTransaction(
                 document.getId(),
@@ -409,15 +408,13 @@ class DocumentTransactionConcurrencyIntegrationTest {
         );
 
         List<Integer> statuses = List.of(create.get().getResponse().getStatus(), replace.get().getResponse().getStatus());
-        assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        assertThat(statuses).containsOnly(200);
 
         List<Block> activeBlocks = blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId());
-        assertThat(activeBlocks).hasSizeBetween(1, 2);
+        assertThat(activeBlocks).hasSize(2);
 
         Block reloadedExistingBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
-        boolean createSucceeded = activeBlocks.size() == 2;
-        boolean replaceSucceeded = reloadedExistingBlock.getVersion() == 1;
-        assertThat(createSucceeded ^ replaceSucceeded).isTrue();
+        assertThat(reloadedExistingBlock.getVersion()).isEqualTo(1);
     }
 
     @Test
@@ -426,7 +423,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         Document document = document("문서");
         Block block = block(document, null, "기존 블록", "000000000001000000000000");
 
-        serializeConcurrentUpdates(3);
+        serializeConcurrentTransactions(3);
 
         Future<MvcResult> first = submitTransaction(document.getId(), replaceContentRequest("batch-a", block.getId(), 0, "첫 번째 수정"));
         Future<MvcResult> second = submitTransaction(document.getId(), replaceContentRequest("batch-b", block.getId(), 0, "두 번째 수정"));
@@ -450,14 +447,14 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     @Test
-    @DisplayName("동시성_서로 다른 block replace_content 요청 3개도 같은 documentVersion이면 하나만 성공한다")
-    void concurrentReplaceOnDifferentBlocksThreeWayOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("동시성_서로 다른 block replace_content 요청 3개는 동시에 와도 각각 성공한다")
+    void concurrentReplaceOnDifferentBlocksThreeWayAllSucceed() throws Exception {
         Document document = document("문서");
         Block firstBlock = block(document, null, "첫 번째 블록", "000000000001000000000000");
         Block secondBlock = block(document, null, "두 번째 블록", "000000000002000000000000");
         Block thirdBlock = block(document, null, "세 번째 블록", "000000000003000000000000");
 
-        serializeConcurrentUpdates(3);
+        serializeConcurrentTransactions(3);
 
         Future<MvcResult> first = submitTransaction(
                 document.getId(),
@@ -477,15 +474,14 @@ class DocumentTransactionConcurrencyIntegrationTest {
                 second.get().getResponse().getStatus(),
                 third.get().getResponse().getStatus()
         );
-        assertThat(statuses.stream().filter(status -> status == 200).count()).isEqualTo(1);
-        assertThat(statuses.stream().filter(status -> status == 409).count()).isEqualTo(2);
+        assertThat(statuses).containsOnly(200);
 
         List<Block> reloadedBlocks = List.of(
                 blockRepository.findByIdAndDeletedAtIsNull(firstBlock.getId()).orElseThrow(),
                 blockRepository.findByIdAndDeletedAtIsNull(secondBlock.getId()).orElseThrow(),
                 blockRepository.findByIdAndDeletedAtIsNull(thirdBlock.getId()).orElseThrow()
         );
-        assertThat(reloadedBlocks.stream().mapToInt(Block::getVersion).sum()).isEqualTo(1);
+        assertThat(reloadedBlocks.stream().mapToInt(Block::getVersion).sum()).isEqualTo(3);
     }
 
     @Test
@@ -510,7 +506,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     @Test
-    @DisplayName("경쟁형_같은 block replace_content 요청 10개에서 성공 응답은 documentVersion 1을 반환하고 실패 응답은 충돌 코드를 반환한다")
+    @DisplayName("경쟁형_같은 block replace_content 요청 10개는 성공 1건과 충돌 9건 응답 계약을 유지한다")
     void racingReplaceContentOnSameBlockTenRequestsReturnsExpectedResponseContract() throws Exception {
         Document document = document("문서");
         Block block = block(document, null, "기존 블록", "000000000001000000000000");
@@ -536,8 +532,8 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     @Test
-    @DisplayName("경쟁형_서로 다른 block replace_content 요청 10개도 같은 documentVersion이면 하나만 성공한다")
-    void racingReplaceContentOnDifferentBlocksTenRequestsOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("경쟁형_서로 다른 block replace_content 요청 10개는 동시에 보내도 모두 성공한다")
+    void racingReplaceContentOnDifferentBlocksTenRequestsAllSucceed() throws Exception {
         Document document = document("문서");
 
         List<Block> blocks = new ArrayList<>();
@@ -550,19 +546,18 @@ class DocumentTransactionConcurrencyIntegrationTest {
 
         List<Integer> statuses = submitTransactionsSimultaneously(document.getId(), requestBodies);
 
-        assertThat(statuses.stream().filter(status -> status == 200).count()).isEqualTo(1);
-        assertThat(statuses.stream().filter(status -> status == 409).count()).isEqualTo(9);
+        assertThat(statuses).containsOnly(200);
 
         int totalVersion = blocks.stream()
                 .map(block -> blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow())
                 .mapToInt(Block::getVersion)
                 .sum();
-        assertThat(totalVersion).isEqualTo(1);
+        assertThat(totalVersion).isEqualTo(10);
     }
 
     @Test
-    @DisplayName("경쟁형_새 block create 요청 10개를 같은 documentVersion으로 동시에 보내면 하나만 성공한다")
-    void racingCreateTenRequestsOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("경쟁형_새 block create 요청 10개는 동시에 보내도 모두 성공한다")
+    void racingCreateTenRequestsAllSucceed() throws Exception {
         Document document = document("문서");
 
         List<String> requestBodies = new ArrayList<>();
@@ -572,10 +567,9 @@ class DocumentTransactionConcurrencyIntegrationTest {
 
         List<Integer> statuses = submitTransactionsSimultaneously(document.getId(), requestBodies);
 
-        assertThat(statuses.stream().filter(status -> status == 200).count()).isEqualTo(1);
-        assertThat(statuses.stream().filter(status -> status == 409).count()).isEqualTo(9);
+        assertThat(statuses).containsOnly(200);
 
-        assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId())).hasSize(1);
+        assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId())).hasSize(10);
     }
 
     @Test
@@ -622,8 +616,8 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     @Test
-    @DisplayName("경쟁형_서로 다른 block move 요청 10개도 같은 documentVersion이면 하나만 성공한다")
-    void racingMoveOnDifferentBlocksTenRequestsOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("경쟁형_서로 다른 block move 요청 10개는 동시에 보내도 모두 성공한다")
+    void racingMoveOnDifferentBlocksTenRequestsAllSucceed() throws Exception {
         Document document = document("문서");
         Block targetParent = block(document, null, "대상 부모", "000000000001000000000000");
 
@@ -637,19 +631,18 @@ class DocumentTransactionConcurrencyIntegrationTest {
 
         List<Integer> statuses = submitTransactionsSimultaneously(document.getId(), requestBodies);
 
-        assertThat(statuses.stream().filter(status -> status == 200).count()).isEqualTo(1);
-        assertThat(statuses.stream().filter(status -> status == 409).count()).isEqualTo(9);
+        assertThat(statuses).containsOnly(200);
 
         long movedCount = blocks.stream()
                 .map(block -> blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow())
                 .filter(block -> targetParent.getId().equals(block.getParentId()))
                 .count();
-        assertThat(movedCount).isEqualTo(1);
+        assertThat(movedCount).isEqualTo(10);
     }
 
     @Test
-    @DisplayName("경쟁형_서로 다른 block delete 요청 10개도 같은 documentVersion이면 하나만 성공한다")
-    void racingDeleteOnDifferentBlocksTenRequestsOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("경쟁형_서로 다른 block delete 요청 10개는 동시에 보내도 모두 성공한다")
+    void racingDeleteOnDifferentBlocksTenRequestsAllSucceed() throws Exception {
         Document document = document("문서");
 
         List<Block> blocks = new ArrayList<>();
@@ -662,19 +655,18 @@ class DocumentTransactionConcurrencyIntegrationTest {
 
         List<Integer> statuses = submitTransactionsSimultaneously(document.getId(), requestBodies);
 
-        assertThat(statuses.stream().filter(status -> status == 200).count()).isEqualTo(1);
-        assertThat(statuses.stream().filter(status -> status == 409).count()).isEqualTo(9);
+        assertThat(statuses).containsOnly(200);
 
         long deletedCount = blocks.stream()
                 .map(block -> blockRepository.findById(block.getId()).orElseThrow())
                 .filter(block -> block.getDeletedAt() != null)
                 .count();
-        assertThat(deletedCount).isEqualTo(1);
+        assertThat(deletedCount).isEqualTo(10);
     }
 
     @Test
-    @DisplayName("경쟁형_새 block create 5개와 기존 block replace_content 5개를 같은 documentVersion으로 동시에 보내면 하나만 성공한다")
-    void racingCreateAndReplaceMixedRequestsOnlyOneSucceedsBecauseDocumentVersionConflicts() throws Exception {
+    @DisplayName("경쟁형_새 block create 5개와 같은 기존 block replace_content 5개를 함께 보내면 create는 모두 성공하고 replace는 block version 기준으로 충돌한다")
+    void racingCreateAndReplaceMixedRequestsKeepCreateSuccessAndBlockConflicts() throws Exception {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
@@ -686,18 +678,17 @@ class DocumentTransactionConcurrencyIntegrationTest {
 
         List<Integer> statuses = submitTransactionsSimultaneously(document.getId(), requestBodies);
 
-        assertThat(statuses.stream().filter(status -> status == 200).count()).isEqualTo(1);
-        assertThat(statuses.stream().filter(status -> status == 409).count()).isEqualTo(9);
+        assertThat(statuses.stream().filter(status -> status == 200).count()).isEqualTo(6);
+        assertThat(statuses.stream().filter(status -> status == 409).count()).isEqualTo(4);
 
         List<Block> activeBlocks = blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId());
         Block reloadedExistingBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
-        boolean createSucceeded = activeBlocks.size() == 2;
-        boolean replaceSucceeded = reloadedExistingBlock.getVersion() == 1;
-        assertThat(createSucceeded ^ replaceSucceeded).isTrue();
+        assertThat(activeBlocks).hasSize(6);
+        assertThat(reloadedExistingBlock.getVersion()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("재시도_같은 block replace_content 경쟁에서 충돌한 뒤 최신 block version과 documentVersion으로 다시 보내면 성공한다")
+    @DisplayName("재시도_같은 block replace_content 경쟁에서 충돌한 뒤 최신 block version으로 다시 보내면 성공한다")
     void retryAfterConflictWithLatestVersionsSucceeds() throws Exception {
         Document document = document("문서");
         Block block = block(document, null, "기존 블록", "000000000001000000000000");
@@ -714,14 +705,11 @@ class DocumentTransactionConcurrencyIntegrationTest {
         assertThat(raceResults.stream().filter(result -> result.getResponse().getStatus() == 409).count()).isEqualTo(1);
 
         Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow();
-        Document reloadedDocument = documentRepository.findByIdAndDeletedAtIsNull(document.getId()).orElseThrow();
-
         MvcResult retryResult = mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content(replaceContentRequest(
                                 "batch-retry",
-                                reloadedDocument.getVersion(),
                                 block.getId(),
                                 reloadedBlock.getVersion(),
                                 "재시도 성공"
@@ -735,8 +723,8 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     @Test
-    @DisplayName("경쟁형_같은 block replace_content no-op 요청 10개를 동시에 보내면 모두 성공하고 documentVersion은 유지된다")
-    void racingReplaceContentNoOpTenRequestsAllSucceedWithoutIncrementingDocumentVersion() throws Exception {
+    @DisplayName("경쟁형_같은 block replace_content no-op 요청 10개를 동시에 보내면 모두 성공하고 block version은 유지된다")
+    void racingReplaceContentNoOpTenRequestsAllSucceedWithoutIncrementingVersion() throws Exception {
         Document document = document("문서");
         Block block = block(document, null, "같은 내용", "000000000001000000000000");
 
@@ -758,14 +746,12 @@ class DocumentTransactionConcurrencyIntegrationTest {
         assertThat(operationStatuses).containsOnly("NO_OP");
 
         Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow();
-        Document reloadedDocument = documentRepository.findByIdAndDeletedAtIsNull(document.getId()).orElseThrow();
         assertThat(reloadedBlock.getVersion()).isEqualTo(0);
-        assertThat(reloadedDocument.getVersion()).isEqualTo(0);
     }
 
     @Test
-    @DisplayName("경쟁형_같은 block move no-op 요청 10개를 동시에 보내면 모두 성공하고 documentVersion은 유지된다")
-    void racingMoveNoOpTenRequestsAllSucceedWithoutIncrementingDocumentVersion() throws Exception {
+    @DisplayName("경쟁형_같은 block move no-op 요청 10개를 동시에 보내면 모두 성공하고 block version은 유지된다")
+    void racingMoveNoOpTenRequestsAllSucceedWithoutIncrementingVersion() throws Exception {
         Document document = document("문서");
         Block movingBlock = block(document, null, "이동 대상", "000000000001000000000000");
 
@@ -787,77 +773,14 @@ class DocumentTransactionConcurrencyIntegrationTest {
         assertThat(operationStatuses).containsOnly("NO_OP");
 
         Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(movingBlock.getId()).orElseThrow();
-        Document reloadedDocument = documentRepository.findByIdAndDeletedAtIsNull(document.getId()).orElseThrow();
         assertThat(reloadedBlock.getVersion()).isEqualTo(0);
-        assertThat(reloadedDocument.getVersion()).isEqualTo(0);
     }
 
-    private void serializeConcurrentUpdates(int participants) throws Exception {
+    private void serializeConcurrentTransactions(int participants) throws Exception {
         Answer<Object> answer = serializingAnswer(participants);
         Mockito.doAnswer(answer)
-                .when(blockService)
-                .update(Mockito.any(UUID.class), Mockito.anyString(), Mockito.anyInt(), Mockito.anyString());
-    }
-
-    private void serializeConcurrentCreates(int participants) throws Exception {
-        Answer<Object> answer = serializingAnswer(participants);
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .create(Mockito.any(Document.class), Mockito.any(), Mockito.any(), Mockito.anyString(), Mockito.any(), Mockito.any(), Mockito.anyString());
-    }
-
-    private void serializeConcurrentMoves(int participants) throws Exception {
-        Answer<Object> answer = serializingAnswer(participants);
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .move(Mockito.any(UUID.class), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyInt(), Mockito.anyString());
-    }
-
-    private void serializeConcurrentDeletes(int participants) throws Exception {
-        Answer<Object> answer = serializingAnswer(participants);
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .delete(Mockito.any(UUID.class), Mockito.anyInt(), Mockito.anyString());
-    }
-
-    private void serializeConcurrentCreateAndUpdate(int participants) throws Exception {
-        Answer<Object> answer = serializingAnswer(participants);
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .create(Mockito.any(Document.class), Mockito.any(), Mockito.any(), Mockito.anyString(), Mockito.any(), Mockito.any(), Mockito.anyString());
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .update(Mockito.any(UUID.class), Mockito.anyString(), Mockito.anyInt(), Mockito.anyString());
-    }
-
-    private void serializeConcurrentUpdateAndMove(int participants) throws Exception {
-        Answer<Object> answer = serializingAnswer(participants);
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .update(Mockito.any(UUID.class), Mockito.anyString(), Mockito.anyInt(), Mockito.anyString());
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .move(Mockito.any(UUID.class), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyInt(), Mockito.anyString());
-    }
-
-    private void serializeConcurrentUpdateAndDelete(int participants) throws Exception {
-        Answer<Object> answer = serializingAnswer(participants);
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .update(Mockito.any(UUID.class), Mockito.anyString(), Mockito.anyInt(), Mockito.anyString());
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .delete(Mockito.any(UUID.class), Mockito.anyInt(), Mockito.anyString());
-    }
-
-    private void serializeConcurrentMoveAndDelete(int participants) throws Exception {
-        Answer<Object> answer = serializingAnswer(participants);
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .move(Mockito.any(UUID.class), Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyInt(), Mockito.anyString());
-        Mockito.doAnswer(answer)
-                .when(blockService)
-                .delete(Mockito.any(UUID.class), Mockito.anyInt(), Mockito.anyString());
+                .when(documentTransactionService)
+                .apply(Mockito.any(UUID.class), Mockito.any(), Mockito.anyString());
     }
 
     private Answer<Object> serializingAnswer(int participants) {
@@ -935,12 +858,12 @@ class DocumentTransactionConcurrencyIntegrationTest {
         }
     }
 
-    private int extractDocumentVersion(MvcResult result) throws Exception {
-        return responseBody(result).path("data").path("documentVersion").asInt();
-    }
-
     private int extractErrorCode(MvcResult result) throws Exception {
         return responseBody(result).path("code").asInt();
+    }
+
+    private int extractDocumentVersion(MvcResult result) throws Exception {
+        return responseBody(result).path("data").path("documentVersion").asInt();
     }
 
     private String extractAppliedOperationStatus(MvcResult result) throws Exception {

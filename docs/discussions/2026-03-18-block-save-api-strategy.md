@@ -120,7 +120,7 @@
 - 클라이언트는 편집 이벤트를 즉시 로컬 적용한다.
 - 서버 전송은 block 단위 patch operation들을 짧은 구간으로 batch 묶어 보낸다.
 - 자동 저장과 수동 저장은 모두 같은 batch queue를 flush한다.
-- 서버는 `baseVersion` 또는 `documentVersion` 기준으로 검증하고, 성공 시 새 version과 적용 결과를 돌려준다.
+- 서버는 block별 `baseVersion` 기준으로 검증하고, 성공 시 새 version과 적용 결과를 돌려준다.
 
 #### 권장 API 형태
 

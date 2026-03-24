@@ -56,7 +56,7 @@ class DocumentTransactionServiceImplTest {
         documentTransactionService = new DocumentTransactionServiceImpl(blockService, blockRepository, documentRepository);
         lenient().when(documentRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
                 .thenAnswer(invocation -> Optional.of(document(invocation.getArgument(0), 0)));
-        lenient().when(documentRepository.incrementVersion(any(UUID.class), anyInt(), anyString(), any(LocalDateTime.class)))
+        lenient().when(documentRepository.incrementVersion(any(UUID.class), anyString(), any(LocalDateTime.class)))
                 .thenReturn(1);
     }
 
@@ -79,6 +79,9 @@ class DocumentTransactionServiceImplTest {
                 eq(null),
                 eq(ACTOR_ID)
         )).thenReturn(createdBlock);
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId))
+                .thenReturn(Optional.of(document(documentId, 0)))
+                .thenReturn(Optional.of(document(documentId, 1)));
         when(blockService.update(blockId, REPLACED_CONTENT, 0, ACTOR_ID)).thenReturn(updatedBlock);
         doNothing().when(blockRepository).flush();
 
@@ -123,8 +126,8 @@ class DocumentTransactionServiceImplTest {
         assertThat(result.appliedOperations().get(1).version()).isEqualTo(1);
 
         verify(blockService).update(blockId, REPLACED_CONTENT, 0, ACTOR_ID);
-        verify(documentRepository, times(1)).findByIdAndDeletedAtIsNull(documentId);
-        verify(documentRepository).incrementVersion(eq(documentId), eq(0), eq(ACTOR_ID), any(LocalDateTime.class));
+        verify(documentRepository, times(2)).findByIdAndDeletedAtIsNull(documentId);
+        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
     }
 
     @Test
@@ -248,43 +251,7 @@ class DocumentTransactionServiceImplTest {
         assertThat(result.appliedOperations().get(0).version()).isEqualTo(4);
         assertThat(result.documentVersion()).isEqualTo(0);
 
-        verify(documentRepository, never()).incrementVersion(any(UUID.class), anyInt(), anyString(), any(LocalDateTime.class));
-    }
-
-    @Test
-    @DisplayName("실패_document version이 현재 문서와 다르면 블록 검증 전에 충돌 예외를 던진다")
-    void applyRejectsWhenDocumentVersionIsStale() {
-        UUID documentId = UUID.randomUUID();
-        UUID blockId = UUID.randomUUID();
-
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId, 3)));
-
-        assertThatThrownBy(() -> documentTransactionService.apply(
-                documentId,
-                new DocumentTransactionCommand(
-                        "web-editor",
-                        "batch-stale-document",
-                        2,
-                        List.of(
-                                new DocumentTransactionOperationCommand(
-                                        "op-1",
-                                        DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT,
-                                        blockId.toString(),
-                                        0,
-                                        REPLACED_CONTENT,
-                                        null,
-                                        null,
-                                        null
-                                )
-                        )
-                ),
-                ACTOR_ID
-        )).isInstanceOf(BusinessException.class)
-                .extracting("errorCode")
-                .isEqualTo(BusinessErrorCode.CONFLICT);
-
-        verifyNoInteractions(blockService);
-        verify(blockRepository, never()).findByIdAndDeletedAtIsNull(any(UUID.class));
+        verify(documentRepository, never()).incrementVersion(any(UUID.class), anyString(), any(LocalDateTime.class));
     }
 
     @Test

@@ -779,8 +779,7 @@ TEXT 블록 생성.
 에디터 생성/저장 batch 반영.
 - 에디터의 표준 write 경로다.
 - 한 요청에 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`를 함께 담을 수 있어야 한다.
-- request top-level에는 클라이언트가 마지막으로 합의한 `documentVersion`을 포함해야 한다.
-- 서버는 block 단위 version 검사 전에 `documentVersion`을 먼저 검증해야 한다.
+- request top-level에는 클라이언트가 마지막으로 알고 있는 `documentVersion`을 포함해야 한다.
 - 기존 block 수정/이동/삭제 operation은 `version`을 포함해야 한다.
 - 모든 transaction operation은 블록 참조 필드로 `blockRef`를 사용해야 한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣어야 한다.
@@ -789,7 +788,9 @@ TEXT 블록 생성.
 - 기존 block 수정/이동/삭제 operation의 `blockRef`에는 서버가 내려준 실제 `blockId`를 넣어야 한다.
 - 새 block은 request에서 `blockRef=tempId`로 참조하고, 성공 응답에서 서버가 생성한 실제 `blockId`와 `tempId -> blockId` 매핑을 반환해야 한다.
 - 서버는 request 순서대로 `blockRef`, `parentRef`, `afterRef`, `beforeRef`의 temp 참조를 해석할 수 있어야 한다.
-- 서버는 batch 안에 실제 editor 변경이 하나라도 적용되면 `Document.version`을 정확히 1 증가시키고, 응답에 최신 `documentVersion`을 포함해야 한다.
+- transaction 시작 시 request `documentVersion`과 현재 문서 version을 같다고 강제 검증하지 않는다.
+- 동시성 검사는 block별 `version`으로만 처리해야 한다.
+- 서버는 batch 안에 실제 editor 변경이 하나라도 적용되면 `Document.version`을 증가시키고, 응답에 최신 `documentVersion`을 포함해야 한다.
 - `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`가 모두 no-op이면 block version과 `documentVersion`을 올리지 않아야 한다.
 - 하나의 operation이라도 실패하면 전체 rollback을 적용해야 한다.
 - 충돌 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함해야 한다.
