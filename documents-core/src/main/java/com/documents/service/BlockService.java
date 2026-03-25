@@ -11,6 +11,8 @@ import com.documents.domain.Document;
 public interface BlockService {
     List<Block> getAllByDocumentId(UUID documentId);
 
+    Block getById(UUID blockId);
+
     Block create(
             UUID documentId,
             UUID parentId,

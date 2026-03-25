@@ -1,19 +1,7 @@
 package com.documents.api.block;
 
-import com.documents.api.block.dto.BlockResponse;
-import com.documents.api.block.dto.CreateBlockRequest;
-import com.documents.api.block.dto.MoveBlockRequest;
-import com.documents.api.block.dto.UpdateBlockRequest;
-import com.documents.api.block.support.BlockJsonCodec;
-import com.documents.api.code.SuccessCode;
-import com.documents.api.dto.GlobalResponse;
-import com.documents.domain.Block;
-import com.documents.service.BlockService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -22,8 +10,20 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.documents.api.code.SuccessCode;
+import com.documents.api.document.DocumentTransactionApiMapper;
+import com.documents.api.document.dto.DocumentTransactionRequest;
+import com.documents.api.document.dto.DocumentTransactionResponse;
+import com.documents.api.dto.GlobalResponse;
+import com.documents.service.AdminBlockTransactionService;
+import com.documents.service.transaction.DocumentTransactionCommand;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 
 @Tag(name = "AdminBlock", description = "관리자 블록 API")
 @RestController
@@ -33,73 +33,74 @@ public class AdminBlockController {
 
     private static final String USER_ID_HEADER = "X-User-Id";
 
-    private final BlockService blockService;
-    private final BlockApiMapper blockApiMapper;
-    private final BlockJsonCodec blockJsonCodec;
+    private final AdminBlockTransactionService adminBlockTransactionService;
+    private final DocumentTransactionApiMapper documentTransactionApiMapper;
 
     @Operation(summary = "텍스트 블록 생성")
     @PostMapping("/documents/{documentId}/blocks")
-    public ResponseEntity<GlobalResponse<BlockResponse>> createBlock(
+    public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> createBlock(
             @PathVariable("documentId") UUID documentId,
-            @Valid @RequestBody CreateBlockRequest request,
+            @Valid @RequestBody DocumentTransactionRequest request,
             @RequestHeader(USER_ID_HEADER) String userId
     ) {
-        Block createdBlock = blockService.create(
-                documentId,
-                request.getParentId(),
-                request.getType(),
-                blockJsonCodec.write(request.getContent()),
-                request.getAfterBlockId(),
-                request.getBeforeBlockId(),
-                userId
-        );
+        DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
 
-        return ResponseEntity.status(SuccessCode.CREATED.getHttpStatus())
-                .body(GlobalResponse.ok(SuccessCode.CREATED, blockApiMapper.toResponse(createdBlock)));
+        return ResponseEntity.ok(GlobalResponse.ok(
+                SuccessCode.SUCCESS,
+                documentTransactionApiMapper.toResponse(
+                        adminBlockTransactionService.applyCreate(documentId, command.batchId(), command.operations().get(0), userId)
+                )
+        ));
     }
 
     @Operation(summary = "블록 수정")
     @PatchMapping("/blocks/{blockId}")
-    public ResponseEntity<GlobalResponse<BlockResponse>> updateBlock(
+    public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> updateBlock(
             @PathVariable("blockId") UUID blockId,
-            @Valid @RequestBody UpdateBlockRequest request,
+            @Valid @RequestBody DocumentTransactionRequest request,
             @RequestHeader(USER_ID_HEADER) String userId
     ) {
-        Block updatedBlock = blockService.update(
-                blockId,
-                blockJsonCodec.write(request.getContent()),
-                request.getVersion(),
-                userId
-        );
-        return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, blockApiMapper.toResponse(updatedBlock)));
+        DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
+
+        return ResponseEntity.ok(GlobalResponse.ok(
+                SuccessCode.SUCCESS,
+                documentTransactionApiMapper.toResponse(
+                        adminBlockTransactionService.applyReplaceContent(blockId, command.batchId(), command.operations().get(0), userId)
+                )
+        ));
     }
 
     @Operation(summary = "블록 삭제")
     @DeleteMapping("/blocks/{blockId}")
-    public ResponseEntity<GlobalResponse<Void>> deleteBlock(
+    public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> deleteBlock(
             @PathVariable("blockId") UUID blockId,
-            @RequestParam("version") Integer version,
+            @Valid @RequestBody DocumentTransactionRequest request,
             @RequestHeader(USER_ID_HEADER) String userId
     ) {
-        blockService.delete(blockId, version, userId);
-        return ResponseEntity.ok(GlobalResponse.ok());
+        DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
+
+        return ResponseEntity.ok(GlobalResponse.ok(
+                SuccessCode.SUCCESS,
+                documentTransactionApiMapper.toResponse(
+                        adminBlockTransactionService.applyDelete(blockId, command.batchId(), command.operations().get(0), userId)
+                )
+        ));
     }
 
     @Operation(summary = "블록 이동")
     @PostMapping("/blocks/{blockId}/move")
-    public ResponseEntity<GlobalResponse<Void>> moveBlock(
+    public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> moveBlock(
             @PathVariable("blockId") UUID blockId,
-            @Valid @RequestBody MoveBlockRequest request,
+            @Valid @RequestBody DocumentTransactionRequest request,
             @RequestHeader(USER_ID_HEADER) String userId
     ) {
-        blockService.move(
-                blockId,
-                request.getParentId(),
-                request.getAfterBlockId(),
-                request.getBeforeBlockId(),
-                request.getVersion(),
-                userId
-        );
-        return ResponseEntity.ok(GlobalResponse.ok());
+        DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
+
+        return ResponseEntity.ok(GlobalResponse.ok(
+                SuccessCode.SUCCESS,
+                documentTransactionApiMapper.toResponse(
+                        adminBlockTransactionService.applyMove(blockId, command.batchId(), command.operations().get(0), userId)
+                )
+        ));
     }
 }

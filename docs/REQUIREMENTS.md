@@ -608,6 +608,8 @@ Block {
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되고 있으면 다시 pending에 포함될 수 있다.
 - 같은 블록 안의 비중첩 수정도 v1에서는 block 단위 충돌로 처리할 수 있다.
 - `POST /v1/admin/documents/{documentId}/blocks`, `PATCH /v1/admin/blocks/{blockId}`, `POST /v1/admin/blocks/{blockId}/move`, `DELETE /v1/admin/blocks/{blockId}`는 에디터 표준 저장 경로가 아니라 운영/관리/비에디터 보조 경로로 둘 수 있다.
+- 위 4개 admin block API는 path와 HTTP method는 유지하되, request/response 계약과 실제 실행 로직은 `POST /v1/documents/{documentId}/transactions`와 동일한 transaction 모델을 사용해야 한다.
+- 각 admin block API는 자기 역할에 맞는 단일 operation 하나만 허용해야 한다.
 
 ## 10.2 향후 확장
 다음 기능은 v2 이후 별도 서비스 또는 확장 모듈로 분리 가능하다.
@@ -773,13 +775,25 @@ Block {
 TEXT 블록 생성.
 - 이 API는 운영/관리/비에디터 경로에서 사용할 수 있다.
 - 에디터 표준 생성/저장 경로는 `transactions`를 사용한다.
+- 요청 body는 `POST /v1/documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_CREATE`여야 한다.
+- 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
 
 요청 예시:
 ```json
 {
-  "parentId": null,
-  "afterBlockId": null,
-  "beforeBlockId": null
+  "clientId": "admin-api",
+  "batchId": "batch-create",
+  "operations": [
+    {
+      "opId": "op-1",
+      "type": "BLOCK_CREATE",
+      "blockRef": "tmp:block:1",
+      "parentRef": null,
+      "afterRef": null,
+      "beforeRef": null
+    }
+  ]
 }
 ```
 
@@ -787,33 +801,47 @@ TEXT 블록 생성.
 블록 내용 또는 블록 자체 메타데이터 수정.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
 - 에디터 표준 본문 저장 경로는 `transactions`를 사용한다.
+- 요청 body는 `POST /v1/documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_REPLACE_CONTENT`여야 한다.
+- path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
+- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
+- 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
 
 내용 수정 예시:
 ```json
 {
-  "content": {
-    "format": "rich_text",
-    "schemaVersion": 1,
-    "segments": [
-      {
-        "text": "수정된 ",
-        "marks": []
-      },
-      {
-        "text": "내용",
-        "marks": [
+  "clientId": "admin-api",
+  "batchId": "batch-update",
+  "operations": [
+    {
+      "opId": "op-1",
+      "type": "BLOCK_REPLACE_CONTENT",
+      "blockRef": "real-block-id",
+      "version": 3,
+      "content": {
+        "format": "rich_text",
+        "schemaVersion": 1,
+        "segments": [
           {
-            "type": "bold"
+            "text": "수정된 ",
+            "marks": []
           },
           {
-            "type": "textColor",
-            "value": "#000000"
+            "text": "내용",
+            "marks": [
+              {
+                "type": "bold"
+              },
+              {
+                "type": "textColor",
+                "value": "#000000"
+              }
+            ]
           }
         ]
       }
-    ]
-  },
-  "version": 3
+    }
+  ]
 }
 ```
 
@@ -821,14 +849,28 @@ TEXT 블록 생성.
 단일 블록 이동.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
 - 에디터 표준 이동 경로는 `transactions`를 사용한다.
+- 요청 body는 `POST /v1/documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_MOVE`여야 한다.
+- path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
+- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
+- 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
 
 위치 변경 예시:
 ```json
 {
-  "parentId": "new-parent-block-id",
-  "afterBlockId": "blk-a",
-  "beforeBlockId": "blk-b",
-  "version": 3
+  "clientId": "admin-api",
+  "batchId": "batch-move",
+  "operations": [
+    {
+      "opId": "op-1",
+      "type": "BLOCK_MOVE",
+      "blockRef": "real-block-id",
+      "version": 3,
+      "parentRef": "new-parent-block-id",
+      "afterRef": "blk-a",
+      "beforeRef": "blk-b"
+    }
+  ]
 }
 ```
 
@@ -837,6 +879,11 @@ TEXT 블록 생성.
 - 지정 루트 블록과 하위 블록 subtree를 함께 soft delete 한다.
 - 이 API는 명시적 단일 삭제 액션 또는 운영/관리/비에디터 경로에서 사용할 수 있다.
 - 에디터 표준 삭제 경로는 `transactions`를 사용한다.
+- 요청 body는 `POST /v1/documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_DELETE`여야 한다.
+- path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
+- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
+- 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
 
 ### `POST /v1/documents/{documentId}/transactions`
 에디터 생성/저장 batch 반영.
