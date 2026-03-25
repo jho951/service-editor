@@ -29,6 +29,8 @@ import com.documents.service.transaction.DocumentTransactionOperationCommand;
 import com.documents.service.transaction.DocumentTransactionOperationStatus;
 import com.documents.service.transaction.DocumentTransactionOperationType;
 import com.documents.service.transaction.DocumentTransactionResult;
+import com.documents.support.OrderedSortKeyGenerator;
+import com.documents.support.TextNormalizer;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Document transaction 서비스 구현 검증")
@@ -53,7 +55,53 @@ class DocumentTransactionServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        documentTransactionService = new DocumentTransactionServiceImpl(blockService, blockRepository, documentRepository);
+        BlockService transactionBlockService = new BlockServiceImpl(
+                blockRepository,
+                documentRepository,
+                new TextNormalizer(),
+                new OrderedSortKeyGenerator()
+        ) {
+            @Override
+            public Block create(
+                    Document document,
+                    UUID parentId,
+                    BlockType type,
+                    String content,
+                    UUID afterBlockId,
+                    UUID beforeBlockId,
+                    String actorId
+            ) {
+                return blockService.create(document, parentId, type, content, afterBlockId, beforeBlockId, actorId);
+            }
+
+            @Override
+            public Block update(UUID blockId, String content, Integer version, String actorId) {
+                return blockService.update(blockId, content, version, actorId);
+            }
+
+            @Override
+            public Block move(
+                    UUID blockId,
+                    UUID parentId,
+                    UUID afterBlockId,
+                    UUID beforeBlockId,
+                    Integer version,
+                    String actorId
+            ) {
+                return blockService.move(blockId, parentId, afterBlockId, beforeBlockId, version, actorId);
+            }
+
+            @Override
+            public Block delete(UUID blockId, Integer version, String actorId) {
+                return blockService.delete(blockId, version, actorId);
+            }
+
+        };
+
+        documentTransactionService = new DocumentTransactionServiceImpl(
+                new DocumentTransactionOperationExecutor(transactionBlockService, blockRepository),
+                documentRepository
+        );
         lenient().when(documentRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
                 .thenAnswer(invocation -> Optional.of(document(invocation.getArgument(0), 0)));
         lenient().when(documentRepository.incrementVersion(any(UUID.class), anyString(), any(LocalDateTime.class)))
