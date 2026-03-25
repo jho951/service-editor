@@ -260,10 +260,9 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("성공_문서 수정 API는 제목 trim, 부모 변경, updatedBy 갱신을 반영한다")
+	@DisplayName("성공_문서 수정 API는 제목 trim과 메타데이터 변경과 updatedBy 갱신을 반영한다")
 	void updateDocumentPersistsServiceLogic() throws Exception {
 		Workspace workspace = workspace("Docs Root");
-		Document parentDocument = saveDocument(workspace.getId(), null, "부모 문서", "00000000000000000001");
 		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000002",
 			"{\"type\":\"emoji\",\"value\":\"😀\"}", "{\"type\":\"image\",\"value\":\"cover-1\"}", null, "user-123");
 
@@ -273,15 +272,14 @@ class DocumentApiIntegrationTest {
 				.content("""
 					{
 					  "title": "  수정된 제목  ",
-					  "parentId": "%s",
 					  "icon": null,
 					  "cover": null,
 					  "version": 0
 					}
-					""".formatted(parentDocument.getId())))
+					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.title").value("수정된 제목"))
-			.andExpect(jsonPath("$.data.parentId").value(parentDocument.getId().toString()))
+			.andExpect(jsonPath("$.data.parentId").doesNotExist())
 			.andExpect(jsonPath("$.data.icon").doesNotExist())
 			.andExpect(jsonPath("$.data.cover").doesNotExist())
 			.andExpect(jsonPath("$.data.updatedBy").value("user-456"))
@@ -289,7 +287,7 @@ class DocumentApiIntegrationTest {
 
 		Document updatedDocument = documentRepository.findById(document.getId()).orElseThrow();
 		assertThat(updatedDocument.getTitle()).isEqualTo("수정된 제목");
-		assertThat(updatedDocument.getParentId()).isEqualTo(parentDocument.getId());
+		assertThat(updatedDocument.getParentId()).isNull();
 		assertThat(updatedDocument.getIconJson()).isNull();
 		assertThat(updatedDocument.getCoverJson()).isNull();
 		assertThat(updatedDocument.getUpdatedBy()).isEqualTo("user-456");
@@ -331,70 +329,6 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("실패_다른 워크스페이스 부모 문서를 지정하면 잘못된 요청 응답을 반환한다")
-	void updateDocumentReturnsBadRequestWhenParentBelongsToOtherWorkspace() throws Exception {
-		Workspace workspace = workspace("Docs Root");
-		Workspace otherWorkspace = workspace("Other Workspace");
-		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
-		Document otherWorkspaceParent = saveDocument(otherWorkspace.getId(), null, "다른 워크스페이스 문서",
-			"00000000000000000001");
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
-			.contentType("application/json")
-			.header("X-User-Id", "user-123")
-				.content("""
-					{
-					  "title": "수정된 제목",
-					  "parentId": "%s",
-					  "version": 0
-					}
-					""".formatted(otherWorkspaceParent.getId())));
-
-		assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
-	}
-
-	@Test
-	@DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 응답을 반환한다")
-	void updateDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
-		Workspace workspace = workspace("Docs Root");
-		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
-			.contentType("application/json")
-			.header("X-User-Id", "user-123")
-				.content("""
-					{
-					  "title": "수정된 제목",
-					  "parentId": "%s",
-					  "version": 0
-					}
-					""".formatted(document.getId())));
-
-		assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
-	}
-
-	@Test
-	@DisplayName("실패_하위 문서를 부모로 올려 순환 참조가 생기면 잘못된 요청 오류를 반환한다")
-	void updateDocumentReturnsBadRequestWhenCycleDetected() throws Exception {
-		Workspace workspace = workspace("Docs Root");
-		Document rootDocument = saveDocument(workspace.getId(), null, "루트 문서", "00000000000000000001");
-		Document childDocument = saveDocument(workspace.getId(), rootDocument.getId(), "하위 문서", "00000000000000000002");
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", rootDocument.getId())
-			.contentType("application/json")
-			.header("X-User-Id", "user-123")
-				.content("""
-					{
-					  "title": "수정된 제목",
-					  "parentId": "%s",
-					  "version": 0
-					}
-					""".formatted(childDocument.getId())));
-
-		assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
-	}
-
-	@Test
 	@DisplayName("실패_문서 수정 요청에 제목이 없으면 유효성 검사 오류를 반환한다")
 	void updateDocumentReturnsValidationErrorWhenTitleMissing() throws Exception {
 		Workspace workspace = workspace("Docs Root");
@@ -405,7 +339,7 @@ class DocumentApiIntegrationTest {
 			.header("X-User-Id", "user-123")
 				.content("""
 					{
-					  "parentId": null,
+					  "icon": null,
 					  "version": 0
 					}
 					"""));

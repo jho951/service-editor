@@ -114,7 +114,6 @@ public class DocumentController {
 			request.getTitle(),
 			documentApiMapper.serializeIcon(request),
 			documentApiMapper.serializeCover(request),
-			request.getParentId(),
 			request.getVersion(),
 			userId
 		);

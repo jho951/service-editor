@@ -34,6 +34,12 @@
 - 공개 상태 변경 통합 테스트와 visibility 스키마 테스트를 추가했다.
 - 문서 삭제/복구 경로에서는 block bulk 처리 중 document version 증가를 억제해 삭제된 문서에 대한 불필요한 `409 Conflict`를 막았다.
 
+## Step 6. 문서 수정 API parentId 제거
+
+- `PATCH /v1/documents/{documentId}`에서 `parentId` 입력을 제거했다.
+- 문서 메타 수정 API는 제목, 아이콘, 커버, 공개 상태만 담당하고 부모 변경은 `POST /v1/documents/{documentId}/move`로만 처리하도록 정리했다.
+- 관련 서비스 시그니처와 단위 테스트, WebMvc 테스트, 통합 테스트를 현재 계약에 맞게 수정했다.
+
 ## 테스트 결과
 
 - 실행 명령:

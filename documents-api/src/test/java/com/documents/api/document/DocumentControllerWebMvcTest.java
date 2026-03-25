@@ -1220,17 +1220,15 @@ class DocumentControllerWebMvcTest {
 	void updateDocumentReturnsEnvelope() throws Exception {
 		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		UUID parentId = UUID.randomUUID();
 
 		when(documentService.update(
 			eq(documentId),
 			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
 			eq(ICON_DOC_JSON),
 			eq(COVER_2_JSON),
-			eq(parentId),
 			eq(2),
 			eq(ACTOR_ID)
-		)).thenReturn(document(documentId, workspaceId, parentId, UPDATED_PROJECT_OVERVIEW_TITLE, ACTOR_ID, 3,
+		)).thenReturn(document(documentId, workspaceId, null, UPDATED_PROJECT_OVERVIEW_TITLE, ACTOR_ID, 3,
 			"00000000000000000007",
 			ICON_DOC_JSON,
 			COVER_2_JSON));
@@ -1241,7 +1239,6 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "title": "수정된 프로젝트 개요",
-					  "parentId": "%s",
 					  "version": 2,
 					  "icon": {
 					    "type": "emoji",
@@ -1252,14 +1249,14 @@ class DocumentControllerWebMvcTest {
 					    "value": "cover-2"
 					  }
 					}
-					""".formatted(parentId)))
+					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.code").value(200))
 			.andExpect(jsonPath("$.message").value("요청 응답 성공"))
 			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
-			.andExpect(jsonPath("$.data.parentId").value(parentId.toString()))
+			.andExpect(jsonPath("$.data.parentId").doesNotExist())
 			.andExpect(jsonPath("$.data.title").value(UPDATED_PROJECT_OVERVIEW_TITLE))
 			.andExpect(jsonPath("$.data.cover.value").value("cover-2"))
 			.andExpect(jsonPath("$.data.version").value(3));
@@ -1273,7 +1270,6 @@ class DocumentControllerWebMvcTest {
 		when(documentService.update(
 			eq(documentId),
 			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
-			eq(null),
 			eq(null),
 			eq(null),
 			eq(1),
@@ -1294,65 +1290,6 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
-	@DisplayName("실패_parentId가 자기 자신이면 잘못된 요청 응답을 반환한다")
-	void updateDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
-		UUID documentId = UUID.randomUUID();
-
-		when(documentService.update(
-			eq(documentId),
-			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
-			eq(null),
-			eq(null),
-			eq(documentId),
-			eq(1),
-			eq(ACTOR_ID)
-		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
-			.contentType("application/json")
-			.header(USER_ID_HEADER, ACTOR_ID)
-			.content("""
-				{
-				  "title": "수정된 프로젝트 개요",
-				  "version": 1,
-				  "parentId": "%s"
-				}
-				""".formatted(documentId)));
-
-		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
-	}
-
-	@Test
-	@DisplayName("실패_다른 워크스페이스 부모 문서를 지정하면 잘못된 요청 응답을 반환한다")
-	void updateDocumentReturnsBadRequestWhenParentIsOutOfWorkspace() throws Exception {
-		UUID documentId = UUID.randomUUID();
-		UUID parentId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-
-		when(documentService.update(
-			eq(documentId),
-			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
-			eq(null),
-			eq(null),
-			eq(parentId),
-			eq(1),
-			eq(ACTOR_ID)
-		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
-			.contentType("application/json")
-			.header(USER_ID_HEADER, ACTOR_ID)
-			.content("""
-				{
-				  "title": "수정된 프로젝트 개요",
-				  "version": 1,
-				  "parentId": "11111111-1111-1111-1111-111111111111"
-				}
-				"""));
-
-		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
-	}
-
-	@Test
 	@DisplayName("성공_문서 수정 요청에 변경 내용이 없어도 기존 version을 그대로 응답한다")
 	void updateDocumentReturnsSameVersionWhenRequestIsNoOp() throws Exception {
 		UUID workspaceId = UUID.randomUUID();
@@ -1363,7 +1300,6 @@ class DocumentControllerWebMvcTest {
 			eq(PROJECT_OVERVIEW_TITLE),
 			eq(ICON_DOC_JSON),
 			eq(COVER_1_JSON),
-			eq(null),
 			eq(3),
 			eq(ACTOR_ID)
 		)).thenReturn(document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 3,
@@ -1403,7 +1339,7 @@ class DocumentControllerWebMvcTest {
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
-				  "parentId": null
+				  "icon": null
 				}
 				"""));
 
@@ -1456,7 +1392,6 @@ class DocumentControllerWebMvcTest {
 		when(documentService.update(
 			eq(documentId),
 			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
-			eq(null),
 			eq(null),
 			eq(null),
 			eq(1),

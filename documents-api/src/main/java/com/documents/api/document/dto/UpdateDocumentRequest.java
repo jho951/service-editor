@@ -1,7 +1,5 @@
 package com.documents.api.document.dto;
 
-import java.util.UUID;
-
 import com.documents.api.document.validation.ValidDocumentMeta;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -31,9 +29,6 @@ public class UpdateDocumentRequest {
 	@ValidDocumentMeta
 	@Schema(description = "문서 커버 JSON", nullable = true, example = "{\"type\":\"image\",\"value\":\"cover-2\"}")
 	private JsonNode cover;
-
-	@Schema(description = "부모 문서 ID", nullable = true)
-	private UUID parentId;
 
 	@NotNull
 	@Schema(description = "클라이언트가 기준으로 삼은 문서 버전", example = "3", nullable = false)
