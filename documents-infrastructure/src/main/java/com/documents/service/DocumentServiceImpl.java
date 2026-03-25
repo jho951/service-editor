@@ -41,6 +41,7 @@ public class DocumentServiceImpl implements DocumentService {
 
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
 		String normalizedTitle = textNormalizer.normalizeRequired(title);
+		validateWorkspaceDocumentTitleUnique(workspaceId, normalizedTitle);
 		List<Document> siblings = documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId);
 		String nextSortKey = generateSortKey(siblings, null, null);
 
@@ -93,6 +94,7 @@ public class DocumentServiceImpl implements DocumentService {
 		}
 
 		String nextTitle = title == null ? document.getTitle() : textNormalizer.normalizeRequired(title);
+		validateWorkspaceDocumentTitleUnique(document.getWorkspaceId(), nextTitle, document.getId());
 		String nextIconJson = normalizeNullableMetaJson(iconJson);
 		String nextCoverJson = normalizeNullableMetaJson(coverJson);
 
@@ -159,6 +161,7 @@ public class DocumentServiceImpl implements DocumentService {
 		Document deletedDocument = findDeletedDocument(documentId);
 		validateTrashRestoreAvailable(deletedDocument);
 		validateParentForRestore(deletedDocument);
+		validateWorkspaceDocumentTitleUnique(deletedDocument.getWorkspaceId(), deletedDocument.getTitle(), deletedDocument.getId());
 
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
 		LocalDateTime restoredAt = LocalDateTime.now();
@@ -290,6 +293,18 @@ public class DocumentServiceImpl implements DocumentService {
 		LocalDateTime restoreDeadline = document.getDeletedAt().plusMinutes(DocumentTrashPolicy.RETENTION_MINUTES);
 		if (!LocalDateTime.now().isBefore(restoreDeadline)) {
 			throw new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+		}
+	}
+
+	private void validateWorkspaceDocumentTitleUnique(UUID workspaceId, String title) {
+		if (documentRepository.existsByWorkspace_IdAndTitle(workspaceId, title)) {
+			throw new BusinessException(BusinessErrorCode.CONFLICT);
+		}
+	}
+
+	private void validateWorkspaceDocumentTitleUnique(UUID workspaceId, String title, UUID documentId) {
+		if (documentRepository.existsByWorkspace_IdAndTitleAndIdNot(workspaceId, title, documentId)) {
+			throw new BusinessException(BusinessErrorCode.CONFLICT);
 		}
 	}
 

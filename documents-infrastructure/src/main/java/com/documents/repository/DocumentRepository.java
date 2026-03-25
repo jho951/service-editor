@@ -16,6 +16,10 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
 	Optional<Document> findByIdAndDeletedAtIsNull(UUID id);
 
+	boolean existsByWorkspace_IdAndTitle(UUID workspaceId, String title);
+
+	boolean existsByWorkspace_IdAndTitleAndIdNot(UUID workspaceId, String title, UUID documentId);
+
 	@Query("""
 		select d
 		from Document d

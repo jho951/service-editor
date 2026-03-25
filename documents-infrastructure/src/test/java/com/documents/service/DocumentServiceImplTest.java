@@ -174,6 +174,23 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("실패_같은 워크스페이스에 같은 제목 문서가 있으면 생성 시 충돌 예외를 던진다")
+	void createDocumentThrowsWhenWorkspaceTitleAlreadyExists() {
+		UUID workspaceId = UUID.randomUUID();
+		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+		when(textNormalizer.normalizeRequired("  " + ROOT_TITLE + "  ")).thenReturn(ROOT_TITLE);
+		when(documentRepository.existsByWorkspace_IdAndTitle(workspaceId, ROOT_TITLE)).thenReturn(true);
+
+		assertThatThrownBy(() -> documentService.create(workspaceId, null, "  " + ROOT_TITLE + "  ", null, null, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.CONFLICT);
+
+		verify(documentRepository, never()).save(any(Document.class));
+	}
+
+	@Test
 	@DisplayName("성공_워크스페이스 문서 목록 조회 시 활성 문서를 반환한다")
 	void getDocumentsByWorkspaceIdReturnsActive() {
 		UUID workspaceId = UUID.randomUUID();
@@ -404,6 +421,26 @@ class DocumentServiceImplTest {
 		assertThat(document.getTitle()).isEqualTo("기존 제목");
 		assertThat(document.getUpdatedBy()).isEqualTo("old-user");
 		verify(textNormalizer, never()).normalizeRequired(anyString());
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_같은 워크스페이스의 다른 문서와 제목이 중복되면 수정 시 충돌 예외를 던진다")
+	void updateDocumentThrowsWhenWorkspaceTitleAlreadyExists() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		document.setVersion(3);
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(textNormalizer.normalizeRequired("  수정된 제목  ")).thenReturn("수정된 제목");
+		when(documentRepository.existsByWorkspace_IdAndTitleAndIdNot(workspaceId, "수정된 제목", documentId)).thenReturn(true);
+
+		assertThatThrownBy(() -> documentService.update(documentId, "  수정된 제목  ", null, null, 3, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.CONFLICT);
+
 		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
 	}
 
@@ -721,6 +758,25 @@ class DocumentServiceImplTest {
 
 		verify(documentRepository).restoreDeletedByIds(eq(List.of(childId)), eq(ACTOR_ID),
 			any(LocalDateTime.class));
+	}
+
+	@Test
+	@DisplayName("실패_같은 워크스페이스에 같은 제목 활성 문서가 있으면 휴지통 복구 시 충돌 예외를 던진다")
+	void restoreFailsWhenWorkspaceTitleAlreadyExists() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document deletedDocument = deletedDocument(documentId, workspaceId, null, "복구 대상 문서", "00000000000000000001");
+		when(documentRepository.findById(documentId)).thenReturn(Optional.of(deletedDocument));
+		when(documentRepository.existsByWorkspace_IdAndTitleAndIdNot(workspaceId, "복구 대상 문서", documentId)).thenReturn(true);
+
+		assertThatThrownBy(() -> documentService.restore(documentId, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.CONFLICT);
+
+		verify(documentRepository, never()).restoreDeletedByIds(anyList(), any(), any());
+		verify(blockService, never()).restoreAllByDocumentId(any(), any(), any());
 	}
 
 	@Test

@@ -193,6 +193,24 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("실패_같은 워크스페이스 휴지통 문서와 제목이 중복되면 문서 생성은 충돌 응답을 반환한다")
+	void createDocumentReturnsConflictWhenTitleAlreadyExistsInWorkspaceTrash() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		saveDeletedDocument(workspace.getId(), "프로젝트 개요", "00000000000000000001");
+
+		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "title": "프로젝트 개요"
+				}
+				"""));
+
+		assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
+	}
+
+	@Test
 	@DisplayName("실패_부모 문서가 다른 워크스페이스에 있으면 잘못된 요청 응답을 반환한다")
 	void createDocumentReturnsBadRequestWhenParentBelongsToOtherWorkspace() throws Exception {
 		Workspace rootWorkspace = workspaceRepository.save(Workspace.builder()
@@ -359,6 +377,26 @@ class DocumentApiIntegrationTest {
 					"""));
 
 		assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_같은 워크스페이스 다른 문서와 제목이 중복되면 문서 수정은 충돌 응답을 반환한다")
+	void updateDocumentReturnsConflictWhenTitleAlreadyExists() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document targetDocument = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
+		saveDocument(workspace.getId(), null, "중복 제목", "00000000000000000002");
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", targetDocument.getId())
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+				.content("""
+					{
+					  "title": "중복 제목",
+					  "version": 0
+					}
+					"""));
+
+		assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
 	}
 
 	@Test
@@ -684,6 +722,19 @@ class DocumentApiIntegrationTest {
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_같은 워크스페이스에 같은 제목 활성 문서가 있으면 문서 복구는 충돌 응답을 반환한다")
+	void restoreDocumentReturnsConflictWhenTitleAlreadyExists() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document deletedDocument = saveDeletedDocument(workspace.getId(), "복구 대상 문서", "00000000000000000001");
+		saveDocument(workspace.getId(), null, "복구 대상 문서", "00000000000000000002");
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", deletedDocument.getId())
+			.header("X-User-Id", "user-123"));
+
+		assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
 	}
 
 	@Test

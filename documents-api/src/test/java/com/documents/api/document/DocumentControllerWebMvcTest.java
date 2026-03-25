@@ -1037,6 +1037,32 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("실패_같은 워크스페이스에 같은 제목 문서가 있으면 생성 충돌 응답을 반환한다")
+	void createDocumentReturnsConflictWhenTitleAlreadyExists() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+
+		when(documentService.create(
+			eq(workspaceId),
+			isNull(),
+			eq(PROJECT_OVERVIEW_TITLE),
+			eq(null),
+			eq(null),
+			eq(ACTOR_ID)
+		)).thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
+
+		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspaceId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "title": "프로젝트 개요"
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
+	}
+
+	@Test
 	@DisplayName("성공_문서 단건 조회 요청에 대해 문서 응답을 반환한다")
 	void getDocumentReturnsEnvelope() throws Exception {
 		UUID workspaceId = UUID.randomUUID();
@@ -1127,6 +1153,19 @@ class DocumentControllerWebMvcTest {
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_같은 워크스페이스에 같은 제목 활성 문서가 있으면 복구 충돌 응답을 반환한다")
+	void restoreDocumentReturnsConflictWhenTitleAlreadyExists() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.CONFLICT))
+			.when(documentService).restore(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
 	}
 
 	@Test
