@@ -39,6 +39,7 @@ public class DocumentApiMapper {
                 .title(document.getTitle())
                 .icon(documentJsonCodec.read(document.getIconJson()))
                 .cover(documentJsonCodec.read(document.getCoverJson()))
+                .visibility(document.getVisibility())
                 .sortKey(document.getSortKey())
                 .createdBy(document.getCreatedBy())
                 .updatedBy(document.getUpdatedBy())

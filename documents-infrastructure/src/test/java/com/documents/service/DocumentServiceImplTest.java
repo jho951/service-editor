@@ -18,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.documents.domain.Document;
+import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
@@ -224,18 +225,16 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("성공_문서 수정 시 제목은 trim 후 저장하고 updatedBy와 부모를 갱신한다")
+	@DisplayName("성공_문서 수정 시 제목은 trim 후 저장하고 updatedBy를 갱신한다")
 	void updateDocumentTrimsTitleAndUpdatesAuditFields() {
 		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		UUID parentId = UUID.randomUUID();
 		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		document.setVersion(3);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
 		document.setUpdatedBy("old-user");
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-		when(documentRepository.findByIdAndDeletedAtIsNull(parentId))
-			.thenReturn(Optional.of(parentDocument(parentId, workspaceId)));
 		when(textNormalizer.normalizeRequired("  수정된 제목  ")).thenReturn("수정된 제목");
 		when(textNormalizer.normalizeNullable((String)null)).thenReturn(null);
 		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
@@ -245,13 +244,13 @@ class DocumentServiceImplTest {
 			"  수정된 제목  ",
 			null,
 			null,
-			parentId,
+			3,
 			" user-456 "
 		);
 
 		assertThat(result).isSameAs(document);
 		assertThat(result.getTitle()).isEqualTo("수정된 제목");
-		assertThat(result.getParentId()).isEqualTo(parentId);
+		assertThat(result.getParentId()).isNull();
 		assertThat(result.getIconJson()).isNull();
 		assertThat(result.getCoverJson()).isNull();
 		assertThat(result.getUpdatedBy()).isEqualTo("user-456");
@@ -263,6 +262,7 @@ class DocumentServiceImplTest {
 		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		document.setVersion(4);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
 		document.setUpdatedBy("old-user");
@@ -279,7 +279,7 @@ class DocumentServiceImplTest {
 			"  새 제목  ",
 			"{\"type\":\"emoji\",\"value\":\"😀\"}",
 			"{\"type\":\"image\",\"value\":\"cover-1\"}",
-			null,
+			4,
 			ACTOR_ID
 		);
 
@@ -291,11 +291,13 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("성공_title이 null이면 기존 제목을 유지하고 parentId가 null이면 루트로 변경한다")
-	void updateDocumentKeepsTitleWhenNullAndMovesToRoot() {
+	@DisplayName("성공_title이 null이면 기존 제목을 유지하고 메타데이터만 갱신한다")
+	void updateDocumentKeepsTitleWhenNullAndUpdatesMetadataOnly() {
 		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, UUID.randomUUID(), "기존 제목", "00000000000000000001");
+		UUID parentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, parentId, "기존 제목", "00000000000000000001");
+		document.setVersion(5);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
 		document.setUpdatedBy("old-user");
@@ -305,11 +307,17 @@ class DocumentServiceImplTest {
 			.thenReturn("{\"type\":\"emoji\",\"value\":\"📄\"}");
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
-		Document result = documentService.update(documentId, null, "{\"type\":\"emoji\",\"value\":\"📄\"}", null, null,
-			ACTOR_ID);
+		Document result = documentService.update(
+			documentId,
+			null,
+			"{\"type\":\"emoji\",\"value\":\"📄\"}",
+			null,
+			5,
+			ACTOR_ID
+		);
 
 		assertThat(result.getTitle()).isEqualTo("기존 제목");
-		assertThat(result.getParentId()).isNull();
+		assertThat(result.getParentId()).isEqualTo(parentId);
 		assertThat(result.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"📄\"}");
 		assertThat(result.getCoverJson()).isNull();
 		assertThat(result.getUpdatedBy()).isEqualTo(ACTOR_ID);
@@ -320,6 +328,7 @@ class DocumentServiceImplTest {
 	void updateDocumentStoresNullUpdatedByWhenActorBlank() {
 		UUID documentId = UUID.randomUUID();
 		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
+		document.setVersion(6);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
 		document.setUpdatedBy("old-user");
@@ -336,7 +345,7 @@ class DocumentServiceImplTest {
 			"수정된 제목",
 			"{\"type\":\"emoji\",\"value\":\"😀\"}",
 			"{\"type\":\"image\",\"value\":\"cover-1\"}",
-			null,
+			6,
 			" "
 		);
 
@@ -345,64 +354,131 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 예외를 던진다")
-	void updateDocumentThrowsWhenParentIsSelf() {
-		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
-		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-
-		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, documentId, ACTOR_ID))
-			.isInstanceOf(BusinessException.class)
-			.extracting("errorCode")
-			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
-	}
-
-	@Test
-	@DisplayName("실패_부모 문서가 다른 워크스페이스에 있으면 잘못된 요청 예외를 던진다")
-	void updateDocumentThrowsWhenParentBelongsToOtherWorkspace() {
-		UUID documentId = UUID.randomUUID();
-		UUID parentId = UUID.randomUUID();
-		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
-		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-		when(documentRepository.findByIdAndDeletedAtIsNull(parentId))
-			.thenReturn(Optional.of(parentDocument(parentId, UUID.randomUUID())));
-
-		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, parentId, ACTOR_ID))
-			.isInstanceOf(BusinessException.class)
-			.extracting("errorCode")
-			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
-	}
-
-	@Test
-	@DisplayName("실패_존재하지 않는 부모 문서를 지정하면 문서 없음 예외를 던진다")
-	void updateDocumentThrowsWhenParentMissing() {
-		UUID documentId = UUID.randomUUID();
-		UUID parentId = UUID.randomUUID();
-		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
-		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
-
-		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, parentId, ACTOR_ID))
-			.isInstanceOf(BusinessException.class)
-			.extracting("errorCode")
-			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
-	}
-
-	@Test
-	@DisplayName("실패_순환 참조가 생기면 잘못된 요청 예외를 던진다")
-	void updateDocumentThrowsWhenCycleDetected() {
+	@DisplayName("성공_변경 내용이 모두 같으면 no-op으로 처리하고 updatedBy를 바꾸지 않는다")
+	void updateDocumentDoesNothingWhenRequestedStateIsSame() {
 		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		UUID childId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "루트 문서", "00000000000000000001");
-		Document childDocument = document(childId, workspaceId, documentId, "하위 문서", "00000000000000000002");
+		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		document.setVersion(7);
+		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
+		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
+		document.setUpdatedBy("old-user");
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-		when(documentRepository.findByIdAndDeletedAtIsNull(childId)).thenReturn(Optional.of(childDocument));
+		when(textNormalizer.normalizeRequired("기존 제목")).thenReturn("기존 제목");
+		when(textNormalizer.normalizeNullable("{\"type\":\"emoji\",\"value\":\"😀\"}"))
+			.thenReturn("{\"type\":\"emoji\",\"value\":\"😀\"}");
+		when(textNormalizer.normalizeNullable("{\"type\":\"image\",\"value\":\"cover-1\"}"))
+			.thenReturn("{\"type\":\"image\",\"value\":\"cover-1\"}");
 
-		assertThatThrownBy(() -> documentService.update(documentId, null, null, null, childId, ACTOR_ID))
+		Document result = documentService.update(
+			documentId,
+			"기존 제목",
+			"{\"type\":\"emoji\",\"value\":\"😀\"}",
+			"{\"type\":\"image\",\"value\":\"cover-1\"}",
+			7,
+			ACTOR_ID
+		);
+
+		assertThat(result).isSameAs(document);
+		assertThat(result.getTitle()).isEqualTo("기존 제목");
+		assertThat(result.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"😀\"}");
+		assertThat(result.getCoverJson()).isEqualTo("{\"type\":\"image\",\"value\":\"cover-1\"}");
+		assertThat(result.getUpdatedBy()).isEqualTo("old-user");
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_요청 version이 현재 문서 version과 다르면 충돌 예외를 던진다")
+	void updateDocumentThrowsWhenVersionMismatch() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "기존 제목", "00000000000000000001");
+		document.setVersion(3);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+		assertThatThrownBy(() -> documentService.update(documentId, "새 제목", null, null, 2, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.extracting("errorCode")
-			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
+			.isEqualTo(BusinessErrorCode.CONFLICT);
+
+		assertThat(document.getTitle()).isEqualTo("기존 제목");
+		assertThat(document.getUpdatedBy()).isEqualTo("old-user");
+		verify(textNormalizer, never()).normalizeRequired(anyString());
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("성공_PUBLIC 문서를 PRIVATE로 변경하면 version 증가 대상 상태로 갱신한다")
+	void updateVisibilityChangesPublicToPrivate() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "문서", "00000000000000000001");
+		document.setVersion(3);
+		document.setVisibility(DocumentVisibility.PUBLIC);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
+
+		Document result = documentService.updateVisibility(documentId, DocumentVisibility.PRIVATE, 3, " user-456 ");
+
+		assertThat(result).isSameAs(document);
+		assertThat(result.getVisibility()).isEqualTo(DocumentVisibility.PRIVATE);
+		assertThat(result.getUpdatedBy()).isEqualTo("user-456");
+	}
+
+	@Test
+	@DisplayName("성공_PRIVATE 문서를 PUBLIC으로 변경하면 version 증가 대상 상태로 갱신한다")
+	void updateVisibilityChangesPrivateToPublic() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "문서", "00000000000000000001");
+		document.setVersion(4);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		Document result = documentService.updateVisibility(documentId, DocumentVisibility.PUBLIC, 4, ACTOR_ID);
+
+		assertThat(result).isSameAs(document);
+		assertThat(result.getVisibility()).isEqualTo(DocumentVisibility.PUBLIC);
+		assertThat(result.getUpdatedBy()).isEqualTo(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("성공_동일 공개 상태 요청이면 no-op으로 처리하고 updatedBy를 바꾸지 않는다")
+	void updateVisibilityDoesNothingWhenRequestedStateIsSame() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "문서", "00000000000000000001");
+		document.setVersion(5);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+		Document result = documentService.updateVisibility(documentId, DocumentVisibility.PRIVATE, 5, ACTOR_ID);
+
+		assertThat(result).isSameAs(document);
+		assertThat(result.getVisibility()).isEqualTo(DocumentVisibility.PRIVATE);
+		assertThat(result.getUpdatedBy()).isEqualTo("old-user");
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_공개 상태 변경 요청 version이 현재 문서와 다르면 충돌 예외를 던진다")
+	void updateVisibilityThrowsWhenVersionMismatch() {
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, UUID.randomUUID(), null, "문서", "00000000000000000001");
+		document.setVersion(6);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+		document.setUpdatedBy("old-user");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+
+		assertThatThrownBy(() -> documentService.updateVisibility(documentId, DocumentVisibility.PUBLIC, 5, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.CONFLICT);
+
+		assertThat(document.getVisibility()).isEqualTo(DocumentVisibility.PRIVATE);
+		assertThat(document.getUpdatedBy()).isEqualTo("old-user");
+		verify(textNormalizer, never()).normalizeNullable(ACTOR_ID);
 	}
 
 	@Test

@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
 import com.documents.domain.Document;
+import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
@@ -87,6 +88,7 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
 			.andExpect(jsonPath("$.data.sortKey").value("000000000001000000000000"))
 			.andExpect(jsonPath("$.data.icon.type").value("emoji"))
+			.andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
 			.andExpect(jsonPath("$.data.createdBy").value("user-123"))
 			.andExpect(jsonPath("$.data.version").value(0));
 
@@ -258,10 +260,9 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("성공_문서 수정 API는 제목 trim, 부모 변경, updatedBy 갱신을 반영한다")
+	@DisplayName("성공_문서 수정 API는 제목 trim과 메타데이터 변경과 updatedBy 갱신을 반영한다")
 	void updateDocumentPersistsServiceLogic() throws Exception {
 		Workspace workspace = workspace("Docs Root");
-		Document parentDocument = saveDocument(workspace.getId(), null, "부모 문서", "00000000000000000001");
 		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000002",
 			"{\"type\":\"emoji\",\"value\":\"😀\"}", "{\"type\":\"image\",\"value\":\"cover-1\"}", null, "user-123");
 
@@ -271,14 +272,14 @@ class DocumentApiIntegrationTest {
 				.content("""
 					{
 					  "title": "  수정된 제목  ",
-					  "parentId": "%s",
 					  "icon": null,
-					  "cover": null
+					  "cover": null,
+					  "version": 0
 					}
-					""".formatted(parentDocument.getId())))
+					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.title").value("수정된 제목"))
-			.andExpect(jsonPath("$.data.parentId").value(parentDocument.getId().toString()))
+			.andExpect(jsonPath("$.data.parentId").doesNotExist())
 			.andExpect(jsonPath("$.data.icon").doesNotExist())
 			.andExpect(jsonPath("$.data.cover").doesNotExist())
 			.andExpect(jsonPath("$.data.updatedBy").value("user-456"))
@@ -286,7 +287,7 @@ class DocumentApiIntegrationTest {
 
 		Document updatedDocument = documentRepository.findById(document.getId()).orElseThrow();
 		assertThat(updatedDocument.getTitle()).isEqualTo("수정된 제목");
-		assertThat(updatedDocument.getParentId()).isEqualTo(parentDocument.getId());
+		assertThat(updatedDocument.getParentId()).isNull();
 		assertThat(updatedDocument.getIconJson()).isNull();
 		assertThat(updatedDocument.getCoverJson()).isNull();
 		assertThat(updatedDocument.getUpdatedBy()).isEqualTo("user-456");
@@ -301,11 +302,12 @@ class DocumentApiIntegrationTest {
 		var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
-			.content("""
-				{
-				  "title": "   "
-				}
-				"""));
+				.content("""
+					{
+					  "title": "   ",
+					  "version": 0
+					}
+					"""));
 
 		assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
 	}
@@ -316,74 +318,14 @@ class DocumentApiIntegrationTest {
 		var result = mockMvc.perform(patch("/v1/documents/{documentId}", UUID.randomUUID())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
-			.content("""
-				{
-				  "title": "수정된 제목"
-				}
-				"""));
+				.content("""
+					{
+					  "title": "수정된 제목",
+					  "version": 0
+					}
+					"""));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
-	}
-
-	@Test
-	@DisplayName("실패_다른 워크스페이스 부모 문서를 지정하면 잘못된 요청 응답을 반환한다")
-	void updateDocumentReturnsBadRequestWhenParentBelongsToOtherWorkspace() throws Exception {
-		Workspace workspace = workspace("Docs Root");
-		Workspace otherWorkspace = workspace("Other Workspace");
-		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
-		Document otherWorkspaceParent = saveDocument(otherWorkspace.getId(), null, "다른 워크스페이스 문서",
-			"00000000000000000001");
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
-			.contentType("application/json")
-			.header("X-User-Id", "user-123")
-			.content("""
-				{
-				  "title": "수정된 제목",
-				  "parentId": "%s"
-				}
-				""".formatted(otherWorkspaceParent.getId())));
-
-		assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
-	}
-
-	@Test
-	@DisplayName("실패_자기 자신을 부모로 지정하면 잘못된 요청 응답을 반환한다")
-	void updateDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
-		Workspace workspace = workspace("Docs Root");
-		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
-			.contentType("application/json")
-			.header("X-User-Id", "user-123")
-			.content("""
-				{
-				  "title": "수정된 제목",
-				  "parentId": "%s"
-				}
-				""".formatted(document.getId())));
-
-		assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
-	}
-
-	@Test
-	@DisplayName("실패_하위 문서를 부모로 올려 순환 참조가 생기면 잘못된 요청 오류를 반환한다")
-	void updateDocumentReturnsBadRequestWhenCycleDetected() throws Exception {
-		Workspace workspace = workspace("Docs Root");
-		Document rootDocument = saveDocument(workspace.getId(), null, "루트 문서", "00000000000000000001");
-		Document childDocument = saveDocument(workspace.getId(), rootDocument.getId(), "하위 문서", "00000000000000000002");
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", rootDocument.getId())
-			.contentType("application/json")
-			.header("X-User-Id", "user-123")
-			.content("""
-				{
-				  "title": "수정된 제목",
-				  "parentId": "%s"
-				}
-				""".formatted(childDocument.getId())));
-
-		assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
 	}
 
 	@Test
@@ -395,9 +337,95 @@ class DocumentApiIntegrationTest {
 		var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
+				.content("""
+					{
+					  "icon": null,
+					  "version": 0
+					}
+					"""));
+
+		assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("성공_문서 공개 상태 변경 API는 PUBLIC과 PRIVATE 전환을 반영한다")
+	void updateDocumentVisibilityPersistsVisibilityAndVersion() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document document = saveDocument(workspace.getId(), null, "공개 상태 대상", "00000000000000000001");
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", document.getId())
+				.contentType("application/json")
+				.header("X-User-Id", "user-123")
+				.content("""
+					{
+					  "visibility": "PUBLIC",
+					  "version": 0
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.visibility").value("PUBLIC"))
+			.andExpect(jsonPath("$.data.version").value(1));
+
+		Document updatedDocument = documentRepository.findById(document.getId()).orElseThrow();
+		assertThat(updatedDocument.getVisibility()).isEqualTo(DocumentVisibility.PUBLIC);
+		assertThat(updatedDocument.getUpdatedBy()).isEqualTo("user-123");
+	}
+
+	@Test
+	@DisplayName("성공_같은 공개 상태 요청이면 no-op으로 처리하고 version을 유지한다")
+	void updateDocumentVisibilityKeepsVersionWhenRequestedStateIsSame() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document document = saveDocument(workspace.getId(), null, "공개 상태 대상", "00000000000000000001");
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", document.getId())
+				.contentType("application/json")
+				.header("X-User-Id", "user-123")
+				.content("""
+					{
+					  "visibility": "PRIVATE",
+					  "version": 0
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+			.andExpect(jsonPath("$.data.version").value(0));
+
+		Document updatedDocument = documentRepository.findById(document.getId()).orElseThrow();
+		assertThat(updatedDocument.getVisibility()).isEqualTo(DocumentVisibility.PRIVATE);
+	}
+
+	@Test
+	@DisplayName("실패_공개 상태 변경 요청 version이 현재 문서와 다르면 충돌 응답을 반환한다")
+	void updateDocumentVisibilityReturnsConflictWhenVersionMismatch() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document document = saveDocument(workspace.getId(), null, "공개 상태 대상", "00000000000000000001");
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", document.getId())
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
 			.content("""
 				{
-				  "parentId": null
+				  "visibility": "PUBLIC",
+				  "version": 1
+				}
+				"""));
+
+		assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
+	}
+
+	@Test
+	@DisplayName("실패_허용되지 않은 공개 상태값이면 유효성 검사 오류를 반환한다")
+	void updateDocumentVisibilityReturnsValidationErrorWhenVisibilityInvalid() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document document = saveDocument(workspace.getId(), null, "공개 상태 대상", "00000000000000000001");
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", document.getId())
+			.contentType("application/json")
+			.header("X-User-Id", "user-123")
+			.content("""
+				{
+				  "visibility": "INTERNAL",
+				  "version": 0
 				}
 				"""));
 

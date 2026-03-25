@@ -36,6 +36,13 @@ class PersistenceSchemaIntegrationTest {
     }
 
     @Test
+    @DisplayName("문서 visibility 컬럼은 문자열 enum으로 생성되고 null을 허용하지 않는다")
+    void documentVisibilityColumnIsRequired() {
+        assertThat(countColumn("DOCUMENTS", "VISIBILITY")).isEqualTo(1);
+        assertThat(isNullable("DOCUMENTS", "VISIBILITY")).isFalse();
+    }
+
+    @Test
     @DisplayName("블록 sort_key 컬럼 길이는 ordered sortKey 정책 길이와 일치한다")
     void blockSortKeyColumnLengthMatchesPolicy() {
         assertThat(characterMaximumLength("BLOCKS", "SORT_KEY")).isEqualTo(24);

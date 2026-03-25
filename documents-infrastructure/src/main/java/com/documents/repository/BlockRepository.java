@@ -25,6 +25,14 @@ public interface BlockRepository extends JpaRepository<Block, UUID> {
     long countActiveByDocumentId(@Param("documentId") UUID documentId);
 
     @Query("""
+            select count(b)
+            from Block b
+            where b.document.id = :documentId
+              and b.deletedAt is not null
+            """)
+    long countDeletedByDocumentId(@Param("documentId") UUID documentId);
+
+    @Query("""
             select b
             from Block b
             where b.document.id = :documentId

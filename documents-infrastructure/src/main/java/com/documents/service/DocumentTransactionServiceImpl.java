@@ -47,16 +47,24 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
         for (DocumentTransactionOperationCommand operation : command.operations()) {
             switch (operation.type()) {
                 case BLOCK_CREATE -> appliedOperations.add(
-                        applyCreate(document, operation, actorId, blockReferenceContexts)
+                        DocumentVersionIncrementContext.runWithoutIncrement(
+                                () -> applyCreate(document, operation, actorId, blockReferenceContexts)
+                        )
                 );
                 case BLOCK_REPLACE_CONTENT -> appliedOperations.add(
-                        applyReplaceContent(documentId, operation, actorId, blockReferenceContexts)
+                        DocumentVersionIncrementContext.runWithoutIncrement(
+                                () -> applyReplaceContent(documentId, operation, actorId, blockReferenceContexts)
+                        )
                 );
                 case BLOCK_MOVE -> appliedOperations.add(
-                        applyMove(documentId, operation, actorId, blockReferenceContexts)
+                        DocumentVersionIncrementContext.runWithoutIncrement(
+                                () -> applyMove(documentId, operation, actorId, blockReferenceContexts)
+                        )
                 );
                 case BLOCK_DELETE -> appliedOperations.add(
-                        applyDelete(documentId, operation, actorId, blockReferenceContexts)
+                        DocumentVersionIncrementContext.runWithoutIncrement(
+                                () -> applyDelete(documentId, operation, actorId, blockReferenceContexts)
+                        )
                 );
                 default -> throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
             }

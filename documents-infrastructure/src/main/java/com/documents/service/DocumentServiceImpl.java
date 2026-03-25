@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.documents.domain.Document;
+import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
@@ -49,6 +50,7 @@ public class DocumentServiceImpl implements DocumentService {
 			.title(normalizedTitle)
 			.iconJson(iconJson)
 			.coverJson(coverJson)
+			.visibility(DocumentVisibility.PRIVATE)
 			.sortKey(nextSortKey)
 			.createdBy(normalizedActorId)
 			.updatedBy(normalizedActorId)
@@ -73,17 +75,49 @@ public class DocumentServiceImpl implements DocumentService {
 
 	@Override
 	@Transactional
-	public Document update(UUID documentId, String title, String iconJson, String coverJson, UUID parentId,
+	public Document update(UUID documentId, String title, String iconJson, String coverJson, Integer version,
 		String actorId) {
 		Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
 			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
-		Document parentDocument = findValidParentForUpdate(document, documentId, parentId);
-		applyTitle(document, title);
-		applyMetadata(document, iconJson, coverJson);
-		document.setParent(parentDocument);
+		if (!Objects.equals(document.getVersion(), version)) {
+			throw new BusinessException(BusinessErrorCode.CONFLICT);
+		}
+
+		String nextTitle = title == null ? document.getTitle() : textNormalizer.normalizeRequired(title);
+		String nextIconJson = normalizeNullableMetaJson(iconJson);
+		String nextCoverJson = normalizeNullableMetaJson(coverJson);
+
+		if (Objects.equals(document.getTitle(), nextTitle)
+			&& Objects.equals(document.getIconJson(), nextIconJson)
+			&& Objects.equals(document.getCoverJson(), nextCoverJson)) {
+			return document;
+		}
+
+		document.setTitle(nextTitle);
+		document.setIconJson(nextIconJson);
+		document.setCoverJson(nextCoverJson);
 		document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
 
+		return document;
+	}
+
+	@Override
+	@Transactional
+	public Document updateVisibility(UUID documentId, DocumentVisibility visibility, Integer version, String actorId) {
+		Document document = documentRepository.findByIdAndDeletedAtIsNull(documentId)
+			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+
+		if (!Objects.equals(document.getVersion(), version)) {
+			throw new BusinessException(BusinessErrorCode.CONFLICT);
+		}
+
+		if (document.getVisibility() == visibility) {
+			return document;
+		}
+
+		document.setVisibility(visibility);
+		document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
 		return document;
 	}
 
@@ -97,7 +131,10 @@ public class DocumentServiceImpl implements DocumentService {
 		documentRepository.softDeleteActiveByIds(documentIdsToDelete, normalizedActorId, deletedAt);
 
 		for (UUID currentDocumentId : documentIdsToDelete) {
-			blockService.softDeleteAllByDocumentId(currentDocumentId, normalizedActorId, deletedAt);
+			DocumentVersionIncrementContext.runWithoutIncrement(() -> {
+				blockService.softDeleteAllByDocumentId(currentDocumentId, normalizedActorId, deletedAt);
+				return null;
+			});
 		}
 	}
 
@@ -114,7 +151,10 @@ public class DocumentServiceImpl implements DocumentService {
 		documentRepository.restoreDeletedByIds(documentIdsToRestore, normalizedActorId, restoredAt);
 
 		for (UUID currentDocumentId : documentIdsToRestore) {
-			blockService.restoreAllByDocumentId(currentDocumentId, normalizedActorId, restoredAt);
+			DocumentVersionIncrementContext.runWithoutIncrement(() -> {
+				blockService.restoreAllByDocumentId(currentDocumentId, normalizedActorId, restoredAt);
+				return null;
+			});
 		}
 	}
 
@@ -175,25 +215,6 @@ public class DocumentServiceImpl implements DocumentService {
 		return parentDocument;
 	}
 
-	private Document findValidParentForUpdate(Document document, UUID documentId, UUID parentId) {
-		if (Objects.equals(documentId, parentId)) {
-			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
-		}
-
-		if (parentId == null) {
-			return null;
-		}
-
-		Document parentDocument = findActiveDocument(parentId);
-
-		if (!document.getWorkspaceId().equals(parentDocument.getWorkspaceId())) {
-			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
-		}
-
-		validateNoCycle(documentId, parentDocument);
-		return parentDocument;
-	}
-
 	private Document findValidParentForMove(Document document, UUID targetParentId) {
 		if (Objects.equals(document.getId(), targetParentId)) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
@@ -211,19 +232,6 @@ public class DocumentServiceImpl implements DocumentService {
 
 		validateNoCycle(document.getId(), parentDocument);
 		return parentDocument;
-	}
-
-	private void applyTitle(Document document, String title) {
-		if (title == null) {
-			return;
-		}
-
-		document.setTitle(textNormalizer.normalizeRequired(title));
-	}
-
-	private void applyMetadata(Document document, String iconJson, String coverJson) {
-		document.setIconJson(normalizeNullableMetaJson(iconJson));
-		document.setCoverJson(normalizeNullableMetaJson(coverJson));
 	}
 
 	private void validateNoCycle(UUID documentId, Document parentDocument) {

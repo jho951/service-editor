@@ -4,6 +4,8 @@ import com.documents.common.BaseEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
@@ -72,6 +74,11 @@ public class Document extends BaseEntity {
 
     @Column(name = "cover_json", columnDefinition = "longtext")
     private String coverJson;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false, length = 16)
+    @Default
+    private DocumentVisibility visibility = DocumentVisibility.PRIVATE;
 
     @Column(name = "sort_key", nullable = false, length = 255)
     private String sortKey;

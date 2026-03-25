@@ -1,6 +1,7 @@
 package com.documents.api.document.dto;
 
 import com.documents.api.dto.BaseResponse;
+import com.documents.domain.DocumentVisibility;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
@@ -32,6 +33,9 @@ public class DocumentResponse extends BaseResponse {
 
     @Schema(description = "문서 커버 JSON", nullable = true)
     private JsonNode cover;
+
+    @Schema(description = "문서 공개 상태")
+    private DocumentVisibility visibility;
 
     @Schema(description = "정렬 키", nullable = true)
     private String sortKey;

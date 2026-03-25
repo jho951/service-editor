@@ -56,6 +56,8 @@ class BlockServiceImplTest {
                 textNormalizer,
                 new OrderedSortKeyGenerator()
         );
+        lenient().when(documentRepository.incrementVersion(any(UUID.class), any(), any(LocalDateTime.class)))
+                .thenReturn(1);
     }
 
     @Test
@@ -736,6 +738,168 @@ class BlockServiceImplTest {
                 .hasMessage("요청이 현재 리소스 상태와 충돌합니다.")
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("성공_block create 시 문서 version 증가를 함께 반영한다")
+    void createIncrementsDocumentVersionWhenBlockIsCreated() {
+        UUID documentId = UUID.randomUUID();
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document(documentId)));
+        when(blockRepository.countActiveByDocumentId(documentId)).thenReturn(0L);
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, null))
+                .thenReturn(new ArrayList<>());
+        when(blockRepository.save(any(Block.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        blockService.create(documentId, null, BlockType.TEXT, SIMPLE_CONTENT, null, null, ACTOR_ID);
+
+        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("성공_block update 시 문서 version 증가를 함께 반영한다")
+    void updateIncrementsDocumentVersionWhenContentChanges() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(0);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+        blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID);
+
+        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("성공_block update no-op이면 문서 version을 증가시키지 않는다")
+    void updateDoesNotIncrementDocumentVersionWhenContentIsSame() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(0);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+
+        blockService.update(blockId, toContent("기존 블록"), 0, ACTOR_ID);
+
+        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("성공_block move 시 문서 version 증가를 함께 반영한다")
+    void moveIncrementsDocumentVersionWhenPositionChanges() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, UUID.randomUUID(), "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        Block sibling = block(documentId, null, "000000000002000000000000");
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, null))
+                .thenReturn(List.of(sibling));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+        blockService.move(blockId, null, null, null, 1, ACTOR_ID);
+
+        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("성공_block move no-op이면 문서 version을 증가시키지 않는다")
+    void moveDoesNotIncrementDocumentVersionWhenTargetLocationIsSame() {
+        UUID documentId = UUID.randomUUID();
+        UUID parentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, parentId, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+        Block parent = parentBlock(parentId, documentId);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+        when(blockRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parent));
+        when(blockRepository.findActiveByDocumentIdAndParentIdOrderBySortKey(documentId, parentId))
+                .thenReturn(List.of(block));
+
+        blockService.move(blockId, parentId, null, null, 1, ACTOR_ID);
+
+        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("성공_block delete 시 문서 version 증가를 함께 반영한다")
+    void deleteIncrementsDocumentVersionWhenSoftDeleteSucceeds() {
+        UUID documentId = UUID.randomUUID();
+        UUID rootId = UUID.randomUUID();
+        Block rootBlock = block(documentId, null, "000000000001000000000000");
+        rootBlock.setId(rootId);
+        rootBlock.setVersion(0);
+
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+        when(blockRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootBlock));
+        when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of());
+        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
+                eq(List.of(rootId)),
+                eq(rootId),
+                eq(0),
+                eq(ACTOR_ID),
+                any(LocalDateTime.class)
+        )).thenReturn(1);
+
+        blockService.delete(rootId, 0, ACTOR_ID);
+
+        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("실패_block version mismatch면 문서 version을 증가시키지 않는다")
+    void updateDoesNotIncrementDocumentVersionWhenVersionMismatched() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block block = block(documentId, null, "000000000001000000000000");
+        block.setId(blockId);
+        block.setVersion(1);
+
+        when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(block));
+
+        assertThatThrownBy(() -> blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.CONFLICT);
+
+        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+    }
+
+    @Test
+    @DisplayName("실패_delete conflict면 문서 version을 증가시키지 않는다")
+    void deleteDoesNotIncrementDocumentVersionWhenSoftDeleteConflicts() {
+        UUID documentId = UUID.randomUUID();
+        UUID rootId = UUID.randomUUID();
+        Block rootBlock = block(documentId, null, "000000000001000000000000");
+        rootBlock.setId(rootId);
+        rootBlock.setVersion(0);
+
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+        when(blockRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootBlock));
+        when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of());
+        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
+                eq(List.of(rootId)),
+                eq(rootId),
+                eq(0),
+                eq(ACTOR_ID),
+                any(LocalDateTime.class)
+        )).thenReturn(0);
+
+        assertThatThrownBy(() -> blockService.delete(rootId, 0, ACTOR_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(BusinessErrorCode.CONFLICT);
+
+        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
     }
 
     private Document document(UUID documentId) {

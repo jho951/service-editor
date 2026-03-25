@@ -27,6 +27,7 @@ import com.documents.api.support.ApiResponseAssertions;
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
 import com.documents.domain.Document;
+import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
@@ -1219,16 +1220,15 @@ class DocumentControllerWebMvcTest {
 	void updateDocumentReturnsEnvelope() throws Exception {
 		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		UUID parentId = UUID.randomUUID();
 
 		when(documentService.update(
 			eq(documentId),
 			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
 			eq(ICON_DOC_JSON),
 			eq(COVER_2_JSON),
-			eq(parentId),
+			eq(2),
 			eq(ACTOR_ID)
-		)).thenReturn(document(documentId, workspaceId, parentId, UPDATED_PROJECT_OVERVIEW_TITLE, ACTOR_ID, 3,
+		)).thenReturn(document(documentId, workspaceId, null, UPDATED_PROJECT_OVERVIEW_TITLE, ACTOR_ID, 3,
 			"00000000000000000007",
 			ICON_DOC_JSON,
 			COVER_2_JSON));
@@ -1239,7 +1239,7 @@ class DocumentControllerWebMvcTest {
 				.content("""
 					{
 					  "title": "수정된 프로젝트 개요",
-					  "parentId": "%s",
+					  "version": 2,
 					  "icon": {
 					    "type": "emoji",
 					    "value": "📄"
@@ -1249,14 +1249,14 @@ class DocumentControllerWebMvcTest {
 					    "value": "cover-2"
 					  }
 					}
-					""".formatted(parentId)))
+					"""))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.code").value(200))
 			.andExpect(jsonPath("$.message").value("요청 응답 성공"))
 			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
-			.andExpect(jsonPath("$.data.parentId").value(parentId.toString()))
+			.andExpect(jsonPath("$.data.parentId").doesNotExist())
 			.andExpect(jsonPath("$.data.title").value(UPDATED_PROJECT_OVERVIEW_TITLE))
 			.andExpect(jsonPath("$.data.cover.value").value("cover-2"))
 			.andExpect(jsonPath("$.data.version").value(3));
@@ -1272,7 +1272,7 @@ class DocumentControllerWebMvcTest {
 			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
 			eq(null),
 			eq(null),
-			eq(null),
+			eq(1),
 			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
@@ -1281,7 +1281,8 @@ class DocumentControllerWebMvcTest {
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
-				  "title": "수정된 프로젝트 개요"
+				  "title": "수정된 프로젝트 개요",
+				  "version": 1
 				}
 				"""));
 
@@ -1289,58 +1290,43 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
-	@DisplayName("실패_parentId가 자기 자신이면 잘못된 요청 응답을 반환한다")
-	void updateDocumentReturnsBadRequestWhenParentIsSelf() throws Exception {
+	@DisplayName("성공_문서 수정 요청에 변경 내용이 없어도 기존 version을 그대로 응답한다")
+	void updateDocumentReturnsSameVersionWhenRequestIsNoOp() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 
 		when(documentService.update(
 			eq(documentId),
-			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
-			eq(null),
-			eq(null),
-			eq(documentId),
+			eq(PROJECT_OVERVIEW_TITLE),
+			eq(ICON_DOC_JSON),
+			eq(COVER_1_JSON),
+			eq(3),
 			eq(ACTOR_ID)
-		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
+		)).thenReturn(document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 3,
+			"00000000000000000007",
+			ICON_DOC_JSON,
+			COVER_1_JSON));
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
-			.contentType("application/json")
-			.header(USER_ID_HEADER, ACTOR_ID)
-			.content("""
-				{
-				  "title": "수정된 프로젝트 개요",
-				  "parentId": "%s"
-				}
-				""".formatted(documentId)));
-
-		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
-	}
-
-	@Test
-	@DisplayName("실패_다른 워크스페이스 부모 문서를 지정하면 잘못된 요청 응답을 반환한다")
-	void updateDocumentReturnsBadRequestWhenParentIsOutOfWorkspace() throws Exception {
-		UUID documentId = UUID.randomUUID();
-		UUID parentId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-
-		when(documentService.update(
-			eq(documentId),
-			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
-			eq(null),
-			eq(null),
-			eq(parentId),
-			eq(ACTOR_ID)
-		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
-
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
-			.contentType("application/json")
-			.header(USER_ID_HEADER, ACTOR_ID)
-			.content("""
-				{
-				  "title": "수정된 프로젝트 개요",
-				  "parentId": "11111111-1111-1111-1111-111111111111"
-				}
-				"""));
-
-		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+		mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "title": "프로젝트 개요",
+					  "version": 3,
+					  "icon": {
+					    "type": "emoji",
+					    "value": "📄"
+					  },
+					  "cover": {
+					    "type": "image",
+					    "value": "cover-1"
+					  }
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.title").value(PROJECT_OVERVIEW_TITLE))
+			.andExpect(jsonPath("$.data.version").value(3));
 	}
 
 	@Test
@@ -1353,7 +1339,25 @@ class DocumentControllerWebMvcTest {
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
 				{
-				  "parentId": null
+				  "icon": null
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+		verifyNoInteractions(documentService);
+	}
+
+	@Test
+	@DisplayName("실패_문서 수정 요청에 version이 없으면 유효성 검사 오류를 반환한다")
+	void updateDocumentRejectsMissingVersion() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "title": "수정된 프로젝트 개요"
 				}
 				"""));
 
@@ -1371,12 +1375,40 @@ class DocumentControllerWebMvcTest {
 			.header("X-User-Id", "user-123")
 			.content("""
 				{
-				  "title": " "
+				  "title": " ",
+				  "version": 1
 				}
 				"""));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
 		verifyNoInteractions(documentService);
+	}
+
+	@Test
+	@DisplayName("실패_문서 수정 요청의 version이 현재 문서와 다르면 충돌 응답을 반환한다")
+	void updateDocumentReturnsConflictWhenVersionMismatch() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		when(documentService.update(
+			eq(documentId),
+			eq(UPDATED_PROJECT_OVERVIEW_TITLE),
+			eq(null),
+			eq(null),
+			eq(1),
+			eq(ACTOR_ID)
+		)).thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "title": "수정된 프로젝트 개요",
+				  "version": 1
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
 	}
 
 	@Test
@@ -1388,11 +1420,155 @@ class DocumentControllerWebMvcTest {
 			.contentType("application/json")
 			.content("""
 				{
-				  "title": "수정된 프로젝트 개요"
+				  "title": "수정된 프로젝트 개요",
+				  "version": 1
 				}
 				"""));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+	}
+
+	@Test
+	@DisplayName("성공_PRIVATE 문서 공개 상태를 PUBLIC으로 수정하면 수정 응답을 반환한다")
+	void updateDocumentVisibilityReturnsEnvelope() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 4,
+			"00000000000000000007",
+			ICON_DOC_JSON,
+			COVER_1_JSON);
+		document.setVisibility(DocumentVisibility.PUBLIC);
+
+		when(documentService.updateVisibility(
+			eq(documentId),
+			eq(DocumentVisibility.PUBLIC),
+			eq(3),
+			eq(ACTOR_ID)
+		)).thenReturn(document);
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "visibility": "PUBLIC",
+					  "version": 3
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.visibility").value("PUBLIC"))
+			.andExpect(jsonPath("$.data.version").value(4));
+	}
+
+	@Test
+	@DisplayName("성공_PUBLIC 문서 공개 상태를 PRIVATE로 수정하면 수정 응답을 반환한다")
+	void updateDocumentVisibilityReturnsEnvelopeWhenChangingPublicToPrivate() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 6,
+			"00000000000000000007",
+			ICON_DOC_JSON,
+			COVER_1_JSON);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+
+		when(documentService.updateVisibility(
+			eq(documentId),
+			eq(DocumentVisibility.PRIVATE),
+			eq(5),
+			eq(ACTOR_ID)
+		)).thenReturn(document);
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "visibility": "PRIVATE",
+					  "version": 5
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+			.andExpect(jsonPath("$.data.version").value(6));
+	}
+
+	@Test
+	@DisplayName("성공_동일 공개 상태 요청이면 기존 version을 유지한 응답을 반환한다")
+	void updateDocumentVisibilityReturnsSameVersionWhenRequestedStateIsSame() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		UUID documentId = UUID.randomUUID();
+		Document document = document(documentId, workspaceId, null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 7,
+			"00000000000000000007",
+			ICON_DOC_JSON,
+			COVER_1_JSON);
+		document.setVisibility(DocumentVisibility.PRIVATE);
+
+		when(documentService.updateVisibility(
+			eq(documentId),
+			eq(DocumentVisibility.PRIVATE),
+			eq(7),
+			eq(ACTOR_ID)
+		)).thenReturn(document);
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+				.contentType("application/json")
+				.header(USER_ID_HEADER, ACTOR_ID)
+				.content("""
+					{
+					  "visibility": "PRIVATE",
+					  "version": 7
+					}
+					"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.visibility").value("PRIVATE"))
+			.andExpect(jsonPath("$.data.version").value(7));
+	}
+
+	@Test
+	@DisplayName("실패_공개 상태 변경 요청 version이 현재 문서와 다르면 충돌 응답을 반환한다")
+	void updateDocumentVisibilityReturnsConflictWhenVersionMismatch() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		when(documentService.updateVisibility(
+			eq(documentId),
+			eq(DocumentVisibility.PRIVATE),
+			eq(2),
+			eq(ACTOR_ID)
+		)).thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "visibility": "PRIVATE",
+				  "version": 2
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
+	}
+
+	@Test
+	@DisplayName("실패_허용되지 않은 공개 상태값이면 유효성 검사 오류를 반환한다")
+	void updateDocumentVisibilityRejectsInvalidVisibility() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "visibility": "INTERNAL",
+				  "version": 2
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+		verifyNoInteractions(documentService);
 	}
 
 	@Test

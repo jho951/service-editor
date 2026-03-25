@@ -23,6 +23,7 @@ import com.documents.api.document.dto.MoveDocumentRequest;
 import com.documents.api.document.dto.DocumentTransactionRequest;
 import com.documents.api.document.dto.DocumentTransactionResponse;
 import com.documents.api.document.dto.UpdateDocumentRequest;
+import com.documents.api.document.dto.UpdateDocumentVisibilityRequest;
 import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Document;
 import com.documents.service.BlockService;
@@ -113,7 +114,23 @@ public class DocumentController {
 			request.getTitle(),
 			documentApiMapper.serializeIcon(request),
 			documentApiMapper.serializeCover(request),
-			request.getParentId(),
+			request.getVersion(),
+			userId
+		);
+		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));
+	}
+
+	@Operation(summary = "문서 공개 상태 수정")
+	@PatchMapping("/documents/{documentId}/visibility")
+	public ResponseEntity<GlobalResponse<DocumentResponse>> updateDocumentVisibility(
+		@PathVariable("documentId") UUID documentId,
+		@Valid @RequestBody UpdateDocumentVisibilityRequest request,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		Document updatedDocument = documentService.updateVisibility(
+			documentId,
+			request.getVisibility(),
+			request.getVersion(),
 			userId
 		);
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));

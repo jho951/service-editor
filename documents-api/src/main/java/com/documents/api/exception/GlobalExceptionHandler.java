@@ -1,6 +1,7 @@
 package com.documents.api.exception;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -30,6 +31,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<GlobalResponse<Void>> handleValidationException(MethodArgumentNotValidException ex) {
+        return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus())
+                .body(GlobalResponse.fail(ErrorCode.VALIDATION_ERROR));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<GlobalResponse<Void>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
         return ResponseEntity.status(ErrorCode.VALIDATION_ERROR.getHttpStatus())
                 .body(GlobalResponse.fail(ErrorCode.VALIDATION_ERROR));
     }
