@@ -496,6 +496,35 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("성공_워크스페이스 휴지통 목록 조회는 deletedAt 내림차순으로 반환한다")
+	void getTrashByWorkspaceIdReturnsDeletedDocumentsOrderedByDeletedAtDesc() {
+		UUID workspaceId = UUID.randomUUID();
+		Document olderDeletedDocument = deletedDocument(
+			UUID.randomUUID(),
+			workspaceId,
+			null,
+			"이전 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(4)
+		);
+		Document newerDeletedDocument = deletedDocument(
+			UUID.randomUUID(),
+			workspaceId,
+			null,
+			"최근 삭제 문서",
+			"00000000000000000002",
+			LocalDateTime.now().minusMinutes(1)
+		);
+		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+		when(documentRepository.findDeletedByWorkspaceIdOrderByDeletedAtDesc(workspaceId))
+			.thenReturn(List.of(newerDeletedDocument, olderDeletedDocument));
+
+		List<Document> result = documentService.getTrashByWorkspaceId(workspaceId);
+
+		assertThat(result).containsExactly(newerDeletedDocument, olderDeletedDocument);
+	}
+
+	@Test
 	@DisplayName("성공_문서 삭제는 하위 문서와 블록 정리를 위해 문서 엔티티 hard delete 경로를 사용한다")
 	void deleteUsesDocumentHardDeletePath() {
 		UUID rootId = UUID.randomUUID();

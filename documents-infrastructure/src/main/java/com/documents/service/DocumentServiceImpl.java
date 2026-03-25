@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.documents.domain.Document;
+import com.documents.domain.DocumentTrashPolicy;
 import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
@@ -24,8 +25,6 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
-
-	private static final long TRASH_RETENTION_MINUTES = 5L;
 
 	private final BlockService blockService;
 	private final DocumentRepository documentRepository;
@@ -66,6 +65,13 @@ public class DocumentServiceImpl implements DocumentService {
 	public List<Document> getAllByWorkspaceId(UUID workspaceId) {
 		workspaceService.getById(workspaceId);
 		return documentRepository.findActiveByWorkspaceIdOrderBySortKey(workspaceId);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<Document> getTrashByWorkspaceId(UUID workspaceId) {
+		workspaceService.getById(workspaceId);
+		return documentRepository.findDeletedByWorkspaceIdOrderByDeletedAtDesc(workspaceId);
 	}
 
 	@Override
@@ -171,7 +177,7 @@ public class DocumentServiceImpl implements DocumentService {
 	@Override
 	@Transactional
 	public void purgeExpiredTrash() {
-		LocalDateTime expiredAt = LocalDateTime.now().minusMinutes(TRASH_RETENTION_MINUTES);
+		LocalDateTime expiredAt = LocalDateTime.now().minusMinutes(DocumentTrashPolicy.RETENTION_MINUTES);
 		List<Document> expiredTrashRoots = documentRepository.findExpiredTrashRoots(expiredAt);
 
 		for (Document expiredTrashRoot : expiredTrashRoots) {
@@ -281,7 +287,7 @@ public class DocumentServiceImpl implements DocumentService {
 	}
 
 	private void validateTrashRestoreAvailable(Document document) {
-		LocalDateTime restoreDeadline = document.getDeletedAt().plusMinutes(TRASH_RETENTION_MINUTES);
+		LocalDateTime restoreDeadline = document.getDeletedAt().plusMinutes(DocumentTrashPolicy.RETENTION_MINUTES);
 		if (!LocalDateTime.now().isBefore(restoreDeadline)) {
 			throw new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND);
 		}

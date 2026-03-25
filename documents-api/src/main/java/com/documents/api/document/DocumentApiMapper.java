@@ -3,8 +3,10 @@ package com.documents.api.document;
 import com.documents.api.document.dto.CreateDocumentRequest;
 import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.document.dto.DocumentResponse;
+import com.documents.api.document.dto.TrashDocumentResponse;
 import com.documents.api.document.support.DocumentJsonCodec;
 import com.documents.domain.Document;
+import com.documents.domain.DocumentTrashPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -47,6 +49,16 @@ public class DocumentApiMapper {
                 .version(version)
                 .createdAt(document.getCreatedAt())
                 .updatedAt(document.getUpdatedAt())
+                .build();
+    }
+
+    public TrashDocumentResponse toTrashResponse(Document document) {
+        return TrashDocumentResponse.builder()
+                .documentId(document.getId())
+                .title(document.getTitle())
+                .parentId(document.getParentId())
+                .deletedAt(document.getDeletedAt())
+                .purgeAt(document.getDeletedAt().plusMinutes(DocumentTrashPolicy.RETENTION_MINUTES))
                 .build();
     }
 }

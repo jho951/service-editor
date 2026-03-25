@@ -183,6 +183,73 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("성공_워크스페이스 휴지통 문서 목록 조회 요청에 대해 휴지통 문서 목록을 반환한다")
+	void getTrashDocumentsReturnsTrashDocumentList() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		UUID deletedRootId = UUID.randomUUID();
+		UUID deletedChildId = UUID.randomUUID();
+		Document deletedRoot = document(
+			deletedRootId,
+			workspaceId,
+			null,
+			"삭제된 루트 문서",
+			ACTOR_ID,
+			0,
+			"00000000000000000001",
+			null,
+			null
+		);
+		deletedRoot.setDeletedAt(FIXTURE_TIME);
+		Document deletedChild = document(
+			deletedChildId,
+			workspaceId,
+			deletedRootId,
+			"삭제된 자식 문서",
+			ACTOR_ID,
+			0,
+			"00000000000000000002",
+			null,
+			null
+		);
+		deletedChild.setDeletedAt(FIXTURE_TIME.minusMinutes(1));
+		when(documentService.getTrashByWorkspaceId(workspaceId)).thenReturn(List.of(deletedRoot, deletedChild));
+
+		mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspaceId))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data.length()").value(2))
+			.andExpect(jsonPath("$.data[0].documentId").value(deletedRootId.toString()))
+			.andExpect(jsonPath("$.data[0].title").value("삭제된 루트 문서"))
+			.andExpect(jsonPath("$.data[0].parentId").doesNotExist())
+			.andExpect(jsonPath("$.data[0].deletedAt[0]").value(2026))
+			.andExpect(jsonPath("$.data[0].deletedAt[1]").value(3))
+			.andExpect(jsonPath("$.data[0].deletedAt[2]").value(16))
+			.andExpect(jsonPath("$.data[0].deletedAt[3]").value(0))
+			.andExpect(jsonPath("$.data[0].deletedAt[4]").value(0))
+			.andExpect(jsonPath("$.data[0].purgeAt[0]").value(2026))
+			.andExpect(jsonPath("$.data[0].purgeAt[1]").value(3))
+			.andExpect(jsonPath("$.data[0].purgeAt[2]").value(16))
+			.andExpect(jsonPath("$.data[0].purgeAt[3]").value(0))
+			.andExpect(jsonPath("$.data[0].purgeAt[4]").value(5))
+			.andExpect(jsonPath("$.data[1].documentId").value(deletedChildId.toString()))
+			.andExpect(jsonPath("$.data[1].parentId").value(deletedRootId.toString()));
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 워크스페이스의 휴지통 문서 목록 조회는 리소스 없음 응답을 반환한다")
+	void getTrashDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		when(documentService.getTrashByWorkspaceId(workspaceId))
+			.thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
+
+		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspaceId));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("성공_create와 replace_content transaction 요청에 대해 매핑 응답을 반환한다")
 	void applyTransactionsReturnsAppliedOperations() throws Exception {
 		UUID documentId = UUID.randomUUID();

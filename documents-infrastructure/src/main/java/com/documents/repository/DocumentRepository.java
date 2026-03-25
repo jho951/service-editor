@@ -32,6 +32,18 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 		select d
 		from Document d
 		where d.workspace.id = :workspaceId
+		  and d.deletedAt is not null
+		order by
+		  d.deletedAt desc,
+		  d.createdAt asc,
+		  d.id asc
+		""")
+	List<Document> findDeletedByWorkspaceIdOrderByDeletedAtDesc(@Param("workspaceId") UUID workspaceId);
+
+	@Query("""
+		select d
+		from Document d
+		where d.workspace.id = :workspaceId
 		  and (
 		    (:parentId is null and d.parent is null)
 		    or d.parent.id = :parentId

@@ -125,9 +125,54 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("성공_워크스페이스 휴지통 문서 목록 조회 API는 휴지통 문서와 자동 영구 삭제 예정 시각을 반환한다")
+	void getTrashDocumentsReturnsTrashDocumentList() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document newerDeletedDocument = saveDeletedDocument(
+			workspace.getId(),
+			"최근 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.of(2026, 3, 25, 12, 0, 0)
+		);
+		Document olderDeletedDocument = documentRepository.save(Document.builder()
+			.id(UUID.randomUUID())
+			.workspace(workspaceRepository.getReferenceById(workspace.getId()))
+			.parent(documentRepository.getReferenceById(newerDeletedDocument.getId()))
+			.title("이전 삭제 문서")
+			.sortKey("00000000000000000002")
+			.deletedAt(LocalDateTime.of(2026, 3, 25, 11, 55, 0))
+			.build());
+		saveDocument(workspace.getId(), null, "활성 문서", "00000000000000000003");
+
+		mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspace.getId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data.length()").value(2))
+			.andExpect(jsonPath("$.data[0].documentId").value(newerDeletedDocument.getId().toString()))
+			.andExpect(jsonPath("$.data[0].title").value("최근 삭제 문서"))
+			.andExpect(jsonPath("$.data[0].parentId").doesNotExist())
+			.andExpect(jsonPath("$.data[0].deletedAt").value("2026-03-25T12:00:00"))
+			.andExpect(jsonPath("$.data[0].purgeAt").value("2026-03-25T12:05:00"))
+			.andExpect(jsonPath("$.data[1].documentId").value(olderDeletedDocument.getId().toString()))
+			.andExpect(jsonPath("$.data[1].parentId").value(newerDeletedDocument.getId().toString()))
+			.andExpect(jsonPath("$.data[1].deletedAt").value("2026-03-25T11:55:00"))
+			.andExpect(jsonPath("$.data[1].purgeAt").value("2026-03-25T12:00:00"));
+	}
+
+	@Test
 	@DisplayName("실패_존재하지 않는 워크스페이스의 문서 목록 조회는 리소스 없음 응답을 반환한다")
 	void getDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
 		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID()));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 워크스페이스의 휴지통 문서 목록 조회는 리소스 없음 응답을 반환한다")
+	void getTrashDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
+		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", UUID.randomUUID()));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
 	}
