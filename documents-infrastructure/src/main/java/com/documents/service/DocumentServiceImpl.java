@@ -25,7 +25,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
 
-	private static final long TRASH_RESTORE_AVAILABLE_MINUTES = 5L;
+	private static final long TRASH_RETENTION_MINUTES = 5L;
 
 	private final BlockService blockService;
 	private final DocumentRepository documentRepository;
@@ -170,6 +170,17 @@ public class DocumentServiceImpl implements DocumentService {
 
 	@Override
 	@Transactional
+	public void purgeExpiredTrash() {
+		LocalDateTime expiredAt = LocalDateTime.now().minusMinutes(TRASH_RETENTION_MINUTES);
+		List<Document> expiredTrashRoots = documentRepository.findExpiredTrashRoots(expiredAt);
+
+		for (Document expiredTrashRoot : expiredTrashRoots) {
+			documentRepository.delete(expiredTrashRoot);
+		}
+	}
+
+	@Override
+	@Transactional
 	public void move(UUID documentId, UUID targetParentId, UUID afterDocumentId, UUID beforeDocumentId,
 		String actorId) {
 		Document document = findActiveDocument(documentId);
@@ -270,7 +281,7 @@ public class DocumentServiceImpl implements DocumentService {
 	}
 
 	private void validateTrashRestoreAvailable(Document document) {
-		LocalDateTime restoreDeadline = document.getDeletedAt().plusMinutes(TRASH_RESTORE_AVAILABLE_MINUTES);
+		LocalDateTime restoreDeadline = document.getDeletedAt().plusMinutes(TRASH_RETENTION_MINUTES);
 		if (!LocalDateTime.now().isBefore(restoreDeadline)) {
 			throw new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND);
 		}

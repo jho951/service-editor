@@ -636,6 +636,46 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("성공_휴지통 보관 시간이 지난 루트 문서는 자동 영구 삭제 대상이 된다")
+	void purgeExpiredTrashDeletesExpiredTrashRoot() {
+		UUID documentId = UUID.randomUUID();
+		Document expiredRoot = deletedDocument(
+			documentId,
+			UUID.randomUUID(),
+			null,
+			"만료된 루트 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		when(documentRepository.findExpiredTrashRoots(any(LocalDateTime.class))).thenReturn(List.of(expiredRoot));
+
+		documentService.purgeExpiredTrash();
+
+		verify(documentRepository).delete(expiredRoot);
+	}
+
+	@Test
+	@DisplayName("성공_아직 5분이 지나지 않은 휴지통 문서는 자동 영구 삭제 대상이 아니다")
+	void purgeExpiredTrashSkipsUnexpiredTrash() {
+		when(documentRepository.findExpiredTrashRoots(any(LocalDateTime.class))).thenReturn(List.of());
+
+		documentService.purgeExpiredTrash();
+
+		verify(documentRepository, never()).delete(any(Document.class));
+	}
+
+	@Test
+	@DisplayName("성공_자동 영구 삭제 대상이 없으면 안전하게 종료한다")
+	void purgeExpiredTrashDoesNothingWhenNoExpiredTrashExists() {
+		when(documentRepository.findExpiredTrashRoots(any(LocalDateTime.class))).thenReturn(List.of());
+
+		documentService.purgeExpiredTrash();
+
+		verify(documentRepository).findExpiredTrashRoots(any(LocalDateTime.class));
+		verify(documentRepository, never()).delete(any(Document.class));
+	}
+
+	@Test
 	@DisplayName("성공_활성 부모 밑 삭제 자식 문서는 복구한다")
 	void restoreDeletedChildDocumentWhenParentIsActive() {
 		UUID workspaceId = UUID.randomUUID();

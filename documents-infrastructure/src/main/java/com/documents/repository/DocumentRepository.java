@@ -71,6 +71,23 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 		""")
 	List<Document> findDeletedChildrenByParentIdOrderBySortKey(@Param("parentId") UUID parentId);
 
+	@Query("""
+		select d
+		from Document d
+		left join d.parent p
+		where d.deletedAt is not null
+		  and d.deletedAt <= :expiredAt
+		  and (
+		    p is null
+		    or p.deletedAt is null
+		  )
+		order by
+		  d.deletedAt asc,
+		  d.createdAt asc,
+		  d.id asc
+		""")
+	List<Document> findExpiredTrashRoots(@Param("expiredAt") LocalDateTime expiredAt);
+
 	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query("""
 		update Document d

@@ -31,6 +31,7 @@ import com.documents.domain.Workspace;
 import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
 import com.documents.repository.WorkspaceRepository;
+import com.documents.service.DocumentService;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -52,6 +53,9 @@ class DocumentApiIntegrationTest {
 
 	@Autowired
 	private DocumentDeleteSqlCounter documentDeleteSqlCounter;
+
+	@Autowired
+	private DocumentService documentService;
 
 	@BeforeEach
 	void setUp() {
@@ -652,6 +656,62 @@ class DocumentApiIntegrationTest {
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("성공_휴지통 보관 시간이 지난 문서는 자동 영구 삭제 시 하위 문서와 블록까지 함께 삭제한다")
+	void purgeExpiredTrashDeletesDescendantDocumentsAndBlocks() {
+		Workspace workspace = workspace("Docs Root");
+		Document trashRoot = saveDeletedDocument(
+			workspace.getId(),
+			"만료된 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		Document trashChild = documentRepository.save(Document.builder()
+			.id(UUID.randomUUID())
+			.workspace(workspaceRepository.getReferenceById(workspace.getId()))
+			.parent(documentRepository.getReferenceById(trashRoot.getId()))
+			.title("만료된 하위 문서")
+			.sortKey("00000000000000000002")
+			.deletedAt(LocalDateTime.now().minusMinutes(6))
+			.build());
+		Block rootBlock = saveDeletedBlock(
+			trashRoot.getId(),
+			null,
+			"루트 삭제 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		Block childBlock = saveDeletedBlock(
+			trashChild.getId(),
+			null,
+			"하위 삭제 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		Document safeDocument = saveDeletedDocument(
+			workspace.getId(),
+			"미만료 삭제 문서",
+			"00000000000000000003",
+			LocalDateTime.now().minusMinutes(4).minusSeconds(59)
+		);
+		Block safeBlock = saveDeletedBlock(
+			safeDocument.getId(),
+			null,
+			"미만료 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(4).minusSeconds(59)
+		);
+
+		documentService.purgeExpiredTrash();
+
+		assertThat(documentRepository.findById(trashRoot.getId())).isEmpty();
+		assertThat(documentRepository.findById(trashChild.getId())).isEmpty();
+		assertThat(blockRepository.findById(rootBlock.getId())).isEmpty();
+		assertThat(blockRepository.findById(childBlock.getId())).isEmpty();
+		assertThat(documentRepository.findById(safeDocument.getId())).isPresent();
+		assertThat(blockRepository.findById(safeBlock.getId())).isPresent();
 	}
 
 	@Test

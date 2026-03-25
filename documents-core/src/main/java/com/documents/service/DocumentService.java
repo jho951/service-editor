@@ -14,5 +14,6 @@ public interface DocumentService {
     void delete(UUID documentId, String actorId);
     void trash(UUID documentId, String actorId);
     void restore(UUID documentId, String actorId);
+    void purgeExpiredTrash();
     void move(UUID documentId, UUID targetParentId, UUID afterDocumentId, UUID beforeDocumentId, String actorId);
 }
