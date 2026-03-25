@@ -574,13 +574,29 @@ class DocumentApiIntegrationTest {
 	@DisplayName("성공_문서 복구 API는 삭제 문서와 해당 문서 소속 삭제 블록을 함께 복구한다")
 	void restoreDocumentRestoresDocumentAndOwnedDeletedBlocks() throws Exception {
 		Workspace workspace = workspace("Docs Root");
-		Document deletedDocument = saveDeletedDocument(workspace.getId(), "복구 대상 문서", "00000000000000000001");
+		Document deletedDocument = saveDeletedDocument(
+			workspace.getId(),
+			"복구 대상 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(1)
+		);
 		Document otherDocument = saveDocument(workspace.getId(), null, "다른 문서", "00000000000000000002");
 
-		Block deletedTargetBlock = saveDeletedBlock(deletedDocument.getId(), null, "복구 대상 블록",
-			"000000000001000000000000");
+		Block deletedTargetBlock = saveDeletedBlock(
+			deletedDocument.getId(),
+			null,
+			"복구 대상 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(1)
+		);
 		Block activeTargetBlock = saveBlock(deletedDocument.getId(), null, "활성 블록", "000000000002000000000000");
-		Block deletedOtherBlock = saveDeletedBlock(otherDocument.getId(), null, "다른 문서 블록", "000000000001000000000000");
+		Block deletedOtherBlock = saveDeletedBlock(
+			otherDocument.getId(),
+			null,
+			"다른 문서 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(1)
+		);
 
 		mockMvc.perform(post("/v1/documents/{documentId}/restore", deletedDocument.getId())
 				.header("X-User-Id", "user-123"))
@@ -616,6 +632,23 @@ class DocumentApiIntegrationTest {
 		Document activeDocument = saveDocument(workspace.getId(), null, "활성 문서", "00000000000000000001");
 
 		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", activeDocument.getId())
+			.header("X-User-Id", "user-123"));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_휴지통 보관 시간 5분이 지난 문서 복구 요청은 문서 없음 응답을 반환한다")
+	void restoreDocumentReturnsNotFoundWhenTrashRetentionExpired() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document expiredDeletedDocument = saveDeletedDocument(
+			workspace.getId(),
+			"만료된 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(6)
+		);
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", expiredDeletedDocument.getId())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -840,12 +873,16 @@ class DocumentApiIntegrationTest {
 	}
 
 	private Document saveDeletedDocument(UUID workspaceId, String title, String sortKey) {
+		return saveDeletedDocument(workspaceId, title, sortKey, LocalDateTime.now().minusMinutes(1));
+	}
+
+	private Document saveDeletedDocument(UUID workspaceId, String title, String sortKey, LocalDateTime deletedAt) {
 		return documentRepository.save(Document.builder()
 			.id(UUID.randomUUID())
 			.workspace(workspaceRepository.getReferenceById(workspaceId))
 			.title(title)
 			.sortKey(sortKey)
-			.deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
+			.deletedAt(deletedAt)
 			.build());
 	}
 
@@ -863,6 +900,16 @@ class DocumentApiIntegrationTest {
 	}
 
 	private Block saveDeletedBlock(UUID documentId, UUID parentId, String content, String sortKey) {
+		return saveDeletedBlock(documentId, parentId, content, sortKey, LocalDateTime.now().minusMinutes(1));
+	}
+
+	private Block saveDeletedBlock(
+		UUID documentId,
+		UUID parentId,
+		String content,
+		String sortKey,
+		LocalDateTime deletedAt
+	) {
 		return blockRepository.save(Block.builder()
 			.id(UUID.randomUUID())
 			.document(documentRepository.getReferenceById(documentId))
@@ -872,7 +919,7 @@ class DocumentApiIntegrationTest {
 			.sortKey(sortKey)
 			.createdBy("user-123")
 			.updatedBy("user-123")
-			.deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
+			.deletedAt(deletedAt)
 			.build());
 	}
 

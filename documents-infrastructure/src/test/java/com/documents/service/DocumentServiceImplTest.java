@@ -612,6 +612,30 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("실패_휴지통 보관 시간 5분이 지난 문서는 복구할 수 없다")
+	void restoreFailsWhenTrashRetentionExpired() {
+		UUID documentId = UUID.randomUUID();
+		Document expiredDeletedDocument = deletedDocument(
+			documentId,
+			UUID.randomUUID(),
+			null,
+			"만료된 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		when(documentRepository.findById(documentId)).thenReturn(Optional.of(expiredDeletedDocument));
+
+		assertThatThrownBy(() -> documentService.restore(documentId, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청한 문서를 찾을 수 없습니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+
+		verify(documentRepository, never()).restoreDeletedByIds(anyList(), any(), any());
+		verify(blockService, never()).restoreAllByDocumentId(any(), any(), any());
+	}
+
+	@Test
 	@DisplayName("성공_활성 부모 밑 삭제 자식 문서는 복구한다")
 	void restoreDeletedChildDocumentWhenParentIsActive() {
 		UUID workspaceId = UUID.randomUUID();
@@ -1110,8 +1134,19 @@ class DocumentServiceImplTest {
 	}
 
 	private Document deletedDocument(UUID documentId, UUID workspaceId, UUID parentId, String title, String sortKey) {
+		return deletedDocument(documentId, workspaceId, parentId, title, sortKey, LocalDateTime.now().minusMinutes(1));
+	}
+
+	private Document deletedDocument(
+		UUID documentId,
+		UUID workspaceId,
+		UUID parentId,
+		String title,
+		String sortKey,
+		LocalDateTime deletedAt
+	) {
 		Document document = document(documentId, workspaceId, parentId, title, sortKey);
-		document.setDeletedAt(LocalDateTime.of(2026, 3, 16, 0, 0));
+		document.setDeletedAt(deletedAt);
 		return document;
 	}
 

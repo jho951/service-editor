@@ -25,6 +25,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DocumentServiceImpl implements DocumentService {
 
+	private static final long TRASH_RESTORE_AVAILABLE_MINUTES = 5L;
+
 	private final BlockService blockService;
 	private final DocumentRepository documentRepository;
 	private final WorkspaceService workspaceService;
@@ -149,6 +151,7 @@ public class DocumentServiceImpl implements DocumentService {
 	@Transactional
 	public void restore(UUID documentId, String actorId) {
 		Document deletedDocument = findDeletedDocument(documentId);
+		validateTrashRestoreAvailable(deletedDocument);
 		validateParentForRestore(deletedDocument);
 
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
@@ -263,6 +266,13 @@ public class DocumentServiceImpl implements DocumentService {
 
 		if (parentDocument.getDeletedAt() != null) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+	}
+
+	private void validateTrashRestoreAvailable(Document document) {
+		LocalDateTime restoreDeadline = document.getDeletedAt().plusMinutes(TRASH_RESTORE_AVAILABLE_MINUTES);
+		if (!LocalDateTime.now().isBefore(restoreDeadline)) {
+			throw new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND);
 		}
 	}
 

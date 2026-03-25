@@ -1050,6 +1050,19 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("실패_휴지통 보관 시간 5분이 지난 문서 복구 요청은 문서 없음 응답을 반환한다")
+	void restoreDocumentReturnsNotFoundWhenTrashRetentionExpired() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).restore(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("실패_사용자 식별자 헤더 없이 문서 복구 요청하면 인증 오류 응답을 반환한다")
 	void restoreDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
 		UUID documentId = UUID.randomUUID();
