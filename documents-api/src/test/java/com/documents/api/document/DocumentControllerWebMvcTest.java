@@ -183,6 +183,73 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("성공_워크스페이스 휴지통 문서 목록 조회 요청에 대해 휴지통 문서 목록을 반환한다")
+	void getTrashDocumentsReturnsTrashDocumentList() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		UUID deletedRootId = UUID.randomUUID();
+		UUID deletedChildId = UUID.randomUUID();
+		Document deletedRoot = document(
+			deletedRootId,
+			workspaceId,
+			null,
+			"삭제된 루트 문서",
+			ACTOR_ID,
+			0,
+			"00000000000000000001",
+			null,
+			null
+		);
+		deletedRoot.setDeletedAt(FIXTURE_TIME);
+		Document deletedChild = document(
+			deletedChildId,
+			workspaceId,
+			deletedRootId,
+			"삭제된 자식 문서",
+			ACTOR_ID,
+			0,
+			"00000000000000000002",
+			null,
+			null
+		);
+		deletedChild.setDeletedAt(FIXTURE_TIME.minusMinutes(1));
+		when(documentService.getTrashByWorkspaceId(workspaceId)).thenReturn(List.of(deletedRoot, deletedChild));
+
+		mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspaceId))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data.length()").value(2))
+			.andExpect(jsonPath("$.data[0].documentId").value(deletedRootId.toString()))
+			.andExpect(jsonPath("$.data[0].title").value("삭제된 루트 문서"))
+			.andExpect(jsonPath("$.data[0].parentId").doesNotExist())
+			.andExpect(jsonPath("$.data[0].deletedAt[0]").value(2026))
+			.andExpect(jsonPath("$.data[0].deletedAt[1]").value(3))
+			.andExpect(jsonPath("$.data[0].deletedAt[2]").value(16))
+			.andExpect(jsonPath("$.data[0].deletedAt[3]").value(0))
+			.andExpect(jsonPath("$.data[0].deletedAt[4]").value(0))
+			.andExpect(jsonPath("$.data[0].purgeAt[0]").value(2026))
+			.andExpect(jsonPath("$.data[0].purgeAt[1]").value(3))
+			.andExpect(jsonPath("$.data[0].purgeAt[2]").value(16))
+			.andExpect(jsonPath("$.data[0].purgeAt[3]").value(0))
+			.andExpect(jsonPath("$.data[0].purgeAt[4]").value(5))
+			.andExpect(jsonPath("$.data[1].documentId").value(deletedChildId.toString()))
+			.andExpect(jsonPath("$.data[1].parentId").value(deletedRootId.toString()));
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 워크스페이스의 휴지통 문서 목록 조회는 리소스 없음 응답을 반환한다")
+	void getTrashDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
+		UUID workspaceId = UUID.randomUUID();
+		when(documentService.getTrashByWorkspaceId(workspaceId))
+			.thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
+
+		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspaceId));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("성공_create와 replace_content transaction 요청에 대해 매핑 응답을 반환한다")
 	void applyTransactionsReturnsAppliedOperations() throws Exception {
 		UUID documentId = UUID.randomUUID();
@@ -1050,6 +1117,20 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
+	@DisplayName("실패_휴지통 보관 시간 5분이 지난 문서 복구 요청은 문서 없음 응답을 반환한다")
+	void restoreDocumentReturnsNotFoundWhenTrashRetentionExpired() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).restore(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+
+	@Test
 	@DisplayName("실패_사용자 식별자 헤더 없이 문서 복구 요청하면 인증 오류 응답을 반환한다")
 	void restoreDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
 		UUID documentId = UUID.randomUUID();
@@ -1623,5 +1704,60 @@ class DocumentControllerWebMvcTest {
 		var result = mockMvc.perform(delete("/v1/documents/{documentId}", documentId));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+	}
+
+	@Test
+	@DisplayName("성공_PATCH 문서 휴지통 이동 요청 시 성공 응답을 반환한다")
+	void trashDocumentReturnsSuccessEnvelope() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doNothing().when(documentService).trash(documentId, ACTOR_ID);
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+				.header(USER_ID_HEADER, ACTOR_ID))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.message").value("요청 응답 성공"))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data").doesNotExist());
+
+		verify(documentService).trash(documentId, ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서 휴지통 이동 시 문서 없음 응답을 반환한다")
+	void trashDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).trash(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_이미 휴지통 상태인 문서 휴지통 이동 시 문서 없음 응답을 반환한다")
+	void trashDocumentReturnsNotFoundWhenDocumentAlreadyTrashed() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).trash(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_X-User-Id 헤더가 없으면 문서 휴지통 이동은 인증 오류를 반환한다")
+	void trashDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+		verify(documentService, never()).trash(any(), any());
 	}
 }

@@ -8,10 +8,13 @@ import java.util.UUID;
 public interface DocumentService {
     Document create(UUID workspaceId, UUID parentId, String title, String iconJson, String coverJson, String actorId);
     List<Document> getAllByWorkspaceId(UUID workspaceId);
+    List<Document> getTrashByWorkspaceId(UUID workspaceId);
     Document getById(UUID documentId);
     Document update(UUID documentId, String title, String iconJson, String coverJson, Integer version, String actorId);
     Document updateVisibility(UUID documentId, DocumentVisibility visibility, Integer version, String actorId);
     void delete(UUID documentId, String actorId);
+    void trash(UUID documentId, String actorId);
     void restore(UUID documentId, String actorId);
+    void purgeExpiredTrash();
     void move(UUID documentId, UUID targetParentId, UUID afterDocumentId, UUID beforeDocumentId, String actorId);
 }

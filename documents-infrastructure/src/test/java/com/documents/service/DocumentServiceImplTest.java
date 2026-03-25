@@ -482,15 +482,84 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("성공_문서 삭제 시 문서와 활성 블록을 같은 시각으로 soft delete 처리한다")
-	void deleteSoftDeletesDocumentAndActiveBlocks() {
+	@DisplayName("성공_문서 삭제 시 대상 문서를 즉시 hard delete 처리한다")
+	void deleteHardDeletesDocument() {
+		UUID documentId = UUID.randomUUID();
+		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
+
+		documentService.delete(documentId, " user-456 ");
+
+		verify(documentRepository).delete(targetDocument);
+		verifyNoInteractions(blockService);
+		verify(textNormalizer, never()).normalizeNullable(any());
+	}
+
+	@Test
+	@DisplayName("성공_워크스페이스 휴지통 목록 조회는 deletedAt 내림차순으로 반환한다")
+	void getTrashByWorkspaceIdReturnsDeletedDocumentsOrderedByDeletedAtDesc() {
+		UUID workspaceId = UUID.randomUUID();
+		Document olderDeletedDocument = deletedDocument(
+			UUID.randomUUID(),
+			workspaceId,
+			null,
+			"이전 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(4)
+		);
+		Document newerDeletedDocument = deletedDocument(
+			UUID.randomUUID(),
+			workspaceId,
+			null,
+			"최근 삭제 문서",
+			"00000000000000000002",
+			LocalDateTime.now().minusMinutes(1)
+		);
+		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+		when(documentRepository.findDeletedByWorkspaceIdOrderByDeletedAtDesc(workspaceId))
+			.thenReturn(List.of(newerDeletedDocument, olderDeletedDocument));
+
+		List<Document> result = documentService.getTrashByWorkspaceId(workspaceId);
+
+		assertThat(result).containsExactly(newerDeletedDocument, olderDeletedDocument);
+	}
+
+	@Test
+	@DisplayName("성공_문서 삭제는 하위 문서와 블록 정리를 위해 문서 엔티티 hard delete 경로를 사용한다")
+	void deleteUsesDocumentHardDeletePath() {
+		UUID rootId = UUID.randomUUID();
+		Document rootDocument = document(rootId, UUID.randomUUID(), null, "루트 문서", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootDocument));
+
+		documentService.delete(rootId, ACTOR_ID);
+
+		verify(documentRepository).delete(rootDocument);
+		verify(documentRepository, never()).softDeleteActiveByIds(any(), any(), any());
+		verifyNoInteractions(blockService);
+	}
+
+	@Test
+	@DisplayName("실패_이미 삭제되었거나 없는 문서는 문서 없음 예외를 던진다")
+	void deleteThrowsWhenDocumentMissing() {
+		UUID documentId = UUID.randomUUID();
+
+		assertThatThrownBy(() -> documentService.delete(documentId, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청한 문서를 찾을 수 없습니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+	}
+
+	@Test
+	@DisplayName("성공_문서 휴지통 이동 시 문서와 활성 블록을 같은 시각으로 soft delete 처리한다")
+	void trashSoftDeletesDocumentAndActiveBlocks() {
 		UUID documentId = UUID.randomUUID();
 		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
 		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(documentId)).thenReturn(List.of());
 		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
 
-		documentService.delete(documentId, " user-456 ");
+		documentService.trash(documentId, " user-456 ");
 
 		ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
 		verify(documentRepository).softDeleteActiveByIds(eq(List.of(documentId)), eq("user-456"),
@@ -499,15 +568,15 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("성공_사용자 식별자가 공백이면 block 서비스에도 null 사용자로 위임한다")
-	void deleteDelegatesNullActorToBlockService() {
+	@DisplayName("성공_사용자 식별자가 공백이면 휴지통 이동도 null 사용자로 위임한다")
+	void trashDelegatesNullActorToBlockService() {
 		UUID documentId = UUID.randomUUID();
 		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
 		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(documentId)).thenReturn(List.of());
 		when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
 
-		documentService.delete(documentId, " ");
+		documentService.trash(documentId, " ");
 
 		ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
 		verify(documentRepository).softDeleteActiveByIds(eq(List.of(documentId)), isNull(),
@@ -516,8 +585,8 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("성공_문서 삭제 시 활성 하위 문서와 각 문서의 블록도 함께 soft delete 처리한다")
-	void deleteSoftDeletesDescendantDocumentsAndBlocks() {
+	@DisplayName("성공_문서 휴지통 이동 시 활성 하위 문서와 각 문서의 블록도 함께 soft delete 처리한다")
+	void trashSoftDeletesDescendantDocumentsAndBlocks() {
 		UUID workspaceId = UUID.randomUUID();
 		UUID rootId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
@@ -526,18 +595,15 @@ class DocumentServiceImplTest {
 		Document childDocument = document(childId, workspaceId, rootId, "하위 문서", "00000000000000000002");
 		Document grandChildDocument = document(grandChildId, workspaceId, childId, "손자 문서", "00000000000000000003");
 		when(documentRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootDocument));
-		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(
-			List.of(childDocument));
-		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(childId))
-			.thenReturn(List.of(grandChildDocument));
-		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(grandChildId)).thenReturn(
-			List.of());
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of(childDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(childId)).thenReturn(List.of(grandChildDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(grandChildId)).thenReturn(List.of());
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
-		documentService.delete(rootId, ACTOR_ID);
+		documentService.trash(rootId, ACTOR_ID);
 
 		ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-		verify(documentRepository, times(1)).softDeleteActiveByIds(eq(List.of(rootId, childId, grandChildId)),
+		verify(documentRepository).softDeleteActiveByIds(eq(List.of(rootId, childId, grandChildId)),
 			eq(ACTOR_ID), deletedAtCaptor.capture());
 		verify(blockService).softDeleteAllByDocumentId(eq(rootId), eq(ACTOR_ID), eq(deletedAtCaptor.getValue()));
 		verify(blockService).softDeleteAllByDocumentId(eq(childId), eq(ACTOR_ID), eq(deletedAtCaptor.getValue()));
@@ -545,12 +611,11 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("실패_이미 삭제되었거나 없는 문서는 문서 없음 예외를 던진다")
-	void deleteThrowsWhenDocumentMissing() {
+	@DisplayName("실패_이미 휴지통 상태이거나 없는 문서를 휴지통 이동하면 문서 없음 예외를 던진다")
+	void trashThrowsWhenDocumentMissing() {
 		UUID documentId = UUID.randomUUID();
-		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
-		assertThatThrownBy(() -> documentService.delete(documentId, ACTOR_ID))
+		assertThatThrownBy(() -> documentService.trash(documentId, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.hasMessage("요청한 문서를 찾을 수 없습니다.")
 			.extracting("errorCode")
@@ -576,6 +641,70 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("실패_휴지통 보관 시간 5분이 지난 문서는 복구할 수 없다")
+	void restoreFailsWhenTrashRetentionExpired() {
+		UUID documentId = UUID.randomUUID();
+		Document expiredDeletedDocument = deletedDocument(
+			documentId,
+			UUID.randomUUID(),
+			null,
+			"만료된 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		when(documentRepository.findById(documentId)).thenReturn(Optional.of(expiredDeletedDocument));
+
+		assertThatThrownBy(() -> documentService.restore(documentId, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청한 문서를 찾을 수 없습니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+
+		verify(documentRepository, never()).restoreDeletedByIds(anyList(), any(), any());
+		verify(blockService, never()).restoreAllByDocumentId(any(), any(), any());
+	}
+
+	@Test
+	@DisplayName("성공_휴지통 보관 시간이 지난 루트 문서는 자동 영구 삭제 대상이 된다")
+	void purgeExpiredTrashDeletesExpiredTrashRoot() {
+		UUID documentId = UUID.randomUUID();
+		Document expiredRoot = deletedDocument(
+			documentId,
+			UUID.randomUUID(),
+			null,
+			"만료된 루트 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		when(documentRepository.findExpiredTrashRoots(any(LocalDateTime.class))).thenReturn(List.of(expiredRoot));
+
+		documentService.purgeExpiredTrash();
+
+		verify(documentRepository).delete(expiredRoot);
+	}
+
+	@Test
+	@DisplayName("성공_아직 5분이 지나지 않은 휴지통 문서는 자동 영구 삭제 대상이 아니다")
+	void purgeExpiredTrashSkipsUnexpiredTrash() {
+		when(documentRepository.findExpiredTrashRoots(any(LocalDateTime.class))).thenReturn(List.of());
+
+		documentService.purgeExpiredTrash();
+
+		verify(documentRepository, never()).delete(any(Document.class));
+	}
+
+	@Test
+	@DisplayName("성공_자동 영구 삭제 대상이 없으면 안전하게 종료한다")
+	void purgeExpiredTrashDoesNothingWhenNoExpiredTrashExists() {
+		when(documentRepository.findExpiredTrashRoots(any(LocalDateTime.class))).thenReturn(List.of());
+
+		documentService.purgeExpiredTrash();
+
+		verify(documentRepository).findExpiredTrashRoots(any(LocalDateTime.class));
+		verify(documentRepository, never()).delete(any(Document.class));
+	}
+
+	@Test
 	@DisplayName("성공_활성 부모 밑 삭제 자식 문서는 복구한다")
 	void restoreDeletedChildDocumentWhenParentIsActive() {
 		UUID workspaceId = UUID.randomUUID();
@@ -593,6 +722,7 @@ class DocumentServiceImplTest {
 		verify(documentRepository).restoreDeletedByIds(eq(List.of(childId)), eq(ACTOR_ID),
 			any(LocalDateTime.class));
 	}
+
 
 	@Test
 	@DisplayName("실패_삭제된 부모 밑 삭제 자식 문서는 단독 복구할 수 없다")
@@ -1074,8 +1204,19 @@ class DocumentServiceImplTest {
 	}
 
 	private Document deletedDocument(UUID documentId, UUID workspaceId, UUID parentId, String title, String sortKey) {
+		return deletedDocument(documentId, workspaceId, parentId, title, sortKey, LocalDateTime.now().minusMinutes(1));
+	}
+
+	private Document deletedDocument(
+		UUID documentId,
+		UUID workspaceId,
+		UUID parentId,
+		String title,
+		String sortKey,
+		LocalDateTime deletedAt
+	) {
 		Document document = document(documentId, workspaceId, parentId, title, sortKey);
-		document.setDeletedAt(LocalDateTime.of(2026, 3, 16, 0, 0));
+		document.setDeletedAt(deletedAt);
 		return document;
 	}
 

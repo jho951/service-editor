@@ -22,6 +22,7 @@ import com.documents.api.document.dto.DocumentResponse;
 import com.documents.api.document.dto.MoveDocumentRequest;
 import com.documents.api.document.dto.DocumentTransactionRequest;
 import com.documents.api.document.dto.DocumentTransactionResponse;
+import com.documents.api.document.dto.TrashDocumentResponse;
 import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.document.dto.UpdateDocumentVisibilityRequest;
 import com.documents.api.dto.GlobalResponse;
@@ -58,6 +59,17 @@ public class DocumentController {
 	) {
 		List<DocumentResponse> response = documentService.getAllByWorkspaceId(workspaceId).stream()
 			.map(documentApiMapper::toResponse)
+			.toList();
+		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
+	}
+
+	@Operation(summary = "워크스페이스 휴지통 문서 목록 조회")
+	@GetMapping("/workspaces/{workspaceId}/trash/documents")
+	public ResponseEntity<GlobalResponse<List<TrashDocumentResponse>>> getTrashDocuments(
+		@PathVariable("workspaceId") UUID workspaceId
+	) {
+		List<TrashDocumentResponse> response = documentService.getTrashByWorkspaceId(workspaceId).stream()
+			.map(documentApiMapper::toTrashResponse)
 			.toList();
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
 	}
@@ -156,6 +168,16 @@ public class DocumentController {
 		@RequestHeader(USER_ID_HEADER) String userId
 	) {
 		documentService.delete(documentId, userId);
+		return ResponseEntity.ok(GlobalResponse.ok());
+	}
+
+	@Operation(summary = "문서 휴지통 이동")
+	@PatchMapping("/documents/{documentId}/trash")
+	public ResponseEntity<GlobalResponse<Void>> trashDocument(
+		@PathVariable("documentId") UUID documentId,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		documentService.trash(documentId, userId);
 		return ResponseEntity.ok(GlobalResponse.ok());
 	}
 

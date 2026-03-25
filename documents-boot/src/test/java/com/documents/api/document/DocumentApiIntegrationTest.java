@@ -31,6 +31,7 @@ import com.documents.domain.Workspace;
 import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
 import com.documents.repository.WorkspaceRepository;
+import com.documents.service.DocumentService;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -52,6 +53,9 @@ class DocumentApiIntegrationTest {
 
 	@Autowired
 	private DocumentDeleteSqlCounter documentDeleteSqlCounter;
+
+	@Autowired
+	private DocumentService documentService;
 
 	@BeforeEach
 	void setUp() {
@@ -121,9 +125,54 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("성공_워크스페이스 휴지통 문서 목록 조회 API는 휴지통 문서와 자동 영구 삭제 예정 시각을 반환한다")
+	void getTrashDocumentsReturnsTrashDocumentList() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document newerDeletedDocument = saveDeletedDocument(
+			workspace.getId(),
+			"최근 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.of(2026, 3, 25, 12, 0, 0)
+		);
+		Document olderDeletedDocument = documentRepository.save(Document.builder()
+			.id(UUID.randomUUID())
+			.workspace(workspaceRepository.getReferenceById(workspace.getId()))
+			.parent(documentRepository.getReferenceById(newerDeletedDocument.getId()))
+			.title("이전 삭제 문서")
+			.sortKey("00000000000000000002")
+			.deletedAt(LocalDateTime.of(2026, 3, 25, 11, 55, 0))
+			.build());
+		saveDocument(workspace.getId(), null, "활성 문서", "00000000000000000003");
+
+		mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspace.getId()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data.length()").value(2))
+			.andExpect(jsonPath("$.data[0].documentId").value(newerDeletedDocument.getId().toString()))
+			.andExpect(jsonPath("$.data[0].title").value("최근 삭제 문서"))
+			.andExpect(jsonPath("$.data[0].parentId").doesNotExist())
+			.andExpect(jsonPath("$.data[0].deletedAt").value("2026-03-25T12:00:00"))
+			.andExpect(jsonPath("$.data[0].purgeAt").value("2026-03-25T12:05:00"))
+			.andExpect(jsonPath("$.data[1].documentId").value(olderDeletedDocument.getId().toString()))
+			.andExpect(jsonPath("$.data[1].parentId").value(newerDeletedDocument.getId().toString()))
+			.andExpect(jsonPath("$.data[1].deletedAt").value("2026-03-25T11:55:00"))
+			.andExpect(jsonPath("$.data[1].purgeAt").value("2026-03-25T12:00:00"));
+	}
+
+	@Test
 	@DisplayName("실패_존재하지 않는 워크스페이스의 문서 목록 조회는 리소스 없음 응답을 반환한다")
 	void getDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
 		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID()));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 워크스페이스의 휴지통 문서 목록 조회는 리소스 없음 응답을 반환한다")
+	void getTrashDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
+		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", UUID.randomUUID()));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
 	}
@@ -433,8 +482,8 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("성공_문서 삭제 API는 하위 문서와 각 문서의 활성 블록까지 soft delete 처리한다")
-	void deleteDocumentSoftDeletesDescendantDocumentsAndBlocks() throws Exception {
+	@DisplayName("성공_문서 삭제 API는 하위 문서와 각 문서의 소속 블록까지 hard delete 처리한다")
+	void deleteDocumentHardDeletesDescendantDocumentsAndBlocks() throws Exception {
 		Workspace workspace = workspace("Docs Root");
 		Document targetDocument = saveDocument(workspace.getId(), null, "삭제 대상 문서", "00000000000000000001");
 		Document childDocument = saveDocument(workspace.getId(), targetDocument.getId(), "하위 문서",
@@ -455,21 +504,15 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.code").value(200));
 
-		Document deletedDocument = documentRepository.findById(targetDocument.getId()).orElseThrow();
-		Document deletedChildDocument = documentRepository.findById(childDocument.getId()).orElseThrow();
-		assertThat(deletedDocument.getDeletedAt()).isNotNull();
-		assertThat(deletedChildDocument.getDeletedAt()).isNotNull();
-
-		Block deletedRootBlock = blockRepository.findById(targetRootBlock.getId()).orElseThrow();
-		Block deletedChildBlock = blockRepository.findById(targetChildBlock.getId()).orElseThrow();
-		Block deletedDescendantDocumentBlock = blockRepository.findById(childDocumentBlock.getId()).orElseThrow();
-		Block survivedOtherBlock = blockRepository.findById(otherDocumentBlock.getId()).orElseThrow();
-
-		assertThat(deletedRootBlock.getDeletedAt()).isNotNull();
-		assertThat(deletedChildBlock.getDeletedAt()).isNotNull();
-		assertThat(deletedDescendantDocumentBlock.getDeletedAt()).isNotNull();
-		assertThat(survivedOtherBlock.getDeletedAt()).isNull();
-		assertThat(documentDeleteSqlCounter.documentSoftDeleteUpdateCount()).isEqualTo(1);
+		assertThat(documentRepository.findById(targetDocument.getId())).isEmpty();
+		assertThat(documentRepository.findById(childDocument.getId())).isEmpty();
+		assertThat(blockRepository.findById(targetRootBlock.getId())).isEmpty();
+		assertThat(blockRepository.findById(targetChildBlock.getId())).isEmpty();
+		assertThat(blockRepository.findById(childDocumentBlock.getId())).isEmpty();
+		assertThat(blockRepository.findById(otherDocumentBlock.getId()))
+			.get()
+			.extracting(Block::getId)
+			.isEqualTo(otherDocumentBlock.getId());
 	}
 
 	@Test
@@ -498,16 +541,111 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("성공_문서 휴지통 이동 API는 대상 문서를 soft delete 처리한다")
+	void trashDocumentSoftDeletesDocument() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document targetDocument = saveDocument(workspace.getId(), null, "휴지통 대상 문서", "00000000000000000001");
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/trash", targetDocument.getId())
+				.header("X-User-Id", "user-123"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200));
+
+		assertThat(documentRepository.findById(targetDocument.getId())).get()
+			.extracting(Document::getDeletedAt)
+			.isNotNull();
+	}
+
+	@Test
+	@DisplayName("성공_문서 휴지통 이동 API는 하위 문서와 각 문서의 소속 블록까지 soft delete 처리한다")
+	void trashDocumentSoftDeletesDescendantDocumentsAndBlocks() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document targetDocument = saveDocument(workspace.getId(), null, "삭제 대상 문서", "00000000000000000001");
+		Document childDocument = saveDocument(workspace.getId(), targetDocument.getId(), "하위 문서",
+			"00000000000000000002");
+		Document otherDocument = saveDocument(workspace.getId(), null, "다른 문서", "00000000000000000002");
+
+		Block targetRootBlock = saveBlock(targetDocument.getId(), null, "대상 루트 블록", "000000000001000000000000");
+		Block targetChildBlock = saveBlock(targetDocument.getId(), targetRootBlock.getId(), "대상 자식 블록",
+			"000000000001I00000000000");
+		Block childDocumentBlock = saveBlock(childDocument.getId(), null, "하위 문서 블록", "000000000001000000000000");
+		Block otherDocumentBlock = saveBlock(otherDocument.getId(), null, "다른 문서 블록", "000000000001000000000000");
+		documentDeleteSqlCounter.reset();
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/trash", targetDocument.getId())
+				.header("X-User-Id", "user-123"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200));
+
+		Document deletedDocument = documentRepository.findById(targetDocument.getId()).orElseThrow();
+		Document deletedChildDocument = documentRepository.findById(childDocument.getId()).orElseThrow();
+		assertThat(deletedDocument.getDeletedAt()).isNotNull();
+		assertThat(deletedChildDocument.getDeletedAt()).isNotNull();
+
+		Block deletedRootBlock = blockRepository.findById(targetRootBlock.getId()).orElseThrow();
+		Block deletedChildBlock = blockRepository.findById(targetChildBlock.getId()).orElseThrow();
+		Block deletedDescendantDocumentBlock = blockRepository.findById(childDocumentBlock.getId()).orElseThrow();
+		Block survivedOtherBlock = blockRepository.findById(otherDocumentBlock.getId()).orElseThrow();
+
+		assertThat(deletedRootBlock.getDeletedAt()).isNotNull();
+		assertThat(deletedChildBlock.getDeletedAt()).isNotNull();
+		assertThat(deletedDescendantDocumentBlock.getDeletedAt()).isNotNull();
+		assertThat(survivedOtherBlock.getDeletedAt()).isNull();
+		assertThat(documentDeleteSqlCounter.documentSoftDeleteUpdateCount()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서를 휴지통 이동하면 문서 없음 응답을 반환한다")
+	void trashDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", UUID.randomUUID())
+			.header("X-User-Id", "user-123"));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_이미 휴지통 상태인 문서를 다시 휴지통 이동하면 문서 없음 응답을 반환한다")
+	void trashDocumentReturnsNotFoundWhenDocumentAlreadyTrashed() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document deletedDocument = saveDeletedDocument(workspace.getId(), "이미 삭제된 문서", "00000000000000000001");
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", deletedDocument.getId())
+			.header("X-User-Id", "user-123"));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("성공_문서 복구 API는 삭제 문서와 해당 문서 소속 삭제 블록을 함께 복구한다")
 	void restoreDocumentRestoresDocumentAndOwnedDeletedBlocks() throws Exception {
 		Workspace workspace = workspace("Docs Root");
-		Document deletedDocument = saveDeletedDocument(workspace.getId(), "복구 대상 문서", "00000000000000000001");
+		Document deletedDocument = saveDeletedDocument(
+			workspace.getId(),
+			"복구 대상 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(1)
+		);
 		Document otherDocument = saveDocument(workspace.getId(), null, "다른 문서", "00000000000000000002");
 
-		Block deletedTargetBlock = saveDeletedBlock(deletedDocument.getId(), null, "복구 대상 블록",
-			"000000000001000000000000");
+		Block deletedTargetBlock = saveDeletedBlock(
+			deletedDocument.getId(),
+			null,
+			"복구 대상 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(1)
+		);
 		Block activeTargetBlock = saveBlock(deletedDocument.getId(), null, "활성 블록", "000000000002000000000000");
-		Block deletedOtherBlock = saveDeletedBlock(otherDocument.getId(), null, "다른 문서 블록", "000000000001000000000000");
+		Block deletedOtherBlock = saveDeletedBlock(
+			otherDocument.getId(),
+			null,
+			"다른 문서 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(1)
+		);
 
 		mockMvc.perform(post("/v1/documents/{documentId}/restore", deletedDocument.getId())
 				.header("X-User-Id", "user-123"))
@@ -546,6 +684,80 @@ class DocumentApiIntegrationTest {
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+
+	@Test
+	@DisplayName("실패_휴지통 보관 시간 5분이 지난 문서 복구 요청은 문서 없음 응답을 반환한다")
+	void restoreDocumentReturnsNotFoundWhenTrashRetentionExpired() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document expiredDeletedDocument = saveDeletedDocument(
+			workspace.getId(),
+			"만료된 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(6)
+		);
+
+		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", expiredDeletedDocument.getId())
+			.header("X-User-Id", "user-123"));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("성공_휴지통 보관 시간이 지난 문서는 자동 영구 삭제 시 하위 문서와 블록까지 함께 삭제한다")
+	void purgeExpiredTrashDeletesDescendantDocumentsAndBlocks() {
+		Workspace workspace = workspace("Docs Root");
+		Document trashRoot = saveDeletedDocument(
+			workspace.getId(),
+			"만료된 삭제 문서",
+			"00000000000000000001",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		Document trashChild = documentRepository.save(Document.builder()
+			.id(UUID.randomUUID())
+			.workspace(workspaceRepository.getReferenceById(workspace.getId()))
+			.parent(documentRepository.getReferenceById(trashRoot.getId()))
+			.title("만료된 하위 문서")
+			.sortKey("00000000000000000002")
+			.deletedAt(LocalDateTime.now().minusMinutes(6))
+			.build());
+		Block rootBlock = saveDeletedBlock(
+			trashRoot.getId(),
+			null,
+			"루트 삭제 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		Block childBlock = saveDeletedBlock(
+			trashChild.getId(),
+			null,
+			"하위 삭제 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(6)
+		);
+		Document safeDocument = saveDeletedDocument(
+			workspace.getId(),
+			"미만료 삭제 문서",
+			"00000000000000000003",
+			LocalDateTime.now().minusMinutes(4).minusSeconds(59)
+		);
+		Block safeBlock = saveDeletedBlock(
+			safeDocument.getId(),
+			null,
+			"미만료 블록",
+			"000000000001000000000000",
+			LocalDateTime.now().minusMinutes(4).minusSeconds(59)
+		);
+
+		documentService.purgeExpiredTrash();
+
+		assertThat(documentRepository.findById(trashRoot.getId())).isEmpty();
+		assertThat(documentRepository.findById(trashChild.getId())).isEmpty();
+		assertThat(blockRepository.findById(rootBlock.getId())).isEmpty();
+		assertThat(blockRepository.findById(childBlock.getId())).isEmpty();
+		assertThat(documentRepository.findById(safeDocument.getId())).isPresent();
+		assertThat(blockRepository.findById(safeBlock.getId())).isPresent();
 	}
 
 	@Test
@@ -767,12 +979,16 @@ class DocumentApiIntegrationTest {
 	}
 
 	private Document saveDeletedDocument(UUID workspaceId, String title, String sortKey) {
+		return saveDeletedDocument(workspaceId, title, sortKey, LocalDateTime.now().minusMinutes(1));
+	}
+
+	private Document saveDeletedDocument(UUID workspaceId, String title, String sortKey, LocalDateTime deletedAt) {
 		return documentRepository.save(Document.builder()
 			.id(UUID.randomUUID())
 			.workspace(workspaceRepository.getReferenceById(workspaceId))
 			.title(title)
 			.sortKey(sortKey)
-			.deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
+			.deletedAt(deletedAt)
 			.build());
 	}
 
@@ -790,6 +1006,16 @@ class DocumentApiIntegrationTest {
 	}
 
 	private Block saveDeletedBlock(UUID documentId, UUID parentId, String content, String sortKey) {
+		return saveDeletedBlock(documentId, parentId, content, sortKey, LocalDateTime.now().minusMinutes(1));
+	}
+
+	private Block saveDeletedBlock(
+		UUID documentId,
+		UUID parentId,
+		String content,
+		String sortKey,
+		LocalDateTime deletedAt
+	) {
 		return blockRepository.save(Block.builder()
 			.id(UUID.randomUUID())
 			.document(documentRepository.getReferenceById(documentId))
@@ -799,7 +1025,7 @@ class DocumentApiIntegrationTest {
 			.sortKey(sortKey)
 			.createdBy("user-123")
 			.updatedBy("user-123")
-			.deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
+			.deletedAt(deletedAt)
 			.build());
 	}
 

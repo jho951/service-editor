@@ -20,6 +20,11 @@
 16. 스키마 명명 규칙 확인이 필요하면 H2 `INFORMATION_SCHEMA.COLUMNS` 또는 MySQL `information_schema.columns`에서 `workspaces.workspace_id`, `documents.document_id`, `blocks.block_id` 컬럼이 생성됐는지 확인한다.
 17. 문서 계층 삭제 이슈를 확인할 때는 `information_schema.table_constraints`, `information_schema.referential_constraints`에서 `FK_DOCUMENTS_PARENT`가 존재하는지와 `DELETE_RULE = CASCADE`인지 함께 확인한다.
 18. 블록 계층 삭제 이슈를 확인할 때는 `FK_BLOCKS_DOCUMENT`, `FK_BLOCKS_PARENT`가 존재하는지와 두 FK 모두 `DELETE_RULE = CASCADE`인지 함께 확인한다.
+19. 문서 hard delete 확인이 필요하면 `DELETE /v1/documents/{documentId}`를 호출한 뒤 `documents`, `blocks` 테이블에서 대상 문서, 하위 문서, 각 문서 소속 블록 row가 실제로 사라졌는지 확인한다.
+20. 문서 휴지통 이동 확인이 필요하면 `PATCH /v1/documents/{documentId}/trash`를 호출한 뒤 대상 문서, 하위 문서, 각 문서 소속 블록의 `deleted_at`이 같은 흐름으로 채워졌는지 확인한다.
+21. 문서 복구 확인이 필요하면 휴지통 이동 직후 `POST /v1/documents/{documentId}/restore`를 호출해 `deleted_at`이 null로 돌아오는지 확인한다. `deletedAt + 5분`이 지난 데이터는 복구가 실패해야 한다.
+22. 휴지통 목록 확인이 필요하면 `GET /v1/workspaces/{workspaceId}/trash/documents`를 호출해 `deletedAt` 내림차순 정렬, `purgeAt = deletedAt + 5분` 계산, 활성 문서 제외 여부를 확인한다.
+23. 자동 영구 삭제 확인이 필요하면 `deleted_at`이 현재 시각 기준 5분 이상 지난 문서를 만든 뒤 스케줄러 실행 또는 `DocumentService.purgeExpiredTrash()` 호출로 대상 문서, 하위 문서, 각 문서 소속 블록이 실제 삭제되는지 확인한다.
 
 ## 확인할 로그
 
@@ -41,6 +46,9 @@
 - `400` Block 생성 실패: `afterBlockId`/`beforeBlockId`가 같은 sibling gap을 가리키는지, 요청 `parentId`와 같은 형제 집합인지 확인한다.
 - `404` Block 삭제 실패: 대상 `blockId`가 이미 soft delete되었거나 존재하지 않는지 확인한다.
 - `409` sort key 충돌: 같은 gap에 삽입이 누적되어 재균형이 필요한 상태인지 확인한다.
+- 휴지통 복구 실패: `deleted_at`이 현재 시각 기준 5분 이상 지났는지, 부모 문서가 여전히 삭제 상태인지 확인한다.
+- 휴지통 목록 응답 이상: `deleted_at` 내림차순 정렬 쿼리와 `purgeAt` 계산 로직이 같은 보관 시간 상수를 쓰는지 확인한다.
+- 자동 영구 삭제 미동작: `@EnableScheduling` 적용 여부, 스케줄러 등록 여부, 만료 기준 `deletedAt <= now - 5분` 조건, purge 루트 조회 쿼리를 함께 확인한다.
 - 스키마 검증 실패: 엔티티 `@Column(name = ...)` 값과 실제 생성된 DDL 컬럼명이 일치하는지 확인한다. PK는 `id`가 아니라 `${domain}_id` 규칙을 따른다.
 
 ## 복구 절차

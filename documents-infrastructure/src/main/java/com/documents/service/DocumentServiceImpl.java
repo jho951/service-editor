@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.documents.domain.Document;
+import com.documents.domain.DocumentTrashPolicy;
 import com.documents.domain.DocumentVisibility;
 import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
@@ -64,6 +65,13 @@ public class DocumentServiceImpl implements DocumentService {
 	public List<Document> getAllByWorkspaceId(UUID workspaceId) {
 		workspaceService.getById(workspaceId);
 		return documentRepository.findActiveByWorkspaceIdOrderBySortKey(workspaceId);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public List<Document> getTrashByWorkspaceId(UUID workspaceId) {
+		workspaceService.getById(workspaceId);
+		return documentRepository.findDeletedByWorkspaceIdOrderByDeletedAtDesc(workspaceId);
 	}
 
 	@Override
@@ -124,6 +132,13 @@ public class DocumentServiceImpl implements DocumentService {
 	@Override
 	@Transactional
 	public void delete(UUID documentId, String actorId) {
+		Document document = findActiveDocument(documentId);
+		documentRepository.delete(document);
+	}
+
+	@Override
+	@Transactional
+	public void trash(UUID documentId, String actorId) {
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
 		LocalDateTime deletedAt = LocalDateTime.now();
 		List<UUID> documentIdsToDelete = collectActiveDocumentTreeIds(findActiveDocument(documentId));
@@ -142,6 +157,7 @@ public class DocumentServiceImpl implements DocumentService {
 	@Transactional
 	public void restore(UUID documentId, String actorId) {
 		Document deletedDocument = findDeletedDocument(documentId);
+		validateTrashRestoreAvailable(deletedDocument);
 		validateParentForRestore(deletedDocument);
 
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
@@ -155,6 +171,17 @@ public class DocumentServiceImpl implements DocumentService {
 				blockService.restoreAllByDocumentId(currentDocumentId, normalizedActorId, restoredAt);
 				return null;
 			});
+		}
+	}
+
+	@Override
+	@Transactional
+	public void purgeExpiredTrash() {
+		LocalDateTime expiredAt = LocalDateTime.now().minusMinutes(DocumentTrashPolicy.RETENTION_MINUTES);
+		List<Document> expiredTrashRoots = documentRepository.findExpiredTrashRoots(expiredAt);
+
+		for (Document expiredTrashRoot : expiredTrashRoots) {
+			documentRepository.delete(expiredTrashRoot);
 		}
 	}
 
@@ -256,6 +283,13 @@ public class DocumentServiceImpl implements DocumentService {
 
 		if (parentDocument.getDeletedAt() != null) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+	}
+
+	private void validateTrashRestoreAvailable(Document document) {
+		LocalDateTime restoreDeadline = document.getDeletedAt().plusMinutes(DocumentTrashPolicy.RETENTION_MINUTES);
+		if (!LocalDateTime.now().isBefore(restoreDeadline)) {
+			throw new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND);
 		}
 	}
 
