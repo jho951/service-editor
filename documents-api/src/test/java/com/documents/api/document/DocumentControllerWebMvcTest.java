@@ -1624,4 +1624,59 @@ class DocumentControllerWebMvcTest {
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
 	}
+
+	@Test
+	@DisplayName("성공_PATCH 문서 휴지통 이동 요청 시 성공 응답을 반환한다")
+	void trashDocumentReturnsSuccessEnvelope() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doNothing().when(documentService).trash(documentId, ACTOR_ID);
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+				.header(USER_ID_HEADER, ACTOR_ID))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.message").value("요청 응답 성공"))
+			.andExpect(jsonPath("$.code").value(200))
+			.andExpect(jsonPath("$.data").doesNotExist());
+
+		verify(documentService).trash(documentId, ACTOR_ID);
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서 휴지통 이동 시 문서 없음 응답을 반환한다")
+	void trashDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).trash(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_이미 휴지통 상태인 문서 휴지통 이동 시 문서 없음 응답을 반환한다")
+	void trashDocumentReturnsNotFoundWhenDocumentAlreadyTrashed() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
+			.when(documentService).trash(documentId, ACTOR_ID);
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+			.header(USER_ID_HEADER, ACTOR_ID));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_X-User-Id 헤더가 없으면 문서 휴지통 이동은 인증 오류를 반환한다")
+	void trashDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
+		UUID documentId = UUID.randomUUID();
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+		verify(documentService, never()).trash(any(), any());
+	}
 }

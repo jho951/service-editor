@@ -130,6 +130,23 @@ public class DocumentServiceImpl implements DocumentService {
 
 	@Override
 	@Transactional
+	public void trash(UUID documentId, String actorId) {
+		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+		LocalDateTime deletedAt = LocalDateTime.now();
+		List<UUID> documentIdsToDelete = collectActiveDocumentTreeIds(findActiveDocument(documentId));
+
+		documentRepository.softDeleteActiveByIds(documentIdsToDelete, normalizedActorId, deletedAt);
+
+		for (UUID currentDocumentId : documentIdsToDelete) {
+			DocumentVersionIncrementContext.runWithoutIncrement(() -> {
+				blockService.softDeleteAllByDocumentId(currentDocumentId, normalizedActorId, deletedAt);
+				return null;
+			});
+		}
+	}
+
+	@Override
+	@Transactional
 	public void restore(UUID documentId, String actorId) {
 		Document deletedDocument = findDeletedDocument(documentId);
 		validateParentForRestore(deletedDocument);

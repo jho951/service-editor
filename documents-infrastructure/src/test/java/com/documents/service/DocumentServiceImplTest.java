@@ -522,6 +522,78 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("성공_문서 휴지통 이동 시 문서와 활성 블록을 같은 시각으로 soft delete 처리한다")
+	void trashSoftDeletesDocumentAndActiveBlocks() {
+		UUID documentId = UUID.randomUUID();
+		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(documentId)).thenReturn(List.of());
+		when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
+
+		documentService.trash(documentId, " user-456 ");
+
+		ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+		verify(documentRepository).softDeleteActiveByIds(eq(List.of(documentId)), eq("user-456"),
+			deletedAtCaptor.capture());
+		verify(blockService).softDeleteAllByDocumentId(eq(documentId), eq("user-456"), eq(deletedAtCaptor.getValue()));
+	}
+
+	@Test
+	@DisplayName("성공_사용자 식별자가 공백이면 휴지통 이동도 null 사용자로 위임한다")
+	void trashDelegatesNullActorToBlockService() {
+		UUID documentId = UUID.randomUUID();
+		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(documentId)).thenReturn(List.of());
+		when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
+
+		documentService.trash(documentId, " ");
+
+		ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+		verify(documentRepository).softDeleteActiveByIds(eq(List.of(documentId)), isNull(),
+			deletedAtCaptor.capture());
+		verify(blockService).softDeleteAllByDocumentId(eq(documentId), isNull(), eq(deletedAtCaptor.getValue()));
+	}
+
+	@Test
+	@DisplayName("성공_문서 휴지통 이동 시 활성 하위 문서와 각 문서의 블록도 함께 soft delete 처리한다")
+	void trashSoftDeletesDescendantDocumentsAndBlocks() {
+		UUID workspaceId = UUID.randomUUID();
+		UUID rootId = UUID.randomUUID();
+		UUID childId = UUID.randomUUID();
+		UUID grandChildId = UUID.randomUUID();
+		Document rootDocument = document(rootId, workspaceId, null, "루트 문서", "00000000000000000001");
+		Document childDocument = document(childId, workspaceId, rootId, "하위 문서", "00000000000000000002");
+		Document grandChildDocument = document(grandChildId, workspaceId, childId, "손자 문서", "00000000000000000003");
+		when(documentRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of(childDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(childId)).thenReturn(List.of(grandChildDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(grandChildId)).thenReturn(List.of());
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.trash(rootId, ACTOR_ID);
+
+		ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+		verify(documentRepository).softDeleteActiveByIds(eq(List.of(rootId, childId, grandChildId)),
+			eq(ACTOR_ID), deletedAtCaptor.capture());
+		verify(blockService).softDeleteAllByDocumentId(eq(rootId), eq(ACTOR_ID), eq(deletedAtCaptor.getValue()));
+		verify(blockService).softDeleteAllByDocumentId(eq(childId), eq(ACTOR_ID), eq(deletedAtCaptor.getValue()));
+		verify(blockService).softDeleteAllByDocumentId(eq(grandChildId), eq(ACTOR_ID), eq(deletedAtCaptor.getValue()));
+	}
+
+	@Test
+	@DisplayName("실패_이미 휴지통 상태이거나 없는 문서를 휴지통 이동하면 문서 없음 예외를 던진다")
+	void trashThrowsWhenDocumentMissing() {
+		UUID documentId = UUID.randomUUID();
+
+		assertThatThrownBy(() -> documentService.trash(documentId, ACTOR_ID))
+			.isInstanceOf(BusinessException.class)
+			.hasMessage("요청한 문서를 찾을 수 없습니다.")
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.DOCUMENT_NOT_FOUND);
+	}
+
+	@Test
 	@DisplayName("성공_루트 삭제 문서는 부모 검증 없이 복구한다")
 	void restoreRootDeletedDocument() {
 		UUID documentId = UUID.randomUUID();

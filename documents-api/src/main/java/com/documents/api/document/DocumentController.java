@@ -159,6 +159,16 @@ public class DocumentController {
 		return ResponseEntity.ok(GlobalResponse.ok());
 	}
 
+	@Operation(summary = "문서 휴지통 이동")
+	@PatchMapping("/documents/{documentId}/trash")
+	public ResponseEntity<GlobalResponse<Void>> trashDocument(
+		@PathVariable("documentId") UUID documentId,
+		@RequestHeader(USER_ID_HEADER) String userId
+	) {
+		documentService.trash(documentId, userId);
+		return ResponseEntity.ok(GlobalResponse.ok());
+	}
+
 	@Operation(summary = "문서 복구")
 	@PostMapping("/documents/{documentId}/restore")
 	public ResponseEntity<GlobalResponse<Void>> restoreDocument(

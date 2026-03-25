@@ -492,6 +492,85 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("성공_문서 휴지통 이동 API는 대상 문서를 soft delete 처리한다")
+	void trashDocumentSoftDeletesDocument() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document targetDocument = saveDocument(workspace.getId(), null, "휴지통 대상 문서", "00000000000000000001");
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/trash", targetDocument.getId())
+				.header("X-User-Id", "user-123"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200));
+
+		assertThat(documentRepository.findById(targetDocument.getId())).get()
+			.extracting(Document::getDeletedAt)
+			.isNotNull();
+	}
+
+	@Test
+	@DisplayName("성공_문서 휴지통 이동 API는 하위 문서와 각 문서의 소속 블록까지 soft delete 처리한다")
+	void trashDocumentSoftDeletesDescendantDocumentsAndBlocks() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document targetDocument = saveDocument(workspace.getId(), null, "삭제 대상 문서", "00000000000000000001");
+		Document childDocument = saveDocument(workspace.getId(), targetDocument.getId(), "하위 문서",
+			"00000000000000000002");
+		Document otherDocument = saveDocument(workspace.getId(), null, "다른 문서", "00000000000000000002");
+
+		Block targetRootBlock = saveBlock(targetDocument.getId(), null, "대상 루트 블록", "000000000001000000000000");
+		Block targetChildBlock = saveBlock(targetDocument.getId(), targetRootBlock.getId(), "대상 자식 블록",
+			"000000000001I00000000000");
+		Block childDocumentBlock = saveBlock(childDocument.getId(), null, "하위 문서 블록", "000000000001000000000000");
+		Block otherDocumentBlock = saveBlock(otherDocument.getId(), null, "다른 문서 블록", "000000000001000000000000");
+		documentDeleteSqlCounter.reset();
+
+		mockMvc.perform(patch("/v1/documents/{documentId}/trash", targetDocument.getId())
+				.header("X-User-Id", "user-123"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.httpStatus").value("OK"))
+			.andExpect(jsonPath("$.success").value(true))
+			.andExpect(jsonPath("$.code").value(200));
+
+		Document deletedDocument = documentRepository.findById(targetDocument.getId()).orElseThrow();
+		Document deletedChildDocument = documentRepository.findById(childDocument.getId()).orElseThrow();
+		assertThat(deletedDocument.getDeletedAt()).isNotNull();
+		assertThat(deletedChildDocument.getDeletedAt()).isNotNull();
+
+		Block deletedRootBlock = blockRepository.findById(targetRootBlock.getId()).orElseThrow();
+		Block deletedChildBlock = blockRepository.findById(targetChildBlock.getId()).orElseThrow();
+		Block deletedDescendantDocumentBlock = blockRepository.findById(childDocumentBlock.getId()).orElseThrow();
+		Block survivedOtherBlock = blockRepository.findById(otherDocumentBlock.getId()).orElseThrow();
+
+		assertThat(deletedRootBlock.getDeletedAt()).isNotNull();
+		assertThat(deletedChildBlock.getDeletedAt()).isNotNull();
+		assertThat(deletedDescendantDocumentBlock.getDeletedAt()).isNotNull();
+		assertThat(survivedOtherBlock.getDeletedAt()).isNull();
+		assertThat(documentDeleteSqlCounter.documentSoftDeleteUpdateCount()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("실패_존재하지 않는 문서를 휴지통 이동하면 문서 없음 응답을 반환한다")
+	void trashDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", UUID.randomUUID())
+			.header("X-User-Id", "user-123"));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_이미 휴지통 상태인 문서를 다시 휴지통 이동하면 문서 없음 응답을 반환한다")
+	void trashDocumentReturnsNotFoundWhenDocumentAlreadyTrashed() throws Exception {
+		Workspace workspace = workspace("Docs Root");
+		Document deletedDocument = saveDeletedDocument(workspace.getId(), "이미 삭제된 문서", "00000000000000000001");
+
+		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", deletedDocument.getId())
+			.header("X-User-Id", "user-123"));
+
+		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
+	}
+
+	@Test
 	@DisplayName("성공_문서 복구 API는 삭제 문서와 해당 문서 소속 삭제 블록을 함께 복구한다")
 	void restoreDocumentRestoresDocumentAndOwnedDeletedBlocks() throws Exception {
 		Workspace workspace = workspace("Docs Root");
