@@ -49,12 +49,6 @@
 - `docs/runbook/DEBUG.md`에 hard delete, 휴지통 이동, 복구, 휴지통 조회, 자동 영구 삭제 재현 절차를 추가했다.
 - 휴지통 만료 복구 실패와 자동 영구 삭제 미동작 시 점검 항목을 보강했다.
 
-## Step 8. 워크스페이스 문서 제목 유니크 제약 추가
-
-- 휴지통 목록 UI에서 제목만으로 문서를 구분할 수 있도록, 같은 워크스페이스에서는 활성 문서와 휴지통 문서를 포함해 `title` 중복을 허용하지 않도록 정책을 정했다.
-- `create`, `update`, `restore`에서 같은 워크스페이스의 다른 문서와 제목이 중복되면 `409 Conflict`를 반환하도록 서비스 로직을 보강했다.
-- WebMvc / 서비스 / 통합 테스트에 생성, 수정, 복구의 제목 중복 실패 시나리오를 추가했다.
-
 ## 테스트 실행 결과
 
 - `./gradlew :documents-infrastructure:test --tests com.documents.service.DocumentServiceImplTest` 통과
