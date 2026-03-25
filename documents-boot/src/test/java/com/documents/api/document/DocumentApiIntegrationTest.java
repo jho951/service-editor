@@ -433,8 +433,8 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("성공_문서 삭제 API는 하위 문서와 각 문서의 활성 블록까지 soft delete 처리한다")
-	void deleteDocumentSoftDeletesDescendantDocumentsAndBlocks() throws Exception {
+	@DisplayName("성공_문서 삭제 API는 하위 문서와 각 문서의 소속 블록까지 hard delete 처리한다")
+	void deleteDocumentHardDeletesDescendantDocumentsAndBlocks() throws Exception {
 		Workspace workspace = workspace("Docs Root");
 		Document targetDocument = saveDocument(workspace.getId(), null, "삭제 대상 문서", "00000000000000000001");
 		Document childDocument = saveDocument(workspace.getId(), targetDocument.getId(), "하위 문서",
@@ -455,21 +455,15 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$.success").value(true))
 			.andExpect(jsonPath("$.code").value(200));
 
-		Document deletedDocument = documentRepository.findById(targetDocument.getId()).orElseThrow();
-		Document deletedChildDocument = documentRepository.findById(childDocument.getId()).orElseThrow();
-		assertThat(deletedDocument.getDeletedAt()).isNotNull();
-		assertThat(deletedChildDocument.getDeletedAt()).isNotNull();
-
-		Block deletedRootBlock = blockRepository.findById(targetRootBlock.getId()).orElseThrow();
-		Block deletedChildBlock = blockRepository.findById(targetChildBlock.getId()).orElseThrow();
-		Block deletedDescendantDocumentBlock = blockRepository.findById(childDocumentBlock.getId()).orElseThrow();
-		Block survivedOtherBlock = blockRepository.findById(otherDocumentBlock.getId()).orElseThrow();
-
-		assertThat(deletedRootBlock.getDeletedAt()).isNotNull();
-		assertThat(deletedChildBlock.getDeletedAt()).isNotNull();
-		assertThat(deletedDescendantDocumentBlock.getDeletedAt()).isNotNull();
-		assertThat(survivedOtherBlock.getDeletedAt()).isNull();
-		assertThat(documentDeleteSqlCounter.documentSoftDeleteUpdateCount()).isEqualTo(1);
+		assertThat(documentRepository.findById(targetDocument.getId())).isEmpty();
+		assertThat(documentRepository.findById(childDocument.getId())).isEmpty();
+		assertThat(blockRepository.findById(targetRootBlock.getId())).isEmpty();
+		assertThat(blockRepository.findById(targetChildBlock.getId())).isEmpty();
+		assertThat(blockRepository.findById(childDocumentBlock.getId())).isEmpty();
+		assertThat(blockRepository.findById(otherDocumentBlock.getId()))
+			.get()
+			.extracting(Block::getId)
+			.isEqualTo(otherDocumentBlock.getId());
 	}
 
 	@Test
