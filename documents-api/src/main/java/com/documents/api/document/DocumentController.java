@@ -10,10 +10,10 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.documents.api.auth.CurrentUserId;
 import com.documents.api.block.BlockApiMapper;
 import com.documents.api.block.dto.BlockResponse;
 import com.documents.api.code.SuccessCode;
@@ -41,9 +41,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @RequestMapping("/v1")
 public class DocumentController {
-
-	// TODO: 임시 헤더 값. 인증 서버와 연동 후 수정 필요
-	private static final String USER_ID_HEADER = "X-User-Id";
 
 	private final BlockService blockService;
 	private final BlockApiMapper blockApiMapper;
@@ -79,7 +76,7 @@ public class DocumentController {
 	public ResponseEntity<GlobalResponse<DocumentResponse>> createDocument(
 		@PathVariable("workspaceId") UUID workspaceId,
 		@Valid @RequestBody CreateDocumentRequest request,
-		@RequestHeader(USER_ID_HEADER) String userId
+		@CurrentUserId String userId
 	) {
 		Document createdDocument = documentService.create(
 			workspaceId,
@@ -119,7 +116,7 @@ public class DocumentController {
 	public ResponseEntity<GlobalResponse<DocumentResponse>> updateDocument(
 		@PathVariable("documentId") UUID documentId,
 		@Valid @RequestBody UpdateDocumentRequest request,
-		@RequestHeader(USER_ID_HEADER) String userId
+		@CurrentUserId String userId
 	) {
 		Document updatedDocument = documentService.update(
 			documentId,
@@ -137,7 +134,7 @@ public class DocumentController {
 	public ResponseEntity<GlobalResponse<DocumentResponse>> updateDocumentVisibility(
 		@PathVariable("documentId") UUID documentId,
 		@Valid @RequestBody UpdateDocumentVisibilityRequest request,
-		@RequestHeader(USER_ID_HEADER) String userId
+		@CurrentUserId String userId
 	) {
 		Document updatedDocument = documentService.updateVisibility(
 			documentId,
@@ -153,7 +150,7 @@ public class DocumentController {
 	public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> applyTransactions(
 		@PathVariable("documentId") UUID documentId,
 		@Valid @RequestBody DocumentTransactionRequest request,
-		@RequestHeader(USER_ID_HEADER) String userId
+		@CurrentUserId String userId
 	) {
 		DocumentTransactionResponse response = documentTransactionApiMapper.toResponse(
 			documentTransactionService.apply(documentId, documentTransactionApiMapper.toCommand(request), userId)
@@ -165,7 +162,7 @@ public class DocumentController {
 	@DeleteMapping("/documents/{documentId}")
 	public ResponseEntity<GlobalResponse<Void>> deleteDocument(
 		@PathVariable("documentId") UUID documentId,
-		@RequestHeader(USER_ID_HEADER) String userId
+		@CurrentUserId String userId
 	) {
 		documentService.delete(documentId, userId);
 		return ResponseEntity.ok(GlobalResponse.ok());
@@ -175,7 +172,7 @@ public class DocumentController {
 	@PatchMapping("/documents/{documentId}/trash")
 	public ResponseEntity<GlobalResponse<Void>> trashDocument(
 		@PathVariable("documentId") UUID documentId,
-		@RequestHeader(USER_ID_HEADER) String userId
+		@CurrentUserId String userId
 	) {
 		documentService.trash(documentId, userId);
 		return ResponseEntity.ok(GlobalResponse.ok());
@@ -185,7 +182,7 @@ public class DocumentController {
 	@PostMapping("/documents/{documentId}/restore")
 	public ResponseEntity<GlobalResponse<Void>> restoreDocument(
 		@PathVariable("documentId") UUID documentId,
-		@RequestHeader(USER_ID_HEADER) String userId
+		@CurrentUserId String userId
 	) {
 		documentService.restore(documentId, userId);
 		return ResponseEntity.ok(GlobalResponse.ok());
@@ -196,7 +193,7 @@ public class DocumentController {
 	public ResponseEntity<GlobalResponse<Void>> moveDocument(
 		@PathVariable("documentId") UUID documentId,
 		@RequestBody MoveDocumentRequest request,
-		@RequestHeader(USER_ID_HEADER) String userId
+		@CurrentUserId String userId
 	) {
 		documentService.move(
 			documentId,

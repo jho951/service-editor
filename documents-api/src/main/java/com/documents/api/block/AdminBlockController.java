@@ -8,10 +8,10 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.documents.api.auth.CurrentUserId;
 import com.documents.api.code.SuccessCode;
 import com.documents.api.document.DocumentTransactionApiMapper;
 import com.documents.api.document.dto.DocumentTransactionRequest;
@@ -31,8 +31,6 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/v1/admin")
 public class AdminBlockController {
 
-    private static final String USER_ID_HEADER = "X-User-Id";
-
     private final AdminBlockTransactionService adminBlockTransactionService;
     private final DocumentTransactionApiMapper documentTransactionApiMapper;
 
@@ -41,7 +39,7 @@ public class AdminBlockController {
     public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> createBlock(
             @PathVariable("documentId") UUID documentId,
             @Valid @RequestBody DocumentTransactionRequest request,
-            @RequestHeader(USER_ID_HEADER) String userId
+            @CurrentUserId String userId
     ) {
         DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
 
@@ -58,7 +56,7 @@ public class AdminBlockController {
     public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> updateBlock(
             @PathVariable("blockId") UUID blockId,
             @Valid @RequestBody DocumentTransactionRequest request,
-            @RequestHeader(USER_ID_HEADER) String userId
+            @CurrentUserId String userId
     ) {
         DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
 
@@ -75,7 +73,7 @@ public class AdminBlockController {
     public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> deleteBlock(
             @PathVariable("blockId") UUID blockId,
             @Valid @RequestBody DocumentTransactionRequest request,
-            @RequestHeader(USER_ID_HEADER) String userId
+            @CurrentUserId String userId
     ) {
         DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
 
@@ -92,7 +90,7 @@ public class AdminBlockController {
     public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> moveBlock(
             @PathVariable("blockId") UUID blockId,
             @Valid @RequestBody DocumentTransactionRequest request,
-            @RequestHeader(USER_ID_HEADER) String userId
+            @CurrentUserId String userId
     ) {
         DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
 
