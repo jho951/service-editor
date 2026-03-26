@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
+import com.documents.api.auth.CurrentUserIdArgumentResolver;
 import com.documents.api.block.BlockApiMapper;
 import com.documents.api.block.support.BlockJsonCodec;
 import com.documents.api.document.support.DocumentJsonCodec;
@@ -151,9 +152,10 @@ class DocumentControllerWebMvcTest {
 				documentTransactionService,
 				new DocumentTransactionApiMapper(blockJsonCodec)
 			))
-			.setControllerAdvice(new GlobalExceptionHandler())
-			.setValidator(validator)
-			.build();
+				.setControllerAdvice(new GlobalExceptionHandler())
+				.setCustomArgumentResolvers(new CurrentUserIdArgumentResolver())
+				.setValidator(validator)
+				.build();
 	}
 
 	@Test
