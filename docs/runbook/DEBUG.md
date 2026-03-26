@@ -7,10 +7,12 @@
 3. DB 연결 문제가 있으면 `documents-boot/src/main/resources/application-dev.yml`과 환경변수 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`를 점검한다. 기본 로컬 DB 이름은 `documentsdb`이고 기본 계정은 `documents/documents`다.
 4. `dev` 프로파일은 `ddl-auto=update`라서 누락된 테이블은 자동 생성된다. `prod` 프로파일은 `ddl-auto=none`이라 스키마를 자동 변경하지 않는다.
 5. MySQL JDBC URL은 서버/스키마가 `utf8mb4`인 상태를 전제로 `connectionCollation=utf8mb4_unicode_ci`만 사용한다. `characterEncoding=utf8mb4`를 직접 넣으면 드라이버에서 부팅 실패가 날 수 있다.
-6. Workspace API 확인이 필요하면 `POST /v1/workspaces`로 생성 후 `GET /v1/workspaces/{workspaceId}`로 단건 조회를 재현한다.
-7. Document 조회 API 확인이 필요하면 `POST /v1/workspaces/{workspaceId}/documents`로 문서를 만든 뒤 `GET /v1/workspaces/{workspaceId}/documents`와 `GET /v1/documents/{documentId}`를 순서대로 호출한다.
-8. 문서 생성/정렬 이슈를 볼 때는 응답의 `sortKey`가 비어 있지 않은지, 같은 `parentId` 아래에서 증가하는지 확인한다.
-9. Block 생성 API 확인이 필요하면 `POST /v1/documents/{documentId}/blocks`로 `TEXT` 블록을 만든다. 첫 생성은 기본 stride로 떨어진 `sortKey`가 발급되고, 중간 삽입은 앞/뒤 key 사이의 gap key가 발급되는지 확인한다.
+6. `/v1/**` 호출 시 `X-User-Id`를 반드시 포함한다. 누락/빈값이면 `401 UNAUTHORIZED`가 반환돼야 한다.
+7. 요청 추적이 필요하면 `X-Request-Id`를 함께 보낸다. 미전달 시 서버가 값을 생성해 응답 헤더 `X-Request-Id`로 반환해야 한다.
+8. Workspace API 확인이 필요하면 `POST /v1/workspaces`로 생성 후 `GET /v1/workspaces/{workspaceId}`로 단건 조회를 재현한다.
+9. Document 조회 API 확인이 필요하면 `POST /v1/workspaces/{workspaceId}/documents`로 문서를 만든 뒤 `GET /v1/workspaces/{workspaceId}/documents`와 `GET /v1/documents/{documentId}`를 순서대로 호출한다.
+10. 문서 생성/정렬 이슈를 볼 때는 응답의 `sortKey`가 비어 있지 않은지, 같은 `parentId` 아래에서 증가하는지 확인한다.
+11. Block 생성 API 확인이 필요하면 `POST /v1/documents/{documentId}/blocks`로 `TEXT` 블록을 만든다. 첫 생성은 기본 stride로 떨어진 `sortKey`가 발급되고, 중간 삽입은 앞/뒤 key 사이의 gap key가 발급되는지 확인한다.
 10. Block 정렬 디버깅 시 `sortKey`는 대문자 base36 고정폭 문자열이며, 같은 부모 아래 `ORDER BY sort_key ASC` 결과가 화면 순서와 일치해야 한다.
 11. 반복 삽입으로 gap이 없어지면 `SORT_KEY_REBALANCE_REQUIRED(409)`가 반환될 수 있다. 이 경우 즉시 전체 재정렬을 수행하지 않고 후속 reorder/rebalance 작업이 필요하다.
 12. Block 생성 실패를 재현할 때는 `parentId`를 다른 문서의 블록으로 보내거나, 존재하지 않는 `afterBlockId`를 보내서 `400` 또는 `404` 응답이 요구사항대로 나오는지 확인한다.
