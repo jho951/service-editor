@@ -1,13 +1,29 @@
 package com.documents.api.block;
 
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.documents.api.block.support.BlockJsonCodec;
+import com.documents.api.document.DocumentTransactionApiMapper;
+import com.documents.api.exception.GlobalExceptionHandler;
+import com.documents.api.support.ApiResponseAssertions;
+import com.documents.exception.BusinessErrorCode;
+import com.documents.exception.BusinessException;
+import com.documents.service.AdminBlockTransactionService;
+import com.documents.service.transaction.DocumentTransactionAppliedOperationResult;
+import com.documents.service.transaction.DocumentTransactionOperationStatus;
+import com.documents.service.transaction.DocumentTransactionResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,26 +34,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
-import com.documents.api.block.support.BlockJsonCodec;
-import com.documents.api.exception.GlobalExceptionHandler;
-import com.documents.api.support.ApiResponseAssertions;
-import com.documents.domain.Block;
-import com.documents.domain.BlockType;
-import com.documents.domain.Document;
-import com.documents.domain.Workspace;
-import com.documents.exception.BusinessErrorCode;
-import com.documents.exception.BusinessException;
-import com.documents.service.BlockService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AdminBlock 컨트롤러 빠른 검증")
 class AdminBlockControllerWebMvcTest {
 
-    private static final String SIMPLE_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}";
-    private static final String UPDATED_CONTENT_SERIALIZED = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"수정된 블록\",\"marks\":[]}]}";
     @Mock
-    private BlockService blockService;
+    private AdminBlockTransactionService adminBlockTransactionService;
 
     private MockMvc mockMvc;
 
@@ -45,12 +47,11 @@ class AdminBlockControllerWebMvcTest {
     void setUp() {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
-        BlockJsonCodec blockJsonCodec = new BlockJsonCodec(new ObjectMapper());
 
+        BlockJsonCodec blockJsonCodec = new BlockJsonCodec(new ObjectMapper());
         mockMvc = MockMvcBuilders.standaloneSetup(new AdminBlockController(
-                        blockService,
-                        new BlockApiMapper(blockJsonCodec),
-                        blockJsonCodec
+                        adminBlockTransactionService,
+                        new DocumentTransactionApiMapper(blockJsonCodec)
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setValidator(validator)
@@ -58,836 +59,292 @@ class AdminBlockControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("성공_블록 생성 요청에 대해 gap 기반 sortKey 전략의 생성 응답을 반환한다")
-    void createBlockReturnsCreatedEnvelope() throws Exception {
+    @DisplayName("성공_생성 API는 transaction create 요청을 그대로 위임한다")
+    void createBlockDelegatesSingleCreateTransaction() throws Exception {
         UUID documentId = UUID.randomUUID();
-        UUID parentId = UUID.randomUUID();
-        UUID blockId = UUID.randomUUID();
-
-        Block createdBlock = block(
-                blockId,
-                documentId,
-                parentId,
-                "000000000001000000000000",
-                0,
-                "새 블록"
-        );
-        createdBlock.setContent("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"새 블록\",\"marks\":[]}]}");
-
-        when(blockService.create(
-                eq(documentId),
-                eq(parentId),
-                eq(BlockType.TEXT),
-                eq(SIMPLE_CONTENT_SERIALIZED),
-                eq(null),
-                eq(null),
-                eq("user-123")
-        )).thenReturn(createdBlock);
+        when(adminBlockTransactionService.applyCreate(eq(documentId), any(), any(), eq("user-123")))
+                .thenReturn(transactionResult(documentId, "tmp:block:1", UUID.randomUUID(), 1, "000000000001000000000000", null));
 
         mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", documentId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "parentId": "%s",
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  }
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-1",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    }
+                                  ]
                                 }
-                                """.formatted(parentId)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.httpStatus").value("CREATED"))
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.code").value(201))
-                .andExpect(jsonPath("$.data.id").value(blockId.toString()))
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.httpStatus").value("OK"))
+                .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
-                .andExpect(jsonPath("$.data.parentId").value(parentId.toString()))
-                .andExpect(jsonPath("$.data.type").value("TEXT"))
-                .andExpect(jsonPath("$.data.content.format").value("rich_text"))
-                .andExpect(jsonPath("$.data.content.schemaVersion").value(1))
-                .andExpect(jsonPath("$.data.content.segments[0].text").value("새 블록"))
-                .andExpect(jsonPath("$.data.content.segments[0].marks").isArray())
-                .andExpect(jsonPath("$.data.sortKey").value("000000000001000000000000"))
-                .andExpect(jsonPath("$.data.createdBy").value("user-123"))
-                .andExpect(jsonPath("$.data.version").value(0));
+                .andExpect(jsonPath("$.data.batchId").value("batch-1"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"));
+
+        verify(adminBlockTransactionService).applyCreate(eq(documentId), any(), any(), eq("user-123"));
     }
 
     @Test
-    @DisplayName("성공_블록 수정 요청에 대해 수정 응답을 반환한다")
-    void updateBlockReturnsUpdatedEnvelope() throws Exception {
-        UUID documentId = UUID.randomUUID();
+    @DisplayName("성공_수정 API는 blockId로 문서 ID를 찾아 같은 transaction 경로를 호출한다")
+    void updateBlockDelegatesSingleReplaceContentTransaction() throws Exception {
         UUID blockId = UUID.randomUUID();
-
-        Block updatedBlock = block(
-                        blockId,
-                        documentId,
-                        null,
-                        "000000000001000000000000",
-                        1,
-                        "수정된 블록"
-                );
-        updatedBlock.setContent(UPDATED_CONTENT_SERIALIZED);
-
-        when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
-                .thenReturn(updatedBlock);
+        UUID documentId = UUID.randomUUID();
+        when(adminBlockTransactionService.applyReplaceContent(eq(blockId), any(), any(), eq("user-456")))
+                .thenReturn(transactionResult(documentId, null, blockId, 1, "000000000001000000000000", null));
 
         mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
-                        .header("X-User-Id", "user-123")
+                        .header("X-User-Id", "user-456")
                         .content("""
                                 {
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "수정된 블록",
-                                        "marks": []
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-2",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "수정된 블록",
+                                            "marks": []
+                                          }
+                                        ]
                                       }
-                                    ]
-                                  },
-                                  "version": 0
+                                    }
+                                  ]
                                 }
-                                """))
+                                """.formatted(blockId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.httpStatus").value("OK"))
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.id").value(blockId.toString()))
-                .andExpect(jsonPath("$.data.content.format").value("rich_text"))
-                .andExpect(jsonPath("$.data.content.schemaVersion").value(1))
-                .andExpect(jsonPath("$.data.content.segments[0].text").value("수정된 블록"))
-                .andExpect(jsonPath("$.data.version").value(1));
-    }
+                .andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+                .andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(1));
 
-	@Test
-	@DisplayName("성공_정상 삭제 요청에 대해 성공 응답을 반환한다")
-	void deleteBlockReturnsSuccessEnvelope() throws Exception {
-		UUID blockId = UUID.randomUUID();
-		when(blockService.delete(blockId, 3, "user-123"))
-				.thenReturn(block(blockId, UUID.randomUUID(), null, "000000000001000000000000", 0, "삭제 대상"));
-
-		mockMvc.perform(delete("/v1/admin/blocks/{blockId}", blockId)
-						.param("version", "3")
-                        .header("X-User-Id", "user-123"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.httpStatus").value("OK"))
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("요청 응답 성공"))
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data").doesNotExist());
-
-		verify(blockService).delete(blockId, 3, "user-123");
-	}
-
-    @Test
-    @DisplayName("실패_type이 없으면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsMissingType() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+        verify(adminBlockTransactionService).applyReplaceContent(eq(blockId), any(), any(), eq("user-456"));
     }
 
     @Test
-    @DisplayName("실패_부모 블록이 없으면 블록 없음 응답을 반환한다")
-    void createBlockReturnsNotFoundWhenParentMissing() throws Exception {
-        UUID documentId = UUID.randomUUID();
-        UUID parentId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-
-        when(blockService.create(
-                eq(documentId),
-                eq(parentId),
-                eq(BlockType.TEXT),
-                eq(SIMPLE_CONTENT_SERIALIZED),
-                eq(null),
-                eq(null),
-                eq("user-123")
-        )).thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
-
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", documentId)
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "parentId": "11111111-1111-1111-1111-111111111111",
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_인증 헤더가 없으면 블록 생성 API는 인증 오류를 반환한다")
-    void createBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_content가 없으면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsMissingContent() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "type": "TEXT"
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_content format이 다르면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsUnsupportedContentFormat() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "plain_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_mark 타입이 허용 목록이 아니면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsUnsupportedMarkType() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": [
-                                          {
-                                            "type": "link",
-                                            "value": "https://example.com"
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_textColor 값이 hex 형식이 아니면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsInvalidTextColor() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": [
-                                          {
-                                            "type": "textColor",
-                                            "value": "black"
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_같은 segment에 중복 mark 타입이 있으면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsDuplicateMarkType() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": [
-                                          { "type": "bold" },
-                                          { "type": "bold" }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_textColor 외 mark에 value가 있으면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsUnexpectedMarkValue() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": [
-                                          {
-                                            "type": "bold",
-                                            "value": true
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_segment에 허용되지 않은 필드가 있으면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsUnexpectedSegmentField() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "새 블록",
-                                        "marks": [],
-                                        "extra": "field"
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_빈 segment가 중간에 섞여 있으면 유효성 검사 오류를 반환한다")
-    void createBlockRejectsEmptySegmentInMultiSegmentContent() throws Exception {
-        var result = mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "",
-                                        "marks": []
-                                      },
-                                      {
-                                        "text": "새 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("성공_segment가 1개뿐인 빈 블록은 유효성 검사에 통과한다")
-    void createBlockAllowsSingleEmptySegment() throws Exception {
+    @DisplayName("성공_삭제 API는 transaction delete 응답을 반환한다")
+    void deleteBlockDelegatesSingleDeleteTransaction() throws Exception {
         UUID documentId = UUID.randomUUID();
         UUID blockId = UUID.randomUUID();
-        Block createdBlock = block(
-                blockId,
-                documentId,
-                null,
-                "000000000001000000000000",
-                0,
-                ""
-        );
-        createdBlock.setContent("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"\",\"marks\":[]}]}");
+        LocalDateTime deletedAt = LocalDateTime.of(2026, 3, 25, 12, 0);
+        when(adminBlockTransactionService.applyDelete(eq(blockId), any(), any(), eq("user-123")))
+                .thenReturn(transactionResult(documentId, null, blockId, null, null, deletedAt));
 
-        when(blockService.create(
-                eq(documentId),
-                eq(null),
-                eq(BlockType.TEXT),
-                eq("{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"\",\"marks\":[]}]}"),
-                eq(null),
-                eq(null),
-                eq("user-123")
-        )).thenReturn(createdBlock);
-
-        mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", documentId)
+        mockMvc.perform(delete("/v1/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "type": "TEXT",
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "",
-                                        "marks": []
-                                      }
-                                    ]
-                                  }
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-3",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 3
+                                    }
+                                  ]
                                 }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.content.segments[0].text").value(""));
+                                """.formatted(blockId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+                .andExpect(jsonPath("$.data.appliedOperations[0].deletedAt").exists());
+
+        verify(adminBlockTransactionService).applyDelete(eq(blockId), any(), any(), eq("user-123"));
     }
 
     @Test
-    @DisplayName("실패_content가 없으면 블록 수정 요청은 유효성 검사 오류를 반환한다")
-    void updateBlockRejectsMissingContent() throws Exception {
-        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "version": 0
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_존재하지 않는 블록이면 블록 없음 응답을 반환한다")
-    void updateBlockReturnsNotFoundWhenBlockMissing() throws Exception {
-        UUID blockId = UUID.fromString("11111111-1111-1111-1111-111111111111");
-
-        when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
-                .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
-
-        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "수정된 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  },
-                                  "version": 0
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_인증 헤더가 없으면 블록 수정 API는 인증 오류를 반환한다")
-    void updateBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", UUID.randomUUID())
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "수정된 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  },
-                                  "version": 0
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_존재하지 않는 블록 삭제 시 블록 없음 응답을 반환한다")
-    void deleteBlockReturnsNotFoundWhenBlockMissing() throws Exception {
+    @DisplayName("성공_이동 API는 transaction move 응답을 반환한다")
+    void moveBlockDelegatesSingleMoveTransaction() throws Exception {
         UUID blockId = UUID.randomUUID();
-        doThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND))
-                .when(blockService).delete(blockId, 3, "user-123");
-
-        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", blockId)
-                        .param("version", "3")
-                        .header("X-User-Id", "user-123"));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_version 없이 블록 삭제를 요청하면 유효성 오류를 반환한다")
-    void deleteBlockReturnsBadRequestWhenVersionMissing() throws Exception {
-        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", UUID.randomUUID())
-                        .header("X-User-Id", "user-123"));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_인증 헤더가 없으면 블록 삭제 API는 인증 오류를 반환한다")
-    void deleteBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", UUID.randomUUID())
-                        .param("version", "0"));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_version이 없으면 유효성 검사 오류를 반환한다")
-    void updateBlockRejectsMissingVersion() throws Exception {
-        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", UUID.randomUUID())
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "수정된 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  }
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_version이 현재 블록 상태와 충돌하면 충돌 응답을 반환한다")
-    void updateBlockReturnsConflictWhenVersionMismatched() throws Exception {
-        UUID blockId = UUID.randomUUID();
-
-        when(blockService.update(eq(blockId), eq(UPDATED_CONTENT_SERIALIZED), eq(0), eq("user-123")))
-                .thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
-
-        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "content": {
-                                    "format": "rich_text",
-                                    "schemaVersion": 1,
-                                    "segments": [
-                                      {
-                                        "text": "수정된 블록",
-                                        "marks": []
-                                      }
-                                    ]
-                                  },
-                                  "version": 0
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
-    }
-
-    @Test
-    @DisplayName("성공_루트로 이동 요청 시 성공 응답을 반환한다")
-    void moveBlockReturnsSuccessEnvelopeForRootMove() throws Exception {
-        UUID blockId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        when(adminBlockTransactionService.applyMove(eq(blockId), any(), any(), eq("user-123")))
+                .thenReturn(transactionResult(documentId, null, blockId, 2, "000000000002000000000000", null));
 
         mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "parentId": null,
-                                  "afterBlockId": null,
-                                  "beforeBlockId": null,
-                                  "version": 3
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-4",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_MOVE",
+                                      "blockRef": "%s",
+                                      "version": 1,
+                                      "parentRef": null,
+                                      "afterRef": null,
+                                      "beforeRef": null
+                                    }
+                                  ]
                                 }
-                                """))
+                                """.formatted(blockId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.httpStatus").value("OK"))
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value("요청 응답 성공"))
-                .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data").doesNotExist());
+                .andExpect(jsonPath("$.data.appliedOperations[0].status").value("APPLIED"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].sortKey").value("000000000002000000000000"));
 
-        verify(blockService).move(blockId, null, null, null, 3, "user-123");
+        verify(adminBlockTransactionService).applyMove(eq(blockId), any(), any(), eq("user-123"));
     }
 
     @Test
-    @DisplayName("성공_다른 부모 아래 특정 형제 뒤로 이동 요청 시 전달값을 그대로 서비스에 넘긴다")
-    void moveBlockPassesAnchorsToService() throws Exception {
+    @DisplayName("실패_단일 operation이 아니면 잘못된 요청을 반환한다")
+    void updateBlockRejectsMultipleOperations() throws Exception {
         UUID blockId = UUID.randomUUID();
-        UUID parentId = UUID.randomUUID();
-        UUID afterBlockId = UUID.randomUUID();
+        when(adminBlockTransactionService.applyReplaceContent(eq(blockId), any(), any(), eq("user-123")))
+                .thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
 
-        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
+        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
                                 {
-                                  "parentId": "%s",
-                                  "afterBlockId": "%s",
-                                  "beforeBlockId": null,
-                                  "version": 4
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-5",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "A",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 1,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "B",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
                                 }
-                                """.formatted(parentId, afterBlockId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.httpStatus").value("OK"))
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.code").value(200));
-
-        verify(blockService).move(blockId, parentId, afterBlockId, null, 4, "user-123");
-    }
-
-    @Test
-    @DisplayName("실패_인증 헤더가 없으면 블록 이동 API는 인증 오류를 반환한다")
-    void moveBlockReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        UUID blockId = UUID.randomUUID();
-
-        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
-                        .contentType("application/json")
-                        .content("""
-                                {
-                                  "parentId": null,
-                                  "afterBlockId": null,
-                                  "beforeBlockId": null,
-                                  "version": 0
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
-        verify(blockService, never()).move(any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("실패_version이 없으면 블록 이동 API는 유효성 검사 오류를 반환한다")
-    void moveBlockReturnsValidationErrorWhenVersionMissing() throws Exception {
-        UUID blockId = UUID.randomUUID();
-
-        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "parentId": null,
-                                  "afterBlockId": null,
-                                  "beforeBlockId": null
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
-        verify(blockService, never()).move(any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("실패_존재하지 않는 블록 이동 요청은 블록 없음 응답을 반환한다")
-    void moveBlockReturnsNotFoundWhenBlockMissing() throws Exception {
-        UUID blockId = UUID.randomUUID();
-        doThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND))
-                .when(blockService).move(blockId, null, null, null, 0, "user-123");
-
-        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "parentId": null,
-                                  "afterBlockId": null,
-                                  "beforeBlockId": null,
-                                  "version": 0
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
-    }
-
-    @Test
-    @DisplayName("실패_version이 현재 블록 상태와 충돌하면 블록 이동 API는 충돌 응답을 반환한다")
-    void moveBlockReturnsConflictWhenVersionMismatched() throws Exception {
-        UUID blockId = UUID.randomUUID();
-        doThrow(new BusinessException(BusinessErrorCode.CONFLICT))
-                .when(blockService).move(blockId, null, null, null, 0, "user-123");
-
-        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "parentId": null,
-                                  "afterBlockId": null,
-                                  "beforeBlockId": null,
-                                  "version": 0
-                                }
-                                """));
-
-        ApiResponseAssertions.assertErrorEnvelope(result, "CONFLICT", 9005, "요청이 현재 리소스 상태와 충돌합니다.");
-    }
-
-    @Test
-    @DisplayName("실패_잘못된 위치 요청이면 블록 이동 API는 잘못된 요청 응답을 반환한다")
-    void moveBlockReturnsBadRequestWhenRequestInvalid() throws Exception {
-        UUID blockId = UUID.randomUUID();
-        doThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST))
-                .when(blockService).move(blockId, blockId, null, null, 0, "user-123");
-
-        var result = mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
-                        .contentType("application/json")
-                        .header("X-User-Id", "user-123")
-                        .content("""
-                                {
-                                  "parentId": "%s",
-                                  "afterBlockId": null,
-                                  "beforeBlockId": null,
-                                  "version": 0
-                                }
-                                """.formatted(blockId)));
+                                """.formatted(blockId, blockId)));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
     }
 
-    private Block block(UUID blockId, UUID documentId, UUID parentId, String sortKey, int version, String text) {
-        Block block = Block.builder()
-                .id(blockId)
-                .document(document(documentId))
-                .parent(parentId == null ? null : parentBlock(parentId, documentId))
-                .type(BlockType.TEXT)
-                .content(toContent(text))
-                .sortKey(sortKey)
-                .createdBy("user-123")
-                .updatedBy("user-123")
-                .build();
-        block.setVersion(version);
-        block.setCreatedAt(LocalDateTime.of(2026, 3, 17, 0, 0));
-        block.setUpdatedAt(LocalDateTime.of(2026, 3, 17, 0, 0));
-        return block;
+    @Test
+    @DisplayName("실패_path blockId와 blockRef가 다르면 잘못된 요청을 반환한다")
+    void updateBlockRejectsMismatchedBlockReference() throws Exception {
+        UUID blockId = UUID.randomUUID();
+        when(adminBlockTransactionService.applyReplaceContent(eq(blockId), any(), any(), eq("user-123")))
+                .thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
+
+        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-6",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(UUID.randomUUID())));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
     }
 
-    private Document document(UUID documentId) {
-        return Document.builder()
-                .id(documentId)
-                .workspace(Workspace.builder()
-                        .id(UUID.randomUUID())
-                        .name("Docs Root")
-                        .build())
-                .title("문서")
-                .sortKey("00000000000000000001")
-                .build();
+    @Test
+    @DisplayName("실패_block 조회 실패는 그대로 전파한다")
+    void deleteBlockPropagatesBlockNotFound() throws Exception {
+        UUID blockId = UUID.randomUUID();
+        when(adminBlockTransactionService.applyDelete(eq(blockId), any(), any(), eq("user-123")))
+                .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
+
+        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", blockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-7",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_DELETE",
+                                      "blockRef": "%s",
+                                      "version": 0
+                                    }
+                                  ]
+                                }
+                                """.formatted(blockId)));
+
+        ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9006, "요청한 블록을 찾을 수 없습니다.");
     }
 
-    private Block parentBlock(UUID blockId, UUID documentId) {
-        return Block.builder()
-                .id(blockId)
-                .document(document(documentId))
-                .type(BlockType.TEXT)
-                .content(toContent("부모 블록"))
-                .sortKey("000000000001000000000000")
-                .build();
-    }
-
-    private String toContent(String text) {
-        return "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"%s\",\"marks\":[]}]}".formatted(text);
+    private DocumentTransactionResult transactionResult(
+            UUID documentId,
+            String tempId,
+            UUID blockId,
+            Integer version,
+            String sortKey,
+            LocalDateTime deletedAt
+    ) {
+        return new DocumentTransactionResult(
+                documentId,
+                1,
+                "batch-1",
+                List.of(new DocumentTransactionAppliedOperationResult(
+                        "op-1",
+                        DocumentTransactionOperationStatus.APPLIED,
+                        tempId,
+                        blockId,
+                        version,
+                        sortKey,
+                        deletedAt
+                ))
+        );
     }
 }

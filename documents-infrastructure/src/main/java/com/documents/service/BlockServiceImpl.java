@@ -44,6 +44,12 @@ public class BlockServiceImpl implements BlockService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Block getById(UUID blockId) {
+        return findActiveBlock(blockId);
+    }
+
+    @Override
     @Transactional
     public Block create(
             UUID documentId,
@@ -347,4 +353,5 @@ public class BlockServiceImpl implements BlockService {
     private void incrementActiveDocumentVersion(UUID documentId, String actorId) {
         incrementActiveDocumentVersion(documentId, actorId, LocalDateTime.now());
     }
+
 }
