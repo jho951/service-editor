@@ -5,7 +5,7 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'demo'
+rootProject.name = 'Editor-server'
 
 include 'documents-boot'
 include 'documents-api'

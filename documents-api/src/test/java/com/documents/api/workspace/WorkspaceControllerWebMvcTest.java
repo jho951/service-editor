@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.documents.api.auth.CurrentUserIdArgumentResolver;
 import com.documents.api.exception.GlobalExceptionHandler;
 import com.documents.api.support.ApiResponseAssertions;
 import com.documents.domain.Workspace;
@@ -41,6 +42,7 @@ class WorkspaceControllerWebMvcTest {
 
         mockMvc = MockMvcBuilders.standaloneSetup(new WorkspaceController(workspaceService))
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new CurrentUserIdArgumentResolver())
                 .setValidator(validator)
                 .build();
     }

@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.documents.api.auth.CurrentUserIdArgumentResolver;
 import com.documents.api.block.support.BlockJsonCodec;
 import com.documents.api.document.DocumentTransactionApiMapper;
 import com.documents.api.exception.GlobalExceptionHandler;
@@ -54,6 +55,7 @@ class AdminBlockControllerWebMvcTest {
                         new DocumentTransactionApiMapper(blockJsonCodec)
                 ))
                 .setControllerAdvice(new GlobalExceptionHandler())
+                .setCustomArgumentResolvers(new CurrentUserIdArgumentResolver())
                 .setValidator(validator)
                 .build();
     }
