@@ -19,5 +19,5 @@ RUN ./gradlew clean :documents-boot:bootJar -x test
 FROM eclipse-temurin:17-jdk
 WORKDIR /app
 COPY --from=builder /workspace/documents-boot/build/libs/*.jar app.jar
-EXPOSE 8080
+EXPOSE 8083
 ENTRYPOINT ["java","-jar","app.jar"]
