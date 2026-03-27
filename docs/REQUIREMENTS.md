@@ -93,6 +93,7 @@
 - Gateway는 외부 클라이언트가 보낸 `X-User-Id`를 제거하고, 인증 성공 시에만 신뢰 가능한 `X-User-Id`를 재주입해야 한다.
 - Gateway는 외부 공개 경로를 `/v1/**`로 제공하고, 내부 서비스 전달 전 경로의 `/v1` 프리픽스를 제거(rewrite)해야 한다.
 - 본 서비스는 Gateway가 주입한 `X-User-Id`를 인증 컨텍스트로 사용한다.
+- 본 서비스가 다른 내부 서비스(user-server 등)를 호출할 때는 호출 목적에 따라 사용자 위임 토큰 또는 서비스 전용 토큰을 구분해 사용해야 한다.
 
 ---
 
@@ -655,6 +656,8 @@ Block {
 - 비로그인 사용자는 gateway 또는 상위 인증 계층에서 차단되므로, 본 서비스는 인증 완료 요청만 처리 대상으로 본다.
 - 본 서비스는 `/**` 요청에서 `X-User-Id`가 누락되거나 빈 문자열이면 `401 UNAUTHORIZED`를 반환해야 한다.
 - 본 서비스는 직접 공개 엔드포인트로 노출하지 않고, Gateway 경유 트래픽만 수신해야 한다.
+- 다른 내부 서비스 호출 시 사용자 위임이 필요하면 `Authorization: Bearer <user access token>`을 전파해야 한다.
+- 시스템 내부 호출은 사용자 토큰과 분리된 서비스 전용 토큰을 사용해야 한다.
 - 쓰기 요청은 edit 권한이 필요하다.
 - HTML은 저장하지 않는다.
 - 렌더링 시 XSS 방어는 프론트와 계약으로 명시한다.
@@ -674,6 +677,9 @@ Block {
 - 외부 공개 API 경로는 Gateway에서 `/v1/**`로 노출하고, 본 서비스 내부 API는 `/v1` 없는 경로를 기준으로 한다.
 - `X-User-Id` 누락/빈값 요청은 `UNAUTHORIZED(401)`로 처리한다.
 - 요청 추적을 위해 `X-Request-Id`를 수신하며, 누락 시 서버에서 생성해 응답 헤더에 반영한다.
+- outbound 호출 인증 모드는 `USER_DELEGATION`, `SERVICE_TO_SERVICE`로 분리한다.
+- `USER_DELEGATION`은 inbound `Authorization` Bearer 토큰을 그대로 전파한다.
+- `SERVICE_TO_SERVICE`는 `auth.service-token.bearer-token` 설정값을 Bearer 토큰으로 사용한다.
 - 응답 포맷: JSON
 - 모든 성공/실패 응답은 `documents-api` 모듈의 공통 응답 구조(`GlobalResponse`)를 따른다.
 - 비즈니스 성공 코드는 `SuccessCode`로 관리하고, API 오류 응답 코드는 `documents-api` 모듈의 `ErrorCode`로 관리한다.
