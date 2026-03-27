@@ -104,7 +104,9 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 	@Query("""
 		update Document d
 		set d.deletedAt = :deletedAt,
-		    d.updatedBy = :actorId
+		    d.updatedAt = :deletedAt,
+		    d.updatedBy = :actorId,
+		    d.version = d.version + 1
 		where d.id in :documentIds
 		  and d.deletedAt is null
 		""")
@@ -119,7 +121,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 		update Document d
 		set d.deletedAt = null,
 		    d.updatedBy = :actorId,
-		    d.updatedAt = :updatedAt
+		    d.updatedAt = :updatedAt,
+		    d.version = d.version + 1
 		where d.id in :documentIds
 		  and d.deletedAt is not null
 		""")
