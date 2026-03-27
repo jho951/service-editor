@@ -28,7 +28,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "AdminBlock", description = "관리자 블록 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/v1/admin")
+@RequestMapping("/admin")
 public class AdminBlockController {
 
     private final AdminBlockTransactionService adminBlockTransactionService;

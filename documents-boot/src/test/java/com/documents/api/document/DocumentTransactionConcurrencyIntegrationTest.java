@@ -704,7 +704,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
         assertThat(raceResults.stream().filter(result -> result.getResponse().getStatus() == 409).count()).isEqualTo(1);
 
         Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow();
-        MvcResult retryResult = mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        MvcResult retryResult = mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content(replaceContentRequest(
@@ -807,7 +807,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
 
     private Future<MvcResult> submitTransaction(UUID documentId, String requestBody) {
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<MvcResult> future = executor.submit(() -> mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+        Future<MvcResult> future = executor.submit(() -> mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content(requestBody))
@@ -832,7 +832,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
                     .<Callable<MvcResult>>map(requestBody -> () -> {
                         ready.countDown();
                         assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
-                        return mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+                        return mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
                                         .contentType("application/json")
                                         .header("X-User-Id", "user-456")
                                         .content(requestBody))

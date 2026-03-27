@@ -26,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "Workspace", description = "워크스페이스 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/v1/workspaces")
+@RequestMapping("/workspaces")
 public class WorkspaceController {
 
     private final WorkspaceService workspaceService;

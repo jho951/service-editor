@@ -170,7 +170,7 @@ class DocumentControllerWebMvcTest {
 			block(childBlockId, documentId, rootBlockId, "000000000001I00000000000", 1, CHILD_BLOCK_CONTENT_JSON)
 		));
 
-		mockMvc.perform(get("/v1/documents/{documentId}/blocks", documentId))
+		mockMvc.perform(get("/documents/{documentId}/blocks", documentId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -216,7 +216,7 @@ class DocumentControllerWebMvcTest {
 		deletedChild.setDeletedAt(FIXTURE_TIME.minusMinutes(1));
 		when(documentService.getTrashByWorkspaceId(workspaceId)).thenReturn(List.of(deletedRoot, deletedChild));
 
-		mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspaceId))
+		mockMvc.perform(get("/workspaces/{workspaceId}/trash/documents", workspaceId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -246,7 +246,7 @@ class DocumentControllerWebMvcTest {
 		when(documentService.getTrashByWorkspaceId(workspaceId))
 			.thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
 
-		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspaceId));
+		var result = mockMvc.perform(get("/workspaces/{workspaceId}/trash/documents", workspaceId));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
 	}
@@ -284,7 +284,7 @@ class DocumentControllerWebMvcTest {
 				)
 			));
 
-		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -357,7 +357,7 @@ class DocumentControllerWebMvcTest {
 				)
 			));
 
-		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -407,7 +407,7 @@ class DocumentControllerWebMvcTest {
 				)
 			));
 
-		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -459,7 +459,7 @@ class DocumentControllerWebMvcTest {
 				)
 			));
 
-		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -508,7 +508,7 @@ class DocumentControllerWebMvcTest {
 				)
 			));
 
-		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -555,7 +555,7 @@ class DocumentControllerWebMvcTest {
 				)
 			));
 
-		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -591,7 +591,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_replace_content에 content가 없으면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsReplaceContentWithoutContent() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -614,7 +614,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_create에 content가 함께 오면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsCreateWithContent() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -647,7 +647,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_create에 version이 함께 오면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsCreateWithVersion() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -671,7 +671,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_create에 blockRef가 없으면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsCreateWithoutBlockRef() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -693,7 +693,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_replace_content에 위치 필드가 함께 오면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsReplaceContentWithPositionFields() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -748,7 +748,7 @@ class DocumentControllerWebMvcTest {
 				)
 			));
 
-		mockMvc.perform(post("/v1/documents/{documentId}/transactions", documentId)
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -772,7 +772,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_block_move에 content가 함께 오면 유효성 검사 오류를 반환한다")
 	void applyTransactionsRejectsBlockMoveWithContent() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -809,7 +809,7 @@ class DocumentControllerWebMvcTest {
 		when(documentTransactionService.apply(any(), any(), eq(ACTOR_ID)))
 			.thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -845,7 +845,7 @@ class DocumentControllerWebMvcTest {
 		when(documentTransactionService.apply(any(), any(), eq(ACTOR_ID)))
 			.thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -895,7 +895,7 @@ class DocumentControllerWebMvcTest {
 			ICON_DOC_JSON,
 			COVER_1_JSON));
 
-		mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspaceId)
+		mockMvc.perform(post("/workspaces/{workspaceId}/documents", workspaceId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -941,7 +941,7 @@ class DocumentControllerWebMvcTest {
 				"00000000000000000002", null, null)
 		));
 
-		mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspaceId))
+		mockMvc.perform(get("/workspaces/{workspaceId}/documents", workspaceId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -963,7 +963,7 @@ class DocumentControllerWebMvcTest {
 		when(documentService.getAllByWorkspaceId(workspaceId))
 			.thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
 
-		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspaceId));
+		var result = mockMvc.perform(get("/workspaces/{workspaceId}/documents", workspaceId));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
 	}
@@ -971,7 +971,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_문서 제목이 공백이면 유효성 검사 오류를 반환한다")
 	void createDocumentRejectsBlankTitle() throws Exception {
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -997,7 +997,7 @@ class DocumentControllerWebMvcTest {
 			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
 
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspaceId)
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", workspaceId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1025,7 +1025,7 @@ class DocumentControllerWebMvcTest {
 			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspaceId)
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", workspaceId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1050,7 +1050,7 @@ class DocumentControllerWebMvcTest {
 				ICON_DOC_JSON,
 				null));
 
-		mockMvc.perform(get("/v1/documents/{documentId}", documentId))
+		mockMvc.perform(get("/documents/{documentId}", documentId))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -1070,7 +1070,7 @@ class DocumentControllerWebMvcTest {
 		when(documentService.getById(documentId))
 			.thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
-		var result = mockMvc.perform(get("/v1/documents/{documentId}", documentId));
+		var result = mockMvc.perform(get("/documents/{documentId}", documentId));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
 	}
@@ -1080,7 +1080,7 @@ class DocumentControllerWebMvcTest {
 	void restoreDocumentReturnsSuccessEnvelope() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
+		mockMvc.perform(post("/documents/{documentId}/restore", documentId)
 				.header(USER_ID_HEADER, ACTOR_ID))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -1099,7 +1099,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).restore(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
+		var result = mockMvc.perform(post("/documents/{documentId}/restore", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -1112,7 +1112,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).restore(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
+		var result = mockMvc.perform(post("/documents/{documentId}/restore", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -1125,7 +1125,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).restore(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId)
+		var result = mockMvc.perform(post("/documents/{documentId}/restore", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -1137,7 +1137,7 @@ class DocumentControllerWebMvcTest {
 	void restoreDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", documentId));
+		var result = mockMvc.perform(post("/documents/{documentId}/restore", documentId));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
 		verify(documentService, never()).restore(any(), any());
@@ -1148,7 +1148,7 @@ class DocumentControllerWebMvcTest {
 	void moveDocumentReturnsSuccessEnvelope() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+		mockMvc.perform(post("/documents/{documentId}/move", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -1175,7 +1175,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).move(documentId, null, null, null, ACTOR_ID);
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+		var result = mockMvc.perform(post("/documents/{documentId}/move", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1196,7 +1196,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).move(documentId, null, null, null, ACTOR_ID);
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+		var result = mockMvc.perform(post("/documents/{documentId}/move", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1217,7 +1217,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST))
 			.when(documentService).move(documentId, documentId, null, null, ACTOR_ID);
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+		var result = mockMvc.perform(post("/documents/{documentId}/move", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1236,7 +1236,7 @@ class DocumentControllerWebMvcTest {
 	void moveDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", documentId)
+		var result = mockMvc.perform(post("/documents/{documentId}/move", documentId)
 			.contentType("application/json")
 			.content("""
 				{
@@ -1253,7 +1253,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_icon이 객체 스키마를 따르지 않으면 유효성 검사 오류를 반환한다")
 	void createDocumentRejectsInvalidIconSchema() throws Exception {
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", UUID.randomUUID())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -1269,7 +1269,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_cover가 필수 필드를 누락하면 유효성 검사 오류를 반환한다")
 	void createDocumentRejectsInvalidCoverSchema() throws Exception {
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", UUID.randomUUID())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -1287,7 +1287,7 @@ class DocumentControllerWebMvcTest {
 	@Test
 	@DisplayName("실패_인증 헤더가 없으면 인증 오류를 반환한다")
 	void createDocumentRequiresUserHeader() throws Exception {
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", UUID.randomUUID())
 			.contentType("application/json")
 			.content("""
 				{
@@ -1316,7 +1316,7 @@ class DocumentControllerWebMvcTest {
 			ICON_DOC_JSON,
 			COVER_2_JSON));
 
-		mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+		mockMvc.perform(patch("/documents/{documentId}", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -1359,7 +1359,7 @@ class DocumentControllerWebMvcTest {
 			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1390,7 +1390,7 @@ class DocumentControllerWebMvcTest {
 			ICON_DOC_JSON,
 			COVER_1_JSON));
 
-		mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+		mockMvc.perform(patch("/documents/{documentId}", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -1417,7 +1417,7 @@ class DocumentControllerWebMvcTest {
 	void updateDocumentRejectsMissingTitle() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1435,7 +1435,7 @@ class DocumentControllerWebMvcTest {
 	void updateDocumentRejectsMissingVersion() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1453,7 +1453,7 @@ class DocumentControllerWebMvcTest {
 	void updateDocumentRejectsBlankTitle() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}", documentId)
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -1481,7 +1481,7 @@ class DocumentControllerWebMvcTest {
 			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1499,7 +1499,7 @@ class DocumentControllerWebMvcTest {
 	void updateDocumentRequiresUserHeader() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}", documentId)
 			.contentType("application/json")
 			.content("""
 				{
@@ -1529,7 +1529,7 @@ class DocumentControllerWebMvcTest {
 			eq(ACTOR_ID)
 		)).thenReturn(document);
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+		mockMvc.perform(patch("/documents/{documentId}/visibility", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -1562,7 +1562,7 @@ class DocumentControllerWebMvcTest {
 			eq(ACTOR_ID)
 		)).thenReturn(document);
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+		mockMvc.perform(patch("/documents/{documentId}/visibility", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -1595,7 +1595,7 @@ class DocumentControllerWebMvcTest {
 			eq(ACTOR_ID)
 		)).thenReturn(document);
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+		mockMvc.perform(patch("/documents/{documentId}/visibility", documentId)
 				.contentType("application/json")
 				.header(USER_ID_HEADER, ACTOR_ID)
 				.content("""
@@ -1622,7 +1622,7 @@ class DocumentControllerWebMvcTest {
 			eq(ACTOR_ID)
 		)).thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}/visibility", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1640,7 +1640,7 @@ class DocumentControllerWebMvcTest {
 	void updateDocumentVisibilityRejectsInvalidVisibility() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}/visibility", documentId)
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
 			.content("""
@@ -1660,7 +1660,7 @@ class DocumentControllerWebMvcTest {
 		UUID documentId = UUID.randomUUID();
 		doNothing().when(documentService).delete(documentId, ACTOR_ID);
 
-		mockMvc.perform(delete("/v1/documents/{documentId}", documentId)
+		mockMvc.perform(delete("/documents/{documentId}", documentId)
 				.header(USER_ID_HEADER, ACTOR_ID))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -1679,7 +1679,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).delete(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(delete("/v1/documents/{documentId}", documentId)
+		var result = mockMvc.perform(delete("/documents/{documentId}", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -1692,7 +1692,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).delete(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(delete("/v1/documents/{documentId}", documentId)
+		var result = mockMvc.perform(delete("/documents/{documentId}", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -1703,7 +1703,7 @@ class DocumentControllerWebMvcTest {
 	void deleteDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(delete("/v1/documents/{documentId}", documentId));
+		var result = mockMvc.perform(delete("/documents/{documentId}", documentId));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
 	}
@@ -1714,7 +1714,7 @@ class DocumentControllerWebMvcTest {
 		UUID documentId = UUID.randomUUID();
 		doNothing().when(documentService).trash(documentId, ACTOR_ID);
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+		mockMvc.perform(patch("/documents/{documentId}/trash", documentId)
 				.header(USER_ID_HEADER, ACTOR_ID))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -1733,7 +1733,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).trash(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}/trash", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -1746,7 +1746,7 @@ class DocumentControllerWebMvcTest {
 		doThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND))
 			.when(documentService).trash(documentId, ACTOR_ID);
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId)
+		var result = mockMvc.perform(patch("/documents/{documentId}/trash", documentId)
 			.header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -1757,7 +1757,7 @@ class DocumentControllerWebMvcTest {
 	void trashDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
 		UUID documentId = UUID.randomUUID();
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", documentId));
+		var result = mockMvc.perform(patch("/documents/{documentId}/trash", documentId));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
 		verify(documentService, never()).trash(any(), any());

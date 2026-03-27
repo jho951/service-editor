@@ -22,6 +22,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
@@ -43,6 +45,9 @@ class DocumentApiIntegrationTest {
 	private MockMvc mockMvc;
 
 	@Autowired
+	private WebApplicationContext context;
+
+	@Autowired
 	private WorkspaceRepository workspaceRepository;
 
 	@Autowired
@@ -59,6 +64,9 @@ class DocumentApiIntegrationTest {
 
 	@BeforeEach
 	void setUp() {
+		mockMvc = MockMvcBuilders.webAppContextSetup(context)
+			.defaultRequest(get("/").header("X-User-Id", "user-123"))
+			.build();
 		blockRepository.deleteAll();
 		documentRepository.deleteAll();
 		workspaceRepository.deleteAll();
@@ -70,7 +78,7 @@ class DocumentApiIntegrationTest {
 	void createDocumentReturnsCreatedEnvelope() throws Exception {
 		Workspace workspace = workspace("Docs Root");
 
-		mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
+		mockMvc.perform(post("/workspaces/{workspaceId}/documents", workspace.getId())
 				.contentType("application/json")
 				.header("X-User-Id", "user-123")
 				.content("""
@@ -114,7 +122,7 @@ class DocumentApiIntegrationTest {
 		saveDeletedDocument(workspace.getId(), "삭제된 문서", "00000000000000000099");
 		saveDocument(workspace.getId(), rootDocument.getId(), "하위 문서", "00000000000000000002");
 
-		mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspace.getId()))
+		mockMvc.perform(get("/workspaces/{workspaceId}/documents", workspace.getId()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -144,7 +152,7 @@ class DocumentApiIntegrationTest {
 			.build());
 		saveDocument(workspace.getId(), null, "활성 문서", "00000000000000000003");
 
-		mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", workspace.getId()))
+		mockMvc.perform(get("/workspaces/{workspaceId}/trash/documents", workspace.getId()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -164,7 +172,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 워크스페이스의 문서 목록 조회는 리소스 없음 응답을 반환한다")
 	void getDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
-		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID()));
+		var result = mockMvc.perform(get("/workspaces/{workspaceId}/documents", UUID.randomUUID()));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
 	}
@@ -172,7 +180,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 워크스페이스의 휴지통 문서 목록 조회는 리소스 없음 응답을 반환한다")
 	void getTrashDocumentsReturnsNotFoundWhenWorkspaceMissing() throws Exception {
-		var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}/trash/documents", UUID.randomUUID()));
+		var result = mockMvc.perform(get("/workspaces/{workspaceId}/trash/documents", UUID.randomUUID()));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
 	}
@@ -180,7 +188,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 워크스페이스로 문서를 생성하면 리소스 없음 응답을 반환한다")
 	void createDocumentReturnsNotFoundWhenWorkspaceMissing() throws Exception {
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", UUID.randomUUID())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", UUID.randomUUID())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -211,7 +219,7 @@ class DocumentApiIntegrationTest {
 			.sortKey("00000000000000000001")
 			.build());
 
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", rootWorkspace.getId())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", rootWorkspace.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -229,7 +237,7 @@ class DocumentApiIntegrationTest {
 	void createDocumentReturnsValidationErrorWhenIconSchemaInvalid() throws Exception {
 		Workspace workspace = workspace("Docs Root");
 
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", workspace.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -247,7 +255,7 @@ class DocumentApiIntegrationTest {
 	void createDocumentReturnsValidationErrorWhenCoverSchemaInvalid() throws Exception {
 		Workspace workspace = workspace("Docs Root");
 
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", workspace.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -267,8 +275,9 @@ class DocumentApiIntegrationTest {
 	void createDocumentReturnsUnauthorizedWhenHeaderMissing() throws Exception {
 		Workspace workspace = workspace("Docs Root");
 
-		var result = mockMvc.perform(post("/v1/workspaces/{workspaceId}/documents", workspace.getId())
+		var result = mockMvc.perform(post("/workspaces/{workspaceId}/documents", workspace.getId())
 			.contentType("application/json")
+			.header("X-User-Id", " ")
 			.content("""
 				{
 				  "title": "프로젝트 개요"
@@ -285,7 +294,7 @@ class DocumentApiIntegrationTest {
 		Document document = saveDocument(workspace.getId(), null, "프로젝트 개요", "00000000000000000001",
 			"{\"type\":\"emoji\",\"value\":\"📄\"}", null, "user-123", "user-123");
 
-		mockMvc.perform(get("/v1/documents/{documentId}", document.getId()))
+		mockMvc.perform(get("/documents/{documentId}", document.getId()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -303,7 +312,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document document = saveDeletedDocument(workspace.getId(), "삭제된 문서", "00000000000000000001");
 
-		var result = mockMvc.perform(get("/v1/documents/{documentId}", document.getId()));
+		var result = mockMvc.perform(get("/documents/{documentId}", document.getId()));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
 	}
@@ -315,7 +324,7 @@ class DocumentApiIntegrationTest {
 		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000002",
 			"{\"type\":\"emoji\",\"value\":\"😀\"}", "{\"type\":\"image\",\"value\":\"cover-1\"}", null, "user-123");
 
-		mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
+		mockMvc.perform(patch("/documents/{documentId}", document.getId())
 				.contentType("application/json")
 				.header("X-User-Id", "user-456")
 				.content("""
@@ -348,7 +357,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
+		var result = mockMvc.perform(patch("/documents/{documentId}", document.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 				.content("""
@@ -364,7 +373,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 문서를 수정하면 리소스 없음 응답을 반환한다")
 	void updateDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", UUID.randomUUID())
+		var result = mockMvc.perform(patch("/documents/{documentId}", UUID.randomUUID())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 				.content("""
@@ -383,7 +392,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document document = saveDocument(workspace.getId(), null, "기존 제목", "00000000000000000001");
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}", document.getId())
+		var result = mockMvc.perform(patch("/documents/{documentId}", document.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 				.content("""
@@ -402,7 +411,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document document = saveDocument(workspace.getId(), null, "공개 상태 대상", "00000000000000000001");
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", document.getId())
+		mockMvc.perform(patch("/documents/{documentId}/visibility", document.getId())
 				.contentType("application/json")
 				.header("X-User-Id", "user-123")
 				.content("""
@@ -426,7 +435,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document document = saveDocument(workspace.getId(), null, "공개 상태 대상", "00000000000000000001");
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/visibility", document.getId())
+		mockMvc.perform(patch("/documents/{documentId}/visibility", document.getId())
 				.contentType("application/json")
 				.header("X-User-Id", "user-123")
 				.content("""
@@ -449,7 +458,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document document = saveDocument(workspace.getId(), null, "공개 상태 대상", "00000000000000000001");
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", document.getId())
+		var result = mockMvc.perform(patch("/documents/{documentId}/visibility", document.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -468,7 +477,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document document = saveDocument(workspace.getId(), null, "공개 상태 대상", "00000000000000000001");
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/visibility", document.getId())
+		var result = mockMvc.perform(patch("/documents/{documentId}/visibility", document.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -497,7 +506,7 @@ class DocumentApiIntegrationTest {
 		Block otherDocumentBlock = saveBlock(otherDocument.getId(), null, "다른 문서 블록", "000000000001000000000000");
 		documentDeleteSqlCounter.reset();
 
-		mockMvc.perform(delete("/v1/documents/{documentId}", targetDocument.getId())
+		mockMvc.perform(delete("/documents/{documentId}", targetDocument.getId())
 				.header("X-User-Id", "user-123"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -522,11 +531,11 @@ class DocumentApiIntegrationTest {
 		Document document = saveDocument(workspace.getId(), null, "삭제 대상 문서", "00000000000000000001");
 		saveBlock(document.getId(), null, "대상 블록", "000000000001000000000000");
 
-		mockMvc.perform(delete("/v1/documents/{documentId}", document.getId())
+		mockMvc.perform(delete("/documents/{documentId}", document.getId())
 				.header("X-User-Id", "user-123"))
 			.andExpect(status().isOk());
 
-		var result = mockMvc.perform(get("/v1/documents/{documentId}", document.getId()));
+		var result = mockMvc.perform(get("/documents/{documentId}", document.getId()));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
 	}
@@ -534,7 +543,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 문서를 삭제하면 문서 없음 응답을 반환한다")
 	void deleteDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
-		var result = mockMvc.perform(delete("/v1/documents/{documentId}", UUID.randomUUID())
+		var result = mockMvc.perform(delete("/documents/{documentId}", UUID.randomUUID())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -547,7 +556,7 @@ class DocumentApiIntegrationTest {
 		Document targetDocument = saveDocument(workspace.getId(), null, "휴지통 대상 문서", "00000000000000000001");
 		assertThat(targetDocument.getVersion()).isZero();
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/trash", targetDocument.getId())
+		mockMvc.perform(patch("/documents/{documentId}/trash", targetDocument.getId())
 				.header("X-User-Id", "user-123"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -577,7 +586,7 @@ class DocumentApiIntegrationTest {
 		Block otherDocumentBlock = saveBlock(otherDocument.getId(), null, "다른 문서 블록", "000000000001000000000000");
 		documentDeleteSqlCounter.reset();
 
-		mockMvc.perform(patch("/v1/documents/{documentId}/trash", targetDocument.getId())
+		mockMvc.perform(patch("/documents/{documentId}/trash", targetDocument.getId())
 				.header("X-User-Id", "user-123"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -606,7 +615,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 문서를 휴지통 이동하면 문서 없음 응답을 반환한다")
 	void trashDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", UUID.randomUUID())
+		var result = mockMvc.perform(patch("/documents/{documentId}/trash", UUID.randomUUID())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -618,7 +627,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document deletedDocument = saveDeletedDocument(workspace.getId(), "이미 삭제된 문서", "00000000000000000001");
 
-		var result = mockMvc.perform(patch("/v1/documents/{documentId}/trash", deletedDocument.getId())
+		var result = mockMvc.perform(patch("/documents/{documentId}/trash", deletedDocument.getId())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -652,7 +661,7 @@ class DocumentApiIntegrationTest {
 			LocalDateTime.now().minusMinutes(1)
 		);
 
-		mockMvc.perform(post("/v1/documents/{documentId}/restore", deletedDocument.getId())
+		mockMvc.perform(post("/documents/{documentId}/restore", deletedDocument.getId())
 				.header("X-User-Id", "user-123"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
@@ -674,7 +683,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 문서 복구 요청은 문서 없음 응답을 반환한다")
 	void restoreDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/restore", UUID.randomUUID())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -686,7 +695,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document activeDocument = saveDocument(workspace.getId(), null, "활성 문서", "00000000000000000001");
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", activeDocument.getId())
+		var result = mockMvc.perform(post("/documents/{documentId}/restore", activeDocument.getId())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -704,7 +713,7 @@ class DocumentApiIntegrationTest {
 			LocalDateTime.now().minusMinutes(6)
 		);
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/restore", expiredDeletedDocument.getId())
+		var result = mockMvc.perform(post("/documents/{documentId}/restore", expiredDeletedDocument.getId())
 			.header("X-User-Id", "user-123"));
 
 		assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
@@ -776,7 +785,7 @@ class DocumentApiIntegrationTest {
 			null, null, "user-123", "user-123");
 		LocalDateTime previousUpdatedAt = movedDocument.getUpdatedAt();
 
-		mockMvc.perform(post("/v1/documents/{documentId}/move", movedDocument.getId())
+		mockMvc.perform(post("/documents/{documentId}/move", movedDocument.getId())
 				.contentType("application/json")
 				.header("X-User-Id", "user-456")
 				.content("""
@@ -807,7 +816,7 @@ class DocumentApiIntegrationTest {
 		Document second = saveDocument(workspace.getId(), parent.getId(), "두 번째", "000000000006000000000000");
 		Document third = saveDocument(workspace.getId(), parent.getId(), "세 번째", "00000000000A000000000000");
 
-		mockMvc.perform(post("/v1/documents/{documentId}/move", third.getId())
+		mockMvc.perform(post("/documents/{documentId}/move", third.getId())
 				.contentType("application/json")
 				.header("X-User-Id", "user-456")
 				.content("""
@@ -819,7 +828,7 @@ class DocumentApiIntegrationTest {
 					""".formatted(parent.getId(), first.getId(), second.getId())))
 			.andExpect(status().isOk());
 
-		mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspace.getId()))
+		mockMvc.perform(get("/workspaces/{workspaceId}/documents", workspace.getId()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.length()").value(4))
 			.andExpect(jsonPath("$.data[0].title").value("부모 문서"))
@@ -837,7 +846,7 @@ class DocumentApiIntegrationTest {
 		Document childA = saveDocument(workspace.getId(), rootA.getId(), "A의 자식", "000000000008000000000000");
 		Document childB = saveDocument(workspace.getId(), rootB.getId(), "B의 자식", "000000000002000000000000");
 
-		mockMvc.perform(post("/v1/documents/{documentId}/move", childA.getId())
+		mockMvc.perform(post("/documents/{documentId}/move", childA.getId())
 				.contentType("application/json")
 				.header("X-User-Id", "user-456")
 				.content("""
@@ -852,7 +861,7 @@ class DocumentApiIntegrationTest {
 		Document movedDocument = documentRepository.findById(childA.getId()).orElseThrow();
 		assertThat(movedDocument.getParentId()).isEqualTo(rootB.getId());
 
-		mockMvc.perform(get("/v1/workspaces/{workspaceId}/documents", workspace.getId()))
+		mockMvc.perform(get("/workspaces/{workspaceId}/documents", workspace.getId()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.data.length()").value(4))
 			.andExpect(jsonPath("$.data[0].title").value("루트 B"))
@@ -865,7 +874,7 @@ class DocumentApiIntegrationTest {
 	@Test
 	@DisplayName("실패_존재하지 않는 문서 move 요청은 문서 없음 응답을 반환한다")
 	void moveDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", UUID.randomUUID())
+		var result = mockMvc.perform(post("/documents/{documentId}/move", UUID.randomUUID())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -885,7 +894,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document deletedDocument = saveDeletedDocument(workspace.getId(), "삭제된 문서", "00000000000000000001");
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", deletedDocument.getId())
+		var result = mockMvc.perform(post("/documents/{documentId}/move", deletedDocument.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -905,7 +914,7 @@ class DocumentApiIntegrationTest {
 		Workspace workspace = workspace("Docs Root");
 		Document document = saveDocument(workspace.getId(), null, "루트 문서", "00000000000000000001");
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", document.getId())
+		var result = mockMvc.perform(post("/documents/{documentId}/move", document.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""
@@ -926,7 +935,7 @@ class DocumentApiIntegrationTest {
 		Document rootDocument = saveDocument(workspace.getId(), null, "루트 문서", "00000000000000000001");
 		Document childDocument = saveDocument(workspace.getId(), rootDocument.getId(), "하위 문서", "00000000000000000001");
 
-		var result = mockMvc.perform(post("/v1/documents/{documentId}/move", rootDocument.getId())
+		var result = mockMvc.perform(post("/documents/{documentId}/move", rootDocument.getId())
 			.contentType("application/json")
 			.header("X-User-Id", "user-123")
 			.content("""

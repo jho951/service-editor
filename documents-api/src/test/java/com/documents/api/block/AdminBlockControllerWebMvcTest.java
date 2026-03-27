@@ -67,7 +67,7 @@ class AdminBlockControllerWebMvcTest {
         when(adminBlockTransactionService.applyCreate(eq(documentId), any(), any(), eq("user-123")))
                 .thenReturn(transactionResult(documentId, "tmp:block:1", UUID.randomUUID(), 1, "000000000001000000000000", null));
 
-        mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", documentId)
+        mockMvc.perform(post("/admin/documents/{documentId}/blocks", documentId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -103,7 +103,7 @@ class AdminBlockControllerWebMvcTest {
         when(adminBlockTransactionService.applyReplaceContent(eq(blockId), any(), any(), eq("user-456")))
                 .thenReturn(transactionResult(documentId, null, blockId, 1, "000000000001000000000000", null));
 
-        mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
+        mockMvc.perform(patch("/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -147,7 +147,7 @@ class AdminBlockControllerWebMvcTest {
         when(adminBlockTransactionService.applyDelete(eq(blockId), any(), any(), eq("user-123")))
                 .thenReturn(transactionResult(documentId, null, blockId, null, null, deletedAt));
 
-        mockMvc.perform(delete("/v1/admin/blocks/{blockId}", blockId)
+        mockMvc.perform(delete("/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -179,7 +179,7 @@ class AdminBlockControllerWebMvcTest {
         when(adminBlockTransactionService.applyMove(eq(blockId), any(), any(), eq("user-123")))
                 .thenReturn(transactionResult(documentId, null, blockId, 2, "000000000002000000000000", null));
 
-        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", blockId)
+        mockMvc.perform(post("/admin/blocks/{blockId}/move", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -213,7 +213,7 @@ class AdminBlockControllerWebMvcTest {
         when(adminBlockTransactionService.applyReplaceContent(eq(blockId), any(), any(), eq("user-123")))
                 .thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
 
-        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
+        var result = mockMvc.perform(patch("/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -267,7 +267,7 @@ class AdminBlockControllerWebMvcTest {
         when(adminBlockTransactionService.applyReplaceContent(eq(blockId), any(), any(), eq("user-123")))
                 .thenThrow(new BusinessException(BusinessErrorCode.INVALID_REQUEST));
 
-        var result = mockMvc.perform(patch("/v1/admin/blocks/{blockId}", blockId)
+        var result = mockMvc.perform(patch("/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -305,7 +305,7 @@ class AdminBlockControllerWebMvcTest {
         when(adminBlockTransactionService.applyDelete(eq(blockId), any(), any(), eq("user-123")))
                 .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
 
-        var result = mockMvc.perform(delete("/v1/admin/blocks/{blockId}", blockId)
+        var result = mockMvc.perform(delete("/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
