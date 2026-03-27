@@ -16,11 +16,8 @@ class PersistenceSchemaIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    @DisplayName("워크스페이스와 문서와 블록 기본 키는 도메인별 컬럼명으로 생성된다")
+    @DisplayName("문서와 블록 기본 키는 도메인별 컬럼명으로 생성된다")
     void primaryKeyColumnsUseDomainSpecificNames() {
-        assertThat(countColumn("WORKSPACES", "WORKSPACE_ID")).isEqualTo(1);
-        assertThat(countColumn("WORKSPACES", "ID")).isZero();
-
         assertThat(countColumn("DOCUMENTS", "DOCUMENT_ID")).isEqualTo(1);
         assertThat(countColumn("DOCUMENTS", "ID")).isZero();
 
@@ -49,9 +46,8 @@ class PersistenceSchemaIntegrationTest {
     }
 
     @Test
-    @DisplayName("문서 연관관계 FK는 workspace 참조와 parent cascade delete 규칙을 생성한다")
+    @DisplayName("문서 연관관계 FK는 parent cascade delete 규칙을 생성한다")
     void documentForeignKeysUseExpectedDeleteRules() {
-        assertThat(countForeignKey("DOCUMENTS", "FK_DOCUMENTS_WORKSPACE")).isEqualTo(1);
         assertThat(countForeignKey("DOCUMENTS", "FK_DOCUMENTS_PARENT")).isEqualTo(1);
         assertThat(deleteRule("FK_DOCUMENTS_PARENT")).isEqualTo("CASCADE");
     }

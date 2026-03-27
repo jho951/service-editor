@@ -21,7 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
 import com.documents.domain.Document;
-import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.BlockRepository;
@@ -905,12 +904,10 @@ class BlockServiceImplTest {
     private Document document(UUID documentId) {
         return Document.builder()
                 .id(documentId)
-                .workspace(Workspace.builder()
-                        .id(UUID.randomUUID())
-                        .name("Docs Root")
-                        .build())
                 .title("문서")
                 .sortKey("00000000000000000001")
+                .createdBy(ACTOR_ID)
+                .updatedBy(ACTOR_ID)
                 .build();
     }
 

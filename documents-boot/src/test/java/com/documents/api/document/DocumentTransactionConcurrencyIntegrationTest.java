@@ -30,10 +30,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
 import com.documents.domain.Document;
-import com.documents.domain.Workspace;
 import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
-import com.documents.repository.WorkspaceRepository;
 import com.documents.service.DocumentTransactionServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,9 +43,6 @@ class DocumentTransactionConcurrencyIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
 
     @Autowired
     private DocumentRepository documentRepository;
@@ -65,7 +60,6 @@ class DocumentTransactionConcurrencyIntegrationTest {
     void setUp() {
         blockRepository.deleteAll();
         documentRepository.deleteAll();
-        workspaceRepository.deleteAll();
         Mockito.reset(documentTransactionService);
     }
 
@@ -480,7 +474,7 @@ class DocumentTransactionConcurrencyIntegrationTest {
                 blockRepository.findByIdAndDeletedAtIsNull(secondBlock.getId()).orElseThrow(),
                 blockRepository.findByIdAndDeletedAtIsNull(thirdBlock.getId()).orElseThrow()
         );
-        assertThat(reloadedBlocks.stream().mapToInt(Block::getVersion).sum()).isEqualTo(3);
+        assertThat(reloadedBlocks.stream().mapToLong(Block::getVersion).sum()).isEqualTo(3);
     }
 
     @Test
@@ -547,9 +541,9 @@ class DocumentTransactionConcurrencyIntegrationTest {
 
         assertThat(statuses).containsOnly(200);
 
-        int totalVersion = blocks.stream()
+        long totalVersion = blocks.stream()
                 .map(block -> blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow())
-                .mapToInt(Block::getVersion)
+                .mapToLong(Block::getVersion)
                 .sum();
         assertThat(totalVersion).isEqualTo(10);
     }
@@ -954,16 +948,12 @@ class DocumentTransactionConcurrencyIntegrationTest {
     }
 
     private Document document(String title) {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-
         return documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspace(workspace)
                 .title(title)
                 .sortKey("00000000000000000001")
+                .createdBy("user-123")
+                .updatedBy("user-123")
                 .build());
     }
 

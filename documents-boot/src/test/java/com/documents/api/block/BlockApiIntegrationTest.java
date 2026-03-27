@@ -11,10 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
 import com.documents.domain.Document;
-import com.documents.domain.Workspace;
 import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
-import com.documents.repository.WorkspaceRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -40,9 +38,6 @@ class BlockApiIntegrationTest {
     private WebApplicationContext context;
 
     @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
     private DocumentRepository documentRepository;
 
     @Autowired
@@ -55,7 +50,6 @@ class BlockApiIntegrationTest {
                 .build();
         blockRepository.deleteAll();
         documentRepository.deleteAll();
-        workspaceRepository.deleteAll();
     }
 
     @Test
@@ -262,13 +256,8 @@ class BlockApiIntegrationTest {
     }
 
     private Document document(String title) {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
         return documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspace(workspace)
                 .title(title)
                 .sortKey("00000000000000000001")
                 .createdBy("user-123")
