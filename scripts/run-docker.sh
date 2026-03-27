@@ -2,14 +2,29 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOCKER_DIR="${SCRIPT_DIR}/docker"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+DOCKER_DIR="${REPO_ROOT}/docker"
 
-ENV_NAME="${1:-}"
-ACTION="${2:-}"
+ENV_NAME="dev"
+ACTION="up"
 
-if [[ -z "${ENV_NAME}" || -z "${ACTION}" ]]; then
-  echo "Usage: $0 {dev|prod} {all|build|up|down|logs|restart|nuke|ps}"
-  exit 1
+if [[ $# -eq 1 ]]; then
+  case "$1" in
+    dev|prod)
+      ENV_NAME="$1"
+      ;;
+    all|build|up|down|logs|restart|nuke|ps)
+      ACTION="$1"
+      ;;
+    *)
+      echo "지원하지 않는 인자입니다: $1"
+      echo "Usage: $0 [dev|prod] [all|build|up|down|logs|restart|nuke|ps]"
+      exit 1
+      ;;
+  esac
+elif [[ $# -ge 2 ]]; then
+  ENV_NAME="$1"
+  ACTION="$2"
 fi
 
 case "${ENV_NAME}" in
@@ -23,7 +38,7 @@ case "${ENV_NAME}" in
     ;;
   *)
     echo "지원하지 않는 환경입니다: ${ENV_NAME}"
-    echo "Usage: $0 {dev|prod} {all|build|up|down|logs|restart|nuke|ps}"
+    echo "Usage: $0 [dev|prod] [all|build|up|down|logs|restart|nuke|ps]"
     exit 1
     ;;
 esac
@@ -59,7 +74,7 @@ case "${ACTION}" in
     ;;
   *)
     echo "지원하지 않는 동작입니다: ${ACTION}"
-    echo "Usage: $0 {dev|prod} {all|build|up|down|logs|restart|nuke|ps}"
+    echo "Usage: $0 [dev|prod] [all|build|up|down|logs|restart|nuke|ps]"
     exit 1
     ;;
 esac

@@ -38,7 +38,8 @@ services:
       SWAGGER_ENABLED: "false"
       JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50"
     env_file:
-      - ../.env
+      - path: ../.env
+        required: false
     restart: always
 
 volumes:

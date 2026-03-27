@@ -52,26 +52,31 @@
 
 ### Local 실행 스크립트
 
-로컬 실행은 루트 `run-local.sh`를 사용합니다.
+로컬 실행은 `scripts/run-local.sh`를 사용합니다.
 
 ```bash
 # 기본(dev)
-bash run-local.sh
+bash scripts/run-local.sh
 
 # prod 프로필로 실행
-bash run-local.sh prod
+bash scripts/run-local.sh prod
 ```
 
 ### Docker 실행 스크립트
 
-도커 실행은 루트 `run-docker.sh`를 사용하며, 환경(`dev|prod`)을 먼저 지정합니다.
+도커 실행은 `scripts/run-docker.sh`를 사용합니다.
+
+기본 실행(인자 없음): `dev up`
 
 ```bash
 # dev 환경 전체 빌드/기동/로그
-bash run-docker.sh dev all
+bash scripts/run-docker.sh dev all
 
 # prod 환경 기동
-bash run-docker.sh prod up
+bash scripts/run-docker.sh prod up
+
+# 인자 없이 실행하면 dev up
+bash scripts/run-docker.sh
 ```
 
 지원 동작:
@@ -90,7 +95,7 @@ bash run-docker.sh prod up
 - dev: `docker/docker-compose.dev.yml`
 - prod: `docker/docker-compose.prod.yml`
 
-참고: 기존 `docker/docker.sh`는 하위 호환용 래퍼로 유지되며, 인자를 1개만 주면 `dev` 환경으로 동작합니다.
+참고: 기존 `docker/docker.sh`는 하위 호환용 래퍼로 유지되며 내부적으로 `scripts/run-docker.sh`를 호출합니다.
 
 ## 기술 스택
 

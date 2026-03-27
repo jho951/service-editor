@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
 PROFILE="${1:-dev}"
 shift || true
 
@@ -14,4 +17,5 @@ case "${PROFILE}" in
     ;;
 esac
 
+cd "${REPO_ROOT}"
 ./gradlew :documents-boot:bootRun --args="--spring.profiles.active=${PROFILE}" "$@"
