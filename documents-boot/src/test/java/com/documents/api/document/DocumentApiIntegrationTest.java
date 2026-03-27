@@ -545,6 +545,7 @@ class DocumentApiIntegrationTest {
 	void trashDocumentSoftDeletesDocument() throws Exception {
 		Workspace workspace = workspace("Docs Root");
 		Document targetDocument = saveDocument(workspace.getId(), null, "휴지통 대상 문서", "00000000000000000001");
+		assertThat(targetDocument.getVersion()).isZero();
 
 		mockMvc.perform(patch("/v1/documents/{documentId}/trash", targetDocument.getId())
 				.header("X-User-Id", "user-123"))
@@ -554,8 +555,10 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$.code").value(200));
 
 		assertThat(documentRepository.findById(targetDocument.getId())).get()
-			.extracting(Document::getDeletedAt)
-			.isNotNull();
+			.satisfies(document -> {
+				assertThat(document.getDeletedAt()).isNotNull();
+				assertThat(document.getVersion()).isEqualTo(1);
+			});
 	}
 
 	@Test
@@ -585,6 +588,8 @@ class DocumentApiIntegrationTest {
 		Document deletedChildDocument = documentRepository.findById(childDocument.getId()).orElseThrow();
 		assertThat(deletedDocument.getDeletedAt()).isNotNull();
 		assertThat(deletedChildDocument.getDeletedAt()).isNotNull();
+		assertThat(deletedDocument.getVersion()).isEqualTo(1);
+		assertThat(deletedChildDocument.getVersion()).isEqualTo(1);
 
 		Block deletedRootBlock = blockRepository.findById(targetRootBlock.getId()).orElseThrow();
 		Block deletedChildBlock = blockRepository.findById(targetChildBlock.getId()).orElseThrow();
@@ -660,6 +665,7 @@ class DocumentApiIntegrationTest {
 		Block survivedOtherBlock = blockRepository.findById(deletedOtherBlock.getId()).orElseThrow();
 
 		assertThat(restoredDocument.getDeletedAt()).isNull();
+		assertThat(restoredDocument.getVersion()).isEqualTo(1);
 		assertThat(restoredTargetBlock.getDeletedAt()).isNull();
 		assertThat(survivedActiveTargetBlock.getDeletedAt()).isNull();
 		assertThat(survivedOtherBlock.getDeletedAt()).isNotNull();

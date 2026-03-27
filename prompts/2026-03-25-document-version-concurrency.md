@@ -40,6 +40,13 @@
 - 문서 메타 수정 API는 제목, 아이콘, 커버, 공개 상태만 담당하고 부모 변경은 `POST /v1/documents/{documentId}/move`로만 처리하도록 정리했다.
 - 관련 서비스 시그니처와 단위 테스트, WebMvc 테스트, 통합 테스트를 현재 계약에 맞게 수정했다.
 
+## Step 7. 문서 휴지통 이동 및 복구 version 정합성 보강
+
+- 문서 휴지통 이동 bulk update와 복구 bulk update에 `Document.version = Document.version + 1`을 추가했다.
+- 문서 휴지통 이동 시 `updatedAt`을 `deletedAt`과 같은 시각으로 맞추고, 복구 시에도 `updatedAt`과 함께 version을 증가시키도록 정리했다.
+- 문서 삭제/복구 한 요청 안에서는 문서당 version이 정확히 한 번만 증가하도록 기존 block bulk 처리의 문서 version 억제 흐름은 유지했다.
+- 서비스 테스트와 API 통합 테스트에 휴지통 이동/복구 후 문서 version 증가 검증을 추가했다.
+
 ## 테스트 결과
 
 - 실행 명령:

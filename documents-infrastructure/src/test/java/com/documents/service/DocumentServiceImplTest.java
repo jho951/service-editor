@@ -568,6 +568,21 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
+	@DisplayName("성공_문서 휴지통 이동은 문서 version 증가 대상 bulk update를 호출한다")
+	void trashUsesDocumentBulkUpdateThatIncrementsVersion() {
+		UUID documentId = UUID.randomUUID();
+		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
+		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
+		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(documentId)).thenReturn(List.of());
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.trash(documentId, ACTOR_ID);
+
+		verify(documentRepository).softDeleteActiveByIds(eq(List.of(documentId)), eq(ACTOR_ID), any(LocalDateTime.class));
+		verify(blockService).softDeleteAllByDocumentId(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+	}
+
+	@Test
 	@DisplayName("성공_사용자 식별자가 공백이면 휴지통 이동도 null 사용자로 위임한다")
 	void trashDelegatesNullActorToBlockService() {
 		UUID documentId = UUID.randomUUID();
@@ -638,6 +653,22 @@ class DocumentServiceImplTest {
 		ArgumentCaptor<LocalDateTime> restoredAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
 		verify(documentRepository).restoreDeletedByIds(eq(List.of(documentId)), eq("user-456"),
 			restoredAtCaptor.capture());
+	}
+
+	@Test
+	@DisplayName("성공_문서 복구는 문서 version 증가 대상 bulk update를 호출한다")
+	void restoreUsesDocumentBulkUpdateThatIncrementsVersion() {
+		UUID documentId = UUID.randomUUID();
+		Document deletedDocument = deletedDocument(documentId, UUID.randomUUID(), null, "삭제 문서",
+			"00000000000000000001");
+		when(documentRepository.findById(documentId)).thenReturn(Optional.of(deletedDocument));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(documentId)).thenReturn(List.of());
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.restore(documentId, ACTOR_ID);
+
+		verify(documentRepository).restoreDeletedByIds(eq(List.of(documentId)), eq(ACTOR_ID), any(LocalDateTime.class));
+		verify(blockService).restoreAllByDocumentId(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
 	}
 
 	@Test
