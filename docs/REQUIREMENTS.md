@@ -91,6 +91,7 @@
 - 로그인하지 않은 사용자는 gateway 또는 상위 인증 계층에서 먼저 차단되며, 본 서비스까지 도달하지 않는다.
 - 따라서 본 서비스는 인증이 완료된 사용자 컨텍스트를 전제로 비즈니스 처리를 수행한다.
 - Gateway는 외부 클라이언트가 보낸 `X-User-Id`를 제거하고, 인증 성공 시에만 신뢰 가능한 `X-User-Id`를 재주입해야 한다.
+- Gateway는 외부 공개 경로를 `/v1/**`로 제공하고, 내부 서비스 전달 전 경로의 `/v1` 프리픽스를 제거(rewrite)해야 한다.
 - 본 서비스는 Gateway가 주입한 `X-User-Id`를 인증 컨텍스트로 사용한다.
 
 ---
@@ -311,7 +312,7 @@ Block {
 3. 휴지통 문서는 기본 조회에서 제외한다.
 4. 기본 문서 삭제 API는 hard delete를 의미해야 한다.
 5. 기본 문서 삭제 시 대상 문서의 하위 문서와 각 문서 소속 블록도 함께 물리 삭제해야 한다.
-6. 휴지통 이동은 기본 삭제와 분리된 `PATCH /v1/documents/{documentId}/trash` 엔드포인트로 제공해야 한다.
+6. 휴지통 이동은 기본 삭제와 분리된 `PATCH /documents/{documentId}/trash` 엔드포인트로 제공해야 한다.
 7. 문서를 휴지통에 넣으면 `deletedAt`을 기록해야 한다.
 8. 휴지통에 들어간 문서는 현재 테스트 기준 `deletedAt`으로부터 5분이 지나면 자동 영구 삭제 대상이 된다.
 9. 자동 영구 삭제 대상에는 해당 문서의 하위 문서와 각 문서 소속 블록이 함께 포함되어야 한다.
@@ -391,7 +392,7 @@ Block {
 
 ## 8.4 문서 이동 / 순서 변경
 ### 요구사항
-- 문서의 부모 변경과 형제 순서 변경은 `POST /v1/documents/{documentId}/move` 별도 API로 제공해야 한다.
+- 문서의 부모 변경과 형제 순서 변경은 `POST /documents/{documentId}/move` 별도 API로 제공해야 한다.
 - 문서 move API는 제목, 아이콘, 커버 수정 책임을 갖지 않고 부모 변경과 순서 변경만 담당해야 한다.
 - 이동 대상 문서는 활성 문서여야 하며, 삭제된 문서는 `DOCUMENT_NOT_FOUND`로 처리해야 한다.
 - 대상 문서가 존재하지 않으면 `DOCUMENT_NOT_FOUND`를 반환해야 한다.
@@ -434,7 +435,7 @@ Block {
 ## 8.5 문서 삭제 / 휴지통 / 복구
 ### 요구사항
 - 문서 기본 삭제 API는 대상 문서, 하위 문서, 각 문서 소속 블록을 즉시 물리 삭제해야 한다.
-- 문서 휴지통 이동은 기본 삭제와 분리된 `PATCH /v1/documents/{documentId}/trash` 엔드포인트로 제공해야 한다.
+- 문서 휴지통 이동은 기본 삭제와 분리된 `PATCH /documents/{documentId}/trash` 엔드포인트로 제공해야 한다.
 - 문서를 휴지통에 넣을 때 `deletedAt`을 기록해야 한다.
 - 문서 휴지통 이동 시 대상 문서의 하위 문서와 각 문서 소속 블록도 함께 휴지통 상태로 전환해야 한다.
 - 휴지통 문서는 현재 테스트 기준 `deletedAt + 5분`이 지나면 자동 영구 삭제 대상이 되어야 한다.
@@ -581,7 +582,7 @@ Block {
 
 ## 10.1 v1 정책
 - 실시간 협업 merge는 보장하지 않는다.
-- 에디터 저장 표준 write 경로는 `POST /v1/documents/{documentId}/transactions`를 사용한다.
+- 에디터 저장 표준 write 경로는 `POST /documents/{documentId}/transactions`를 사용한다.
 - autosave와 `Ctrl+S`는 서로 다른 API가 아니라 같은 저장 queue의 flush 트리거다.
 - debounce만으로 무한정 저장이 밀리면 안 되며, 장시간 연속 입력 중에도 `max autosave interval` 기준으로 강제 flush가 가능해야 한다.
 - 에디터 저장 queue는 클라이언트 로컬에서 관리한다.
@@ -610,8 +611,8 @@ Block {
 - conflict 후 pending 복구는 실패한 batch payload 복원이 아니라, 현재 로컬 문서 상태 기준 재조립을 원칙으로 한다.
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되고 있으면 다시 pending에 포함될 수 있다.
 - 같은 블록 안의 비중첩 수정도 v1에서는 block 단위 충돌로 처리할 수 있다.
-- `POST /v1/admin/documents/{documentId}/blocks`, `PATCH /v1/admin/blocks/{blockId}`, `POST /v1/admin/blocks/{blockId}/move`, `DELETE /v1/admin/blocks/{blockId}`는 에디터 표준 저장 경로가 아니라 운영/관리/비에디터 보조 경로로 둘 수 있다.
-- 위 4개 admin block API는 path와 HTTP method는 유지하되, request/response 계약과 실제 실행 로직은 `POST /v1/documents/{documentId}/transactions`와 동일한 transaction 모델을 사용해야 한다.
+- `POST /admin/documents/{documentId}/blocks`, `PATCH /admin/blocks/{blockId}`, `POST /admin/blocks/{blockId}/move`, `DELETE /admin/blocks/{blockId}`는 에디터 표준 저장 경로가 아니라 운영/관리/비에디터 보조 경로로 둘 수 있다.
+- 위 4개 admin block API는 path와 HTTP method는 유지하되, request/response 계약과 실제 실행 로직은 `POST /documents/{documentId}/transactions`와 동일한 transaction 모델을 사용해야 한다.
 - 각 admin block API는 자기 역할에 맞는 단일 operation 하나만 허용해야 한다.
 
 ## 10.2 향후 확장
@@ -652,7 +653,7 @@ Block {
 ## 11.4 보안
 - 인증은 외부 서비스(auth-service)에서 받은 identity를 신뢰한다.
 - 비로그인 사용자는 gateway 또는 상위 인증 계층에서 차단되므로, 본 서비스는 인증 완료 요청만 처리 대상으로 본다.
-- 본 서비스는 `/v1/**` 요청에서 `X-User-Id`가 누락되거나 빈 문자열이면 `401 UNAUTHORIZED`를 반환해야 한다.
+- 본 서비스는 `/**` 요청에서 `X-User-Id`가 누락되거나 빈 문자열이면 `401 UNAUTHORIZED`를 반환해야 한다.
 - 본 서비스는 직접 공개 엔드포인트로 노출하지 않고, Gateway 경유 트래픽만 수신해야 한다.
 - 쓰기 요청은 edit 권한이 필요하다.
 - HTML은 저장하지 않는다.
@@ -670,6 +671,7 @@ Block {
 ## 12.1 인증 및 공통 규칙
 - 인증 방식: Bearer token 또는 내부 인증 헤더
 - Gateway가 인증 성공 후 주입한 내부 신뢰 헤더 `X-User-Id`를 사용한다.
+- 외부 공개 API 경로는 Gateway에서 `/v1/**`로 노출하고, 본 서비스 내부 API는 `/v1` 없는 경로를 기준으로 한다.
 - `X-User-Id` 누락/빈값 요청은 `UNAUTHORIZED(401)`로 처리한다.
 - 요청 추적을 위해 `X-Request-Id`를 수신하며, 누락 시 서버에서 생성해 응답 헤더에 반영한다.
 - 응답 포맷: JSON
@@ -719,7 +721,7 @@ Block {
 
 ## 12.3 문서 API
 
-### `POST /v1/workspaces`
+### `POST /workspaces`
 워크스페이스 생성.
 
 요청 예시:
@@ -729,22 +731,22 @@ Block {
 }
 ```
 
-### `GET /v1/workspaces/{workspaceId}`
+### `GET /workspaces/{workspaceId}`
 워크스페이스 단건 조회.
 
-### `GET /v1/workspaces/{workspaceId}/documents`
+### `GET /workspaces/{workspaceId}/documents`
 워크스페이스 내 문서 목록 조회.
 
-### `POST /v1/workspaces/{workspaceId}/documents`
+### `POST /workspaces/{workspaceId}/documents`
 새 문서 생성.
 
-### `GET /v1/documents/{documentId}`
+### `GET /documents/{documentId}`
 문서 단건 조회.
 
-### `PATCH /v1/documents/{documentId}`
+### `PATCH /documents/{documentId}`
 문서 메타데이터 수정.
 
-### `PATCH /v1/documents/{documentId}/visibility`
+### `PATCH /documents/{documentId}/visibility`
 문서 공개 상태 수정.
 - 요청 body는 `visibility`, `version`을 포함해야 한다.
 - `visibility`는 `PUBLIC`, `PRIVATE`만 허용해야 한다.
@@ -752,7 +754,7 @@ Block {
 - 상태가 실제로 바뀌면 `Document.version`을 `1` 증가시켜야 한다.
 - 같은 상태를 다시 요청하면 no-op으로 처리하고 `Document.version`을 증가시키지 않아야 한다.
 
-### `POST /v1/documents/{documentId}/move`
+### `POST /documents/{documentId}/move`
 문서 부모 변경 및 형제 순서 변경.
 
 요청 예시:
@@ -764,26 +766,26 @@ Block {
 }
 ```
 
-### `DELETE /v1/documents/{documentId}`
+### `DELETE /documents/{documentId}`
 문서 soft delete.
 
-### `POST /v1/documents/{documentId}/restore`
+### `POST /documents/{documentId}/restore`
 문서 복구.
 
 ## 12.4 블록 API
 
-- 문서 단위 블록 목록 조회는 문서 API 책임으로 `GET /v1/documents/{documentId}/blocks` 경로를 사용한다.
-- 블록 생성, 수정, 이동, 삭제는 관리자 블록 API 책임으로 `/v1/admin/**` 경로를 사용한다.
+- 문서 단위 블록 목록 조회는 문서 API 책임으로 `GET /documents/{documentId}/blocks` 경로를 사용한다.
+- 블록 생성, 수정, 이동, 삭제는 관리자 블록 API 책임으로 `/admin/**` 경로를 사용한다.
 
-### `GET /v1/documents/{documentId}/blocks`
+### `GET /documents/{documentId}/blocks`
 문서 내 블록 목록 조회.
 - 조회 결과는 soft delete되지 않은 블록만 포함하며 정렬 순서를 보장해야 한다.
 
-### `POST /v1/admin/documents/{documentId}/blocks`
+### `POST /admin/documents/{documentId}/blocks`
 TEXT 블록 생성.
 - 이 API는 운영/관리/비에디터 경로에서 사용할 수 있다.
 - 에디터 표준 생성/저장 경로는 `transactions`를 사용한다.
-- 요청 body는 `POST /v1/documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- 요청 body는 `POST /documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_CREATE`여야 한다.
 - 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
 
@@ -805,11 +807,11 @@ TEXT 블록 생성.
 }
 ```
 
-### `PATCH /v1/admin/blocks/{blockId}`
+### `PATCH /admin/blocks/{blockId}`
 블록 내용 또는 블록 자체 메타데이터 수정.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
 - 에디터 표준 본문 저장 경로는 `transactions`를 사용한다.
-- 요청 body는 `POST /v1/documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- 요청 body는 `POST /documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_REPLACE_CONTENT`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
 - 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
@@ -853,11 +855,11 @@ TEXT 블록 생성.
 }
 ```
 
-### `POST /v1/admin/blocks/{blockId}/move`
+### `POST /admin/blocks/{blockId}/move`
 단일 블록 이동.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
 - 에디터 표준 이동 경로는 `transactions`를 사용한다.
-- 요청 body는 `POST /v1/documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- 요청 body는 `POST /documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_MOVE`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
 - 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
@@ -882,18 +884,18 @@ TEXT 블록 생성.
 }
 ```
 
-### `DELETE /v1/admin/blocks/{blockId}`
+### `DELETE /admin/blocks/{blockId}`
 블록 soft delete.
 - 지정 루트 블록과 하위 블록 subtree를 함께 soft delete 한다.
 - 이 API는 명시적 단일 삭제 액션 또는 운영/관리/비에디터 경로에서 사용할 수 있다.
 - 에디터 표준 삭제 경로는 `transactions`를 사용한다.
-- 요청 body는 `POST /v1/documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- 요청 body는 `POST /documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_DELETE`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
 - 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
 - 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
 
-### `POST /v1/documents/{documentId}/transactions`
+### `POST /documents/{documentId}/transactions`
 에디터 생성/저장 batch 반영.
 - 에디터의 표준 write 경로다.
 - 한 요청에 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`를 함께 담을 수 있어야 한다.
@@ -937,7 +939,7 @@ TEXT 블록 생성.
 ## 14.1 삭제 정책
 - 문서 기본 `DELETE`는 hard delete다.
 - 문서 기본 `DELETE`는 대상 문서, 하위 문서, 각 문서 소속 블록을 함께 물리 삭제해야 한다.
-- 휴지통 이동은 문서 기본 `DELETE`와 분리된 `PATCH /v1/documents/{documentId}/trash` API로 제공한다.
+- 휴지통 이동은 문서 기본 `DELETE`와 분리된 `PATCH /documents/{documentId}/trash` API로 제공한다.
 - 휴지통 상태는 `deletedAt` 설정으로 표현한다.
 - 휴지통 이동이 실제로 반영되면 대상 문서와 함께 휴지통 처리된 하위 문서 각각의 `Document.version`도 `1` 증가해야 한다.
 - 휴지통에 들어간 문서는 현재 테스트 기준 `deletedAt`으로부터 5분이 지나면 자동 영구 삭제 대상이 된다.
