@@ -4,6 +4,8 @@ auth:
     issuer: documents-app
     access-token-exp-seconds: 3600
     refresh-token-exp-seconds: 1209600
+  service-token:
+    bearer-token: ${AUTH_SERVICE_BEARER_TOKEN:}
   cors:
     enabled: true
     allowed-origins:
