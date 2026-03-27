@@ -50,71 +50,52 @@
 ./gradlew test
 ```
 
-### Docker 실행
+### Local 실행 스크립트
 
-도커 관련 명령은 `docker/docker.sh`를 사용합니다.
-
-전체 빌드 후 실행:
+로컬 실행은 `scripts/run-local.sh`를 사용합니다.
 
 ```bash
-bash docker/docker.sh all
+# 기본(dev)
+bash scripts/run-local.sh
+
+# prod 프로필로 실행
+bash scripts/run-local.sh prod
 ```
 
-이미지 빌드:
+### Docker 실행 스크립트
+
+도커 실행은 `scripts/run-docker.sh`를 사용합니다.
+
+기본 실행(인자 없음): `dev up`
 
 ```bash
-bash docker/docker.sh build
+# dev 환경 전체 빌드/기동/로그
+bash scripts/run-docker.sh dev all
+
+# prod 환경 기동
+bash scripts/run-docker.sh prod up
+
+# 인자 없이 실행하면 dev up
+bash scripts/run-docker.sh
 ```
 
-컨테이너 시작:
+지원 동작:
 
-```bash
-bash docker/docker.sh up
-```
-
-컨테이너 중지:
-
-```bash
-bash docker/docker.sh down
-```
-
-로그 확인:
-
-```bash
-bash docker/docker.sh logs
-```
-
-재시작:
-
-```bash
-bash docker/docker.sh restart
-```
-
-볼륨 포함 전체 정리:
-
-```bash
-bash docker/docker.sh nuke
-```
-
-## 도커 시작/중지 쉘 사용법
-
-`docker/docker.sh`는 `docker/docker-compose.yml`을 기준으로 앱과 MySQL 컨테이너를 제어합니다.
-
-- `all`: 이미지 재빌드 후 컨테이너 기동, `documents-app` 로그를 바로 출력
+- `all`: 이미지 재빌드 후 컨테이너 기동, 앱 로그 출력
 - `build`: 이미지만 빌드
 - `up`: 백그라운드로 컨테이너 시작
-- `down`: 컨테이너 중지 및 네트워크 정리
-- `logs`: 전체 서비스 로그 팔로우
-- `restart`: 컨테이너 재시작
-- `nuke`: 컨테이너와 볼륨 삭제, 불필요 이미지 정리
+- `down`: 컨테이너 중지
+- `logs`: 로그 팔로우
+- `restart`: 재시작
+- `nuke`: 컨테이너/볼륨 삭제 + 불필요 이미지 정리
+- `ps`: 컨테이너 상태 확인
 
-사용 예시:
+환경별 compose 파일:
 
-```bash
-bash docker/docker.sh up
-bash docker/docker.sh logs
-bash docker/docker.sh down
-```
+- dev: `docker/docker-compose.dev.yml`
+- prod: `docker/docker-compose.prod.yml`
+
+참고: 기존 `docker/docker.sh`는 하위 호환용 래퍼로 유지되며 내부적으로 `scripts/run-docker.sh`를 호출합니다.
 
 ## 기술 스택
 
