@@ -41,16 +41,6 @@ public class Document extends BaseEntity {
     @Column(name = "document_id", nullable = false, updatable = false, columnDefinition = "char(36)")
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-            name = "workspace_id",
-            nullable = false,
-            columnDefinition = "char(36)",
-            foreignKey = @ForeignKey(name = "fk_documents_workspace")
-    )
-    @ToString.Exclude
-    private Workspace workspace;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "parent_id",
@@ -91,10 +81,6 @@ public class Document extends BaseEntity {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
-
-    public UUID getWorkspaceId() {
-        return workspace == null ? null : workspace.getId();
-    }
 
     public UUID getParentId() {
         return parent == null ? null : parent.getId();

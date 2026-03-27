@@ -8,10 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.documents.domain.Block;
 import com.documents.domain.BlockType;
 import com.documents.domain.Document;
-import com.documents.domain.Workspace;
 import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
-import com.documents.repository.WorkspaceRepository;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,9 +28,6 @@ class DocumentTransactionApiIntegrationTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
     private DocumentRepository documentRepository;
 
     @Autowired
@@ -42,7 +37,6 @@ class DocumentTransactionApiIntegrationTest {
     void setUp() {
         blockRepository.deleteAll();
         documentRepository.deleteAll();
-        workspaceRepository.deleteAll();
     }
 
     @Test
@@ -2359,16 +2353,12 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     private Document document(String title) {
-        Workspace workspace = workspaceRepository.save(Workspace.builder()
-                .id(UUID.randomUUID())
-                .name("Docs Root")
-                .build());
-
         return documentRepository.save(Document.builder()
                 .id(UUID.randomUUID())
-                .workspace(workspace)
                 .title(title)
                 .sortKey("00000000000000000001")
+                .createdBy("user-123")
+                .updatedBy("user-123")
                 .build());
     }
 

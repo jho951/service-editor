@@ -14,7 +14,6 @@ public enum ErrorCode {
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, false, 9017, "허용되지 않은 HTTP 메서드입니다."),
     NOT_FOUND_URL(HttpStatus.NOT_FOUND, false, 9002, "요청하신 URL을 찾을 수 없습니다."),
     SORT_KEY_REBALANCE_REQUIRED(HttpStatus.CONFLICT, false, 9007, "정렬 키 공간이 부족하여 재정렬이 필요합니다."),
-    WORKSPACE_NOT_FOUND(HttpStatus.NOT_FOUND, false, 9003, "요청한 워크스페이스를 찾을 수 없습니다."),
     DOCUMENT_NOT_FOUND(HttpStatus.NOT_FOUND, false, 9004, "요청한 문서를 찾을 수 없습니다."),
     BLOCK_NOT_FOUND(HttpStatus.NOT_FOUND, false, 9006, "요청한 블록을 찾을 수 없습니다."),
     CONFLICT(HttpStatus.CONFLICT, false, 9005, "요청이 현재 리소스 상태와 충돌합니다."),

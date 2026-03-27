@@ -19,9 +19,6 @@ public class DocumentResponse extends BaseResponse {
     @Schema(description = "문서 ID")
     private UUID id;
 
-    @Schema(description = "워크스페이스 ID")
-    private UUID workspaceId;
-
     @Schema(description = "부모 문서 ID", nullable = true)
     private UUID parentId;
 

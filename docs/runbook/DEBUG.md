@@ -9,8 +9,8 @@
 5. MySQL JDBC URL은 서버/스키마가 `utf8mb4`인 상태를 전제로 `connectionCollation=utf8mb4_unicode_ci`만 사용한다. `characterEncoding=utf8mb4`를 직접 넣으면 드라이버에서 부팅 실패가 날 수 있다.
 6. `/**` 호출 시 `X-User-Id`를 반드시 포함한다. 누락/빈값이면 `401 UNAUTHORIZED`가 반환돼야 한다.
 7. 요청 추적이 필요하면 `X-Request-Id`를 함께 보낸다. 미전달 시 서버가 값을 생성해 응답 헤더 `X-Request-Id`로 반환해야 한다.
-8. Workspace API 확인이 필요하면 `POST /workspaces`로 생성 후 `GET /workspaces/{workspaceId}`로 단건 조회를 재현한다.
-9. Document 조회 API 확인이 필요하면 `POST /workspaces/{workspaceId}/documents`로 문서를 만든 뒤 `GET /workspaces/{workspaceId}/documents`와 `GET /documents/{documentId}`를 순서대로 호출한다.
+8. v1 기준 문서 API 확인은 `X-User-Id`를 포함한 상태에서 `POST /documents`로 문서를 만든 뒤 `GET /documents`, `GET /documents/{documentId}`를 순서대로 호출한다.
+9. Workspace API는 v1 활성 범위에서 제외되므로, 현재 기본 디버깅 절차에서는 제외한다.
 10. 문서 생성/정렬 이슈를 볼 때는 응답의 `sortKey`가 비어 있지 않은지, 같은 `parentId` 아래에서 증가하는지 확인한다.
 11. Block 생성 API 확인이 필요하면 `POST /documents/{documentId}/blocks`로 `TEXT` 블록을 만든다. 첫 생성은 기본 stride로 떨어진 `sortKey`가 발급되고, 중간 삽입은 앞/뒤 key 사이의 gap key가 발급되는지 확인한다.
 10. Block 정렬 디버깅 시 `sortKey`는 대문자 base36 고정폭 문자열이며, 같은 부모 아래 `ORDER BY sort_key ASC` 결과가 화면 순서와 일치해야 한다.
@@ -25,7 +25,7 @@
 19. 문서 hard delete 확인이 필요하면 `DELETE /documents/{documentId}`를 호출한 뒤 `documents`, `blocks` 테이블에서 대상 문서, 하위 문서, 각 문서 소속 블록 row가 실제로 사라졌는지 확인한다.
 20. 문서 휴지통 이동 확인이 필요하면 `PATCH /documents/{documentId}/trash`를 호출한 뒤 대상 문서, 하위 문서, 각 문서 소속 블록의 `deleted_at`이 같은 흐름으로 채워졌는지와 대상 문서들의 `version`이 각각 `1` 증가했는지 확인한다.
 21. 문서 복구 확인이 필요하면 휴지통 이동 직후 `POST /documents/{documentId}/restore`를 호출해 `deleted_at`이 null로 돌아오는지와 대상 문서들의 `version`이 각각 `1` 더 증가했는지 확인한다. `deletedAt + 5분`이 지난 데이터는 복구가 실패해야 한다.
-22. 휴지통 목록 확인이 필요하면 `GET /workspaces/{workspaceId}/trash/documents`를 호출해 `deletedAt` 내림차순 정렬, `purgeAt = deletedAt + 5분` 계산, 활성 문서 제외 여부를 확인한다.
+22. 휴지통 목록 확인이 필요하면 `GET /documents/trash`를 호출해 `deletedAt` 내림차순 정렬, `purgeAt = deletedAt + 5분` 계산, 활성 문서 제외 여부를 확인한다.
 23. 자동 영구 삭제 확인이 필요하면 `deleted_at`이 현재 시각 기준 5분 이상 지난 문서를 만든 뒤 스케줄러 실행 또는 `DocumentService.purgeExpiredTrash()` 호출로 대상 문서, 하위 문서, 각 문서 소속 블록이 실제 삭제되는지 확인한다.
 
 ## 확인할 로그
@@ -41,8 +41,7 @@
 - `Access denied for user ...`: 로컬 앱 계정과 MySQL 컨테이너 계정이 불일치한 상태. 기본 로컬 계정은 `documents/documents`로 맞춘다.
 - `Unsupported character encoding 'utf8mb4'`: JDBC URL의 `characterEncoding` 값을 `utf8mb4`로 설정한 상태. `UTF-8`로 수정하고 필요하면 `connectionCollation=utf8mb4_unicode_ci`를 함께 사용한다.
 - `Table "DOCUMENTS" not found` 또는 유사 스키마 오류: 마이그레이션 전 스키마/설정이 남아 있거나 로컬 DB가 최신 설정(`documentsdb`)과 맞지 않는 상태
-- `Table "WORKSPACES" not found`: Workspace 엔티티가 생성되지 않았거나 테스트/로컬 프로파일의 DDL 설정이 비활성화된 상태
-- `404` Workspace 조회 실패: 생성된 `workspaceId`가 아니거나 테스트 데이터 초기화 후 다시 조회한 경우
+- `Table "WORKSPACES" not found`: 현재 v1 문서 흐름에는 직접 영향이 없지만, Workspace 백업 코드를 다시 활성화했거나 관련 테스트를 돌릴 때 스키마가 누락된 상태
 - `400` Document 목록 조회 실패: 커스텀 JPA 쿼리의 named parameter 바인딩 누락 또는 soft delete 조건/정렬 쿼리 오류 여부를 확인한다.
 - `404` Block 생성 실패: `parentId`가 soft delete되었거나 다른 문서의 블록을 부모로 지정한 경우인지 확인한다.
 - `400` Block 생성 실패: `afterBlockId`/`beforeBlockId`가 같은 sibling gap을 가리키는지, 요청 `parentId`와 같은 형제 집합인지 확인한다.

@@ -19,7 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.documents.domain.Document;
 import com.documents.domain.DocumentVisibility;
-import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.DocumentRepository;
@@ -40,9 +39,6 @@ class DocumentServiceImplTest {
 	private DocumentRepository documentRepository;
 
 	@Mock
-	private WorkspaceService workspaceService;
-
-	@Mock
 	private TextNormalizer textNormalizer;
 
 	@Mock
@@ -52,19 +48,16 @@ class DocumentServiceImplTest {
 	private DocumentServiceImpl documentService;
 
 	@Test
-	@DisplayName("성공_루트 문서 생성 시 워크스페이스와 사용자 식별자를 정규화하여 저장한다")
+	@DisplayName("성공_루트 문서 생성 시 사용자 식별자를 소유자와 감사 필드로 저장한다")
 	void createRootDocumentNormalizesActorAndStoresDocument() {
-		UUID workspaceId = UUID.randomUUID();
-		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
 		when(textNormalizer.normalizeNullable(" " + ACTOR_ID + " ")).thenReturn(ACTOR_ID);
 		when(textNormalizer.normalizeRequired("  " + ROOT_TITLE + "  ")).thenReturn(ROOT_TITLE);
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, null)).thenReturn(List.of());
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ACTOR_ID, null)).thenReturn(List.of());
 		when(orderedSortKeyGenerator.generate(anyList(), any(), any(), isNull(), isNull()))
 			.thenReturn("000000000001000000000000");
 		when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		Document result = documentService.create(
-			workspaceId,
 			null,
 			"  " + ROOT_TITLE + "  ",
 			"{\"type\":\"emoji\",\"value\":\"📄\"}",
@@ -77,7 +70,6 @@ class DocumentServiceImplTest {
 		Document request = captor.getValue();
 
 		assertThat(request.getId()).isNotNull();
-		assertThat(request.getWorkspaceId()).isEqualTo(workspaceId);
 		assertThat(request.getParentId()).isNull();
 		assertThat(request.getTitle()).isEqualTo(ROOT_TITLE);
 		assertThat(request.getIconJson()).isEqualTo("{\"type\":\"emoji\",\"value\":\"📄\"}");
@@ -89,39 +81,30 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("성공_사용자 식별자 헤더가 공백이면 감사 필드를 null로 저장한다")
-	void createDocumentStoresNullActorWhenHeaderIsBlank() {
-		UUID workspaceId = UUID.randomUUID();
-		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+	@DisplayName("실패_사용자 식별자 헤더가 공백이면 문서를 생성할 수 없다")
+	void createDocumentRejectsBlankActorWhenHeaderIsBlank() {
 		when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
-		when(textNormalizer.normalizeRequired(ROOT_TITLE)).thenReturn(ROOT_TITLE);
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, null)).thenReturn(List.of());
-		when(orderedSortKeyGenerator.generate(anyList(), any(), any(), isNull(), isNull()))
-			.thenReturn("000000000001000000000000");
-		when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		Document result = documentService.create(workspaceId, null, ROOT_TITLE, null, null, " ");
-
-		assertThat(result.getCreatedBy()).isNull();
-		assertThat(result.getUpdatedBy()).isNull();
+		assertThatThrownBy(() -> documentService.create(null, ROOT_TITLE, null, null, " "))
+			.isInstanceOf(BusinessException.class)
+			.extracting("errorCode")
+			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
 	}
 
 	@Test
-	@DisplayName("성공_부모 문서가 같은 워크스페이스에 있으면 하위 문서를 저장한다")
-	void createChildDocumentWhenParentBelongsToSameWorkspace() {
-		UUID workspaceId = UUID.randomUUID();
+	@DisplayName("성공_부모 문서가 같은 사용자 소유면 하위 문서를 저장한다")
+	void createChildDocumentWhenParentBelongsToSameUser() {
 		UUID parentId = UUID.randomUUID();
-		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId))
-			.thenReturn(Optional.of(parentDocument(parentId, workspaceId)));
+			.thenReturn(Optional.of(parentDocument(parentId, ACTOR_ID)));
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 		when(textNormalizer.normalizeRequired("하위 문서")).thenReturn("하위 문서");
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(List.of());
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ACTOR_ID, parentId)).thenReturn(List.of());
 		when(orderedSortKeyGenerator.generate(anyList(), any(), any(), isNull(), isNull()))
 			.thenReturn("000000000001000000000000");
 		when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		Document result = documentService.create(workspaceId, parentId, "하위 문서", null, null, ACTOR_ID);
+		Document result = documentService.create(parentId, "하위 문서", null, null, ACTOR_ID);
 
 		assertThat(result.getParentId()).isEqualTo(parentId);
 		assertThat(result.getSortKey()).isEqualTo("000000000001000000000000");
@@ -129,28 +112,13 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("실패_워크스페이스가 없으면 문서 생성 시 워크스페이스 없음 예외를 던진다")
-	void createDocumentThrowsWhenWorkspaceMissing() {
-		UUID workspaceId = UUID.randomUUID();
-		when(workspaceService.getById(workspaceId))
-			.thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
-
-		assertThatThrownBy(() -> documentService.create(workspaceId, null, ROOT_TITLE, null, null, ACTOR_ID))
-			.isInstanceOf(BusinessException.class)
-			.hasMessage("요청한 워크스페이스를 찾을 수 없습니다.")
-			.extracting("errorCode")
-			.isEqualTo(BusinessErrorCode.WORKSPACE_NOT_FOUND);
-	}
-
-	@Test
 	@DisplayName("실패_부모 문서가 없으면 문서 생성 시 문서 없음 예외를 던진다")
 	void createDocumentThrowsWhenParentMissing() {
-		UUID workspaceId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
-		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> documentService.create(workspaceId, parentId, ROOT_TITLE, null, null, ACTOR_ID))
+		assertThatThrownBy(() -> documentService.create(parentId, ROOT_TITLE, null, null, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.hasMessage("요청한 문서를 찾을 수 없습니다.")
 			.extracting("errorCode")
@@ -158,15 +126,14 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("실패_부모 문서가 다른 워크스페이스에 있으면 잘못된 요청 예외를 던진다")
-	void createDocumentThrowsWhenParentBelongsToOtherWorkspace() {
-		UUID workspaceId = UUID.randomUUID();
+	@DisplayName("실패_부모 문서가 다른 사용자 소유면 잘못된 요청 예외를 던진다")
+	void createDocumentThrowsWhenParentBelongsToOtherUser() {
 		UUID parentId = UUID.randomUUID();
-		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId))
-			.thenReturn(Optional.of(parentDocument(parentId, UUID.randomUUID())));
+			.thenReturn(Optional.of(parentDocument(parentId, "other-user")));
 
-		assertThatThrownBy(() -> documentService.create(workspaceId, parentId, ROOT_TITLE, null, null, ACTOR_ID))
+		assertThatThrownBy(() -> documentService.create(parentId, ROOT_TITLE, null, null, ACTOR_ID))
 			.isInstanceOf(BusinessException.class)
 			.hasMessage("잘못된 요청입니다.")
 			.extracting("errorCode")
@@ -174,31 +141,27 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("성공_워크스페이스 문서 목록 조회 시 활성 문서를 반환한다")
-	void getDocumentsByWorkspaceIdReturnsActive() {
-		UUID workspaceId = UUID.randomUUID();
-		Document rootDocument = document(workspaceId, null, "루트 문서", "00000000000000000001");
-		Document childDocument = document(workspaceId, rootDocument.getId(), "하위 문서", "00000000000000000002");
-		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
-		when(documentRepository.findActiveByWorkspaceIdOrderBySortKey(eq(workspaceId)))
+	@DisplayName("성공_사용자 문서 목록 조회 시 활성 문서를 반환한다")
+	void getDocumentsByUserIdReturnsActive() {
+		Document rootDocument = document(ACTOR_ID, null, "루트 문서", "00000000000000000001");
+		Document childDocument = document(ACTOR_ID, rootDocument.getId(), "하위 문서", "00000000000000000002");
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+		when(documentRepository.findActiveByCreatedByOrderBySortKey(eq(ACTOR_ID)))
 			.thenReturn(List.of(rootDocument, childDocument));
 
-		assertThat(documentService.getAllByWorkspaceId(workspaceId))
+		assertThat(documentService.getAllByUserId(ACTOR_ID))
 			.containsExactly(rootDocument, childDocument);
 	}
 
 	@Test
-	@DisplayName("실패_존재하지 않는 워크스페이스의 문서 목록 조회는 워크스페이스 없음 예외를 던진다")
-	void getAllByWorkspaceIdThrowsWhenWorkspaceMissing() {
-		UUID workspaceId = UUID.randomUUID();
-		when(workspaceService.getById(workspaceId))
-			.thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
+	@DisplayName("실패_사용자 식별자가 공백이면 문서 목록 조회를 거부한다")
+	void getAllByUserIdRejectsBlankActor() {
+		when(textNormalizer.normalizeNullable(" ")).thenReturn(null);
 
-		assertThatThrownBy(() -> documentService.getAllByWorkspaceId(workspaceId))
+		assertThatThrownBy(() -> documentService.getAllByUserId(" "))
 			.isInstanceOf(BusinessException.class)
-			.hasMessage("요청한 워크스페이스를 찾을 수 없습니다.")
 			.extracting("errorCode")
-			.isEqualTo(BusinessErrorCode.WORKSPACE_NOT_FOUND);
+			.isEqualTo(BusinessErrorCode.INVALID_REQUEST);
 	}
 
 	@Test
@@ -227,9 +190,9 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_문서 수정 시 제목은 trim 후 저장하고 updatedBy를 갱신한다")
 	void updateDocumentTrimsTitleAndUpdatesAuditFields() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		Document document = document(documentId, ownerId, null, "기존 제목", "00000000000000000001");
 		document.setVersion(3);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
@@ -259,9 +222,9 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_title만 수정하면 다른 필드는 유지한다")
 	void updateDocumentUpdatesOnlyTitle() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		Document document = document(documentId, ownerId, null, "기존 제목", "00000000000000000001");
 		document.setVersion(4);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
@@ -293,10 +256,10 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_title이 null이면 기존 제목을 유지하고 메타데이터만 갱신한다")
 	void updateDocumentKeepsTitleWhenNullAndUpdatesMetadataOnly() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, parentId, "기존 제목", "00000000000000000001");
+		Document document = document(documentId, ownerId, parentId, "기존 제목", "00000000000000000001");
 		document.setVersion(5);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
@@ -356,9 +319,9 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_변경 내용이 모두 같으면 no-op으로 처리하고 updatedBy를 바꾸지 않는다")
 	void updateDocumentDoesNothingWhenRequestedStateIsSame() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "기존 제목", "00000000000000000001");
+		Document document = document(documentId, ownerId, null, "기존 제목", "00000000000000000001");
 		document.setVersion(7);
 		document.setIconJson("{\"type\":\"emoji\",\"value\":\"😀\"}");
 		document.setCoverJson("{\"type\":\"image\",\"value\":\"cover-1\"}");
@@ -496,12 +459,12 @@ class DocumentServiceImplTest {
 	}
 
 	@Test
-	@DisplayName("성공_워크스페이스 휴지통 목록 조회는 deletedAt 내림차순으로 반환한다")
-	void getTrashByWorkspaceIdReturnsDeletedDocumentsOrderedByDeletedAtDesc() {
-		UUID workspaceId = UUID.randomUUID();
+	@DisplayName("성공_사용자 휴지통 목록 조회는 deletedAt 내림차순으로 반환한다")
+	void getTrashByUserIdReturnsDeletedDocumentsOrderedByDeletedAtDesc() {
+		UUID ownerId = UUID.randomUUID();
 		Document olderDeletedDocument = deletedDocument(
 			UUID.randomUUID(),
-			workspaceId,
+			ownerId,
 			null,
 			"이전 삭제 문서",
 			"00000000000000000001",
@@ -509,17 +472,17 @@ class DocumentServiceImplTest {
 		);
 		Document newerDeletedDocument = deletedDocument(
 			UUID.randomUUID(),
-			workspaceId,
+			ownerId,
 			null,
 			"최근 삭제 문서",
 			"00000000000000000002",
 			LocalDateTime.now().minusMinutes(1)
 		);
-		when(workspaceService.getById(workspaceId)).thenReturn(workspace(workspaceId));
-		when(documentRepository.findDeletedByWorkspaceIdOrderByDeletedAtDesc(workspaceId))
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+		when(documentRepository.findDeletedByCreatedByOrderByDeletedAtDesc(ACTOR_ID))
 			.thenReturn(List.of(newerDeletedDocument, olderDeletedDocument));
 
-		List<Document> result = documentService.getTrashByWorkspaceId(workspaceId);
+		List<Document> result = documentService.getTrashByUserId(ACTOR_ID);
 
 		assertThat(result).containsExactly(newerDeletedDocument, olderDeletedDocument);
 	}
@@ -602,13 +565,13 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_문서 휴지통 이동 시 활성 하위 문서와 각 문서의 블록도 함께 soft delete 처리한다")
 	void trashSoftDeletesDescendantDocumentsAndBlocks() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID rootId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
 		UUID grandChildId = UUID.randomUUID();
-		Document rootDocument = document(rootId, workspaceId, null, "루트 문서", "00000000000000000001");
-		Document childDocument = document(childId, workspaceId, rootId, "하위 문서", "00000000000000000002");
-		Document grandChildDocument = document(grandChildId, workspaceId, childId, "손자 문서", "00000000000000000003");
+		Document rootDocument = document(rootId, ownerId, null, "루트 문서", "00000000000000000001");
+		Document childDocument = document(childId, ownerId, rootId, "하위 문서", "00000000000000000002");
+		Document grandChildDocument = document(grandChildId, ownerId, childId, "손자 문서", "00000000000000000003");
 		when(documentRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootDocument));
 		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of(childDocument));
 		when(documentRepository.findActiveChildrenByParentIdOrderBySortKey(childId)).thenReturn(List.of(grandChildDocument));
@@ -738,11 +701,11 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_활성 부모 밑 삭제 자식 문서는 복구한다")
 	void restoreDeletedChildDocumentWhenParentIsActive() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
-		Document deletedChild = deletedDocument(childId, workspaceId, parentId, "삭제 자식", "00000000000000000002");
-		Document activeParent = document(parentId, workspaceId, null, "활성 부모", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, ownerId, parentId, "삭제 자식", "00000000000000000002");
+		Document activeParent = document(parentId, ownerId, null, "활성 부모", "00000000000000000001");
 		when(documentRepository.findById(childId)).thenReturn(Optional.of(deletedChild));
 		when(documentRepository.findById(parentId)).thenReturn(Optional.of(activeParent));
 		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(childId)).thenReturn(List.of());
@@ -758,11 +721,11 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("실패_삭제된 부모 밑 삭제 자식 문서는 단독 복구할 수 없다")
 	void restoreFailsWhenParentIsDeleted() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
-		Document deletedChild = deletedDocument(childId, workspaceId, parentId, "삭제 자식", "00000000000000000002");
-		Document deletedParent = deletedDocument(parentId, workspaceId, null, "삭제 부모", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, ownerId, parentId, "삭제 자식", "00000000000000000002");
+		Document deletedParent = deletedDocument(parentId, ownerId, null, "삭제 부모", "00000000000000000001");
 		when(documentRepository.findById(childId)).thenReturn(Optional.of(deletedChild));
 		when(documentRepository.findById(parentId)).thenReturn(Optional.of(deletedParent));
 
@@ -778,11 +741,11 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("실패_삭제된 부모 밑 삭제 자식 문서 복구 실패 시 블록 복구도 호출하지 않는다")
 	void restoreDoesNotDelegateBlockRestoreWhenParentIsDeleted() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
-		Document deletedChild = deletedDocument(childId, workspaceId, parentId, "삭제 자식", "00000000000000000002");
-		Document deletedParent = deletedDocument(parentId, workspaceId, null, "삭제 부모", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, ownerId, parentId, "삭제 자식", "00000000000000000002");
+		Document deletedParent = deletedDocument(parentId, ownerId, null, "삭제 부모", "00000000000000000001");
 		when(documentRepository.findById(childId)).thenReturn(Optional.of(deletedChild));
 		when(documentRepository.findById(parentId)).thenReturn(Optional.of(deletedParent));
 
@@ -811,11 +774,11 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_하위 문서까지 함께 복구될 때 각 문서의 블록 복구도 함께 호출한다")
 	void restoreDelegatesBlockRestoreForDescendantDocuments() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID rootId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
-		Document deletedRoot = deletedDocument(rootId, workspaceId, null, "삭제 루트", "00000000000000000001");
-		Document deletedChild = deletedDocument(childId, workspaceId, rootId, "삭제 자식", "00000000000000000002");
+		Document deletedRoot = deletedDocument(rootId, ownerId, null, "삭제 루트", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, ownerId, rootId, "삭제 자식", "00000000000000000002");
 		when(documentRepository.findById(rootId)).thenReturn(Optional.of(deletedRoot));
 		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(rootId)).thenReturn(
 			List.of(deletedChild));
@@ -834,12 +797,12 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_복구 대상이 아닌 다른 문서 블록은 복구 대상에 포함하지 않는다")
 	void restoreDoesNotDelegateBlockRestoreForOtherDocument() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID rootId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
 		UUID otherDocumentId = UUID.randomUUID();
-		Document deletedRoot = deletedDocument(rootId, workspaceId, null, "삭제 루트", "00000000000000000001");
-		Document deletedChild = deletedDocument(childId, workspaceId, rootId, "삭제 자식", "00000000000000000002");
+		Document deletedRoot = deletedDocument(rootId, ownerId, null, "삭제 루트", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, ownerId, rootId, "삭제 자식", "00000000000000000002");
 		when(documentRepository.findById(rootId)).thenReturn(Optional.of(deletedRoot));
 		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(rootId)).thenReturn(
 			List.of(deletedChild));
@@ -856,9 +819,9 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_targetParentId가 null이면 루트 이동을 허용한다")
 	void moveAllowsRootMoveWhenTargetParentIsNull() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, UUID.randomUUID(), "이동 대상", "00000000000000000001");
+		Document document = document(documentId, ownerId, UUID.randomUUID(), "이동 대상", "00000000000000000001");
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 
 		assertThatCode(() -> documentService.move(documentId, null, null, null, ACTOR_ID))
@@ -868,11 +831,11 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_활성 부모 문서가 같은 워크스페이스에 있으면 이동 검증을 통과한다")
 	void moveAllowsActiveParentInSameWorkspace() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000001");
-		Document parentDocument = parentDocument(parentId, workspaceId);
+		Document document = document(documentId, ownerId, null, "이동 대상", "00000000000000000001");
+		Document parentDocument = parentDocument(parentId, ownerId);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
 
@@ -883,19 +846,19 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_afterDocumentId만 있으면 해당 문서 뒤 위치로 sortKey 계산을 위임한다")
 	void moveDelegatesSortKeyGenerationWhenAfterDocumentIdProvided() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID afterDocumentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000009");
-		Document parentDocument = parentDocument(parentId, workspaceId);
-		Document afterDocument = document(afterDocumentId, workspaceId, parentId, "앞 문서", "00000000000000000001");
-		Document siblingDocument = document(UUID.randomUUID(), workspaceId, parentId, "다음 문서", "00000000000000000002");
+		Document document = document(documentId, ownerId, null, "이동 대상", "00000000000000000009");
+		Document parentDocument = parentDocument(parentId, ownerId);
+		Document afterDocument = document(afterDocumentId, ownerId, parentId, "앞 문서", "00000000000000000001");
+		Document siblingDocument = document(UUID.randomUUID(), ownerId, parentId, "다음 문서", "00000000000000000002");
 		List<Document> siblings = List.of(afterDocument, siblingDocument, document);
 		List<Document> targetSiblings = List.of(afterDocument, siblingDocument);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), parentId)).thenReturn(
 			siblings);
 		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), isNull()))
 			.thenReturn("00000000000000000015");
@@ -909,19 +872,19 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_beforeDocumentId만 있으면 해당 문서 앞 위치로 sortKey 계산을 위임한다")
 	void moveDelegatesSortKeyGenerationWhenBeforeDocumentIdProvided() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID beforeDocumentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000009");
-		Document parentDocument = parentDocument(parentId, workspaceId);
-		Document beforeDocument = document(beforeDocumentId, workspaceId, parentId, "뒤 문서", "00000000000000000002");
-		Document siblingDocument = document(UUID.randomUUID(), workspaceId, parentId, "앞 문서", "00000000000000000001");
+		Document document = document(documentId, ownerId, null, "이동 대상", "00000000000000000009");
+		Document parentDocument = parentDocument(parentId, ownerId);
+		Document beforeDocument = document(beforeDocumentId, ownerId, parentId, "뒤 문서", "00000000000000000002");
+		Document siblingDocument = document(UUID.randomUUID(), ownerId, parentId, "앞 문서", "00000000000000000001");
 		List<Document> siblings = List.of(siblingDocument, beforeDocument, document);
 		List<Document> targetSiblings = List.of(siblingDocument, beforeDocument);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), parentId)).thenReturn(
 			siblings);
 		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), isNull(), eq(beforeDocumentId)))
 			.thenReturn("00000000000000000001");
@@ -935,17 +898,17 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_afterDocumentId와 beforeDocumentId가 없으면 대상 부모의 마지막 위치로 sortKey 계산을 위임한다")
 	void moveDelegatesSortKeyGenerationWhenAnchorMissing() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000009");
-		Document parentDocument = parentDocument(parentId, workspaceId);
-		Document siblingDocument = document(UUID.randomUUID(), workspaceId, parentId, "형제 문서", "00000000000000000002");
+		Document document = document(documentId, ownerId, null, "이동 대상", "00000000000000000009");
+		Document parentDocument = parentDocument(parentId, ownerId);
+		Document siblingDocument = document(UUID.randomUUID(), ownerId, parentId, "형제 문서", "00000000000000000002");
 		List<Document> siblings = List.of(siblingDocument, document);
 		List<Document> targetSiblings = List.of(siblingDocument);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), parentId)).thenReturn(
 			siblings);
 		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), isNull(), isNull()))
 			.thenReturn("00000000000000000003");
@@ -959,20 +922,20 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_afterDocumentId와 beforeDocumentId가 모두 있으면 두 문서 사이 위치로 sortKey 계산을 위임한다")
 	void moveDelegatesSortKeyGenerationWhenBothAnchorsProvided() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID afterDocumentId = UUID.randomUUID();
 		UUID beforeDocumentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000009");
-		Document parentDocument = parentDocument(parentId, workspaceId);
-		Document afterDocument = document(afterDocumentId, workspaceId, parentId, "앞 문서", "00000000000000000001");
-		Document beforeDocument = document(beforeDocumentId, workspaceId, parentId, "뒤 문서", "00000000000000000002");
+		Document document = document(documentId, ownerId, null, "이동 대상", "00000000000000000009");
+		Document parentDocument = parentDocument(parentId, ownerId);
+		Document afterDocument = document(afterDocumentId, ownerId, parentId, "앞 문서", "00000000000000000001");
+		Document beforeDocument = document(beforeDocumentId, ownerId, parentId, "뒤 문서", "00000000000000000002");
 		List<Document> siblings = List.of(afterDocument, beforeDocument, document);
 		List<Document> targetSiblings = List.of(afterDocument, beforeDocument);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), parentId)).thenReturn(
 			siblings);
 		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), eq(beforeDocumentId)))
 			.thenReturn("000000000000000000015");
@@ -986,17 +949,17 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_문서 이동 시 부모와 sortKey와 updatedBy를 함께 갱신한다")
 	void moveUpdatesParentSortKeyAndUpdatedBy() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID targetParentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000009");
-		Document targetParentDocument = parentDocument(targetParentId, workspaceId);
+		Document document = document(documentId, ownerId, null, "이동 대상", "00000000000000000009");
+		Document targetParentDocument = parentDocument(targetParentId, ownerId);
 		java.util.List<Document> siblings = java.util.List.of(
-			document(UUID.randomUUID(), workspaceId, targetParentId, "형제 문서", "00000000000000000001")
+			document(UUID.randomUUID(), ownerId, targetParentId, "형제 문서", "00000000000000000001")
 		);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(targetParentId)).thenReturn(Optional.of(targetParentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, targetParentId))
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), targetParentId))
 			.thenReturn(siblings);
 		when(orderedSortKeyGenerator.generate(eq(siblings), any(), any(), isNull(), isNull()))
 			.thenReturn("00000000000000000010");
@@ -1012,15 +975,15 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_루트 이동 시 parentId를 null로 바꾸고 sortKey와 updatedBy를 갱신한다")
 	void moveUpdatesRootParentSortKeyAndUpdatedBy() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID currentParentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, currentParentId, "이동 대상", "00000000000000000009");
+		Document document = document(documentId, ownerId, currentParentId, "이동 대상", "00000000000000000009");
 		List<Document> siblings = List.of(
-			document(UUID.randomUUID(), workspaceId, null, "루트 문서", "00000000000000000001")
+			document(UUID.randomUUID(), ownerId, null, "루트 문서", "00000000000000000001")
 		);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, null)).thenReturn(siblings);
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), null)).thenReturn(siblings);
 		when(orderedSortKeyGenerator.generate(eq(siblings), any(), any(), isNull(), isNull()))
 			.thenReturn("00000000000000000010");
 		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
@@ -1035,14 +998,14 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_같은 부모 내 reorder도 sortKey와 updatedBy를 갱신한다")
 	void moveReordersWithinSameParent() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID afterDocumentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, parentId, "이동 대상", "00000000000000000009");
-		Document parentDocument = parentDocument(parentId, workspaceId);
+		Document document = document(documentId, ownerId, parentId, "이동 대상", "00000000000000000009");
+		Document parentDocument = parentDocument(parentId, ownerId);
 		java.util.List<Document> siblings = java.util.List.of(
-			document(afterDocumentId, workspaceId, parentId, "앞 문서", "00000000000000000001"),
+			document(afterDocumentId, ownerId, parentId, "앞 문서", "00000000000000000001"),
 			document
 		);
 		List<Document> targetSiblings = List.of(
@@ -1050,7 +1013,7 @@ class DocumentServiceImplTest {
 		);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId))
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), parentId))
 			.thenReturn(siblings);
 		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), isNull()))
 			.thenReturn("00000000000000000015");
@@ -1066,17 +1029,17 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("성공_동일 위치 no-op 요청은 문서를 갱신하지 않는다")
 	void moveDoesNothingWhenTargetLocationIsSame() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, parentId, "이동 대상", "00000000000000000009");
+		Document document = document(documentId, ownerId, parentId, "이동 대상", "00000000000000000009");
 		document.setUpdatedBy("old-user");
-		Document parentDocument = parentDocument(parentId, workspaceId);
+		Document parentDocument = parentDocument(parentId, ownerId);
 		java.util.List<Document> siblings = java.util.List.of(document);
 		List<Document> targetSiblings = List.of();
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId))
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), parentId))
 			.thenReturn(siblings);
 		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), isNull(), isNull()))
 			.thenReturn("00000000000000000009");
@@ -1134,11 +1097,11 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("실패_자신의 하위 문서를 부모로 지정하면 순환 이동 예외를 던진다")
 	void moveThrowsWhenCycleDetected() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID childId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "루트 문서", "00000000000000000001");
-		Document childDocument = document(childId, workspaceId, documentId, "하위 문서", "00000000000000000002");
+		Document document = document(documentId, ownerId, null, "루트 문서", "00000000000000000001");
+		Document childDocument = document(childId, ownerId, documentId, "하위 문서", "00000000000000000002");
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(childId)).thenReturn(Optional.of(childDocument));
 
@@ -1151,17 +1114,17 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("실패_afterDocumentId와 beforeDocumentId가 같은 삽입 간격을 가리키지 않으면 잘못된 요청 예외를 던진다")
 	void moveThrowsWhenAnchorDocumentsAreContradictory() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
 		UUID afterDocumentId = UUID.randomUUID();
 		UUID beforeDocumentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000009");
-		Document parentDocument = parentDocument(parentId, workspaceId);
+		Document document = document(documentId, ownerId, null, "이동 대상", "00000000000000000009");
+		Document parentDocument = parentDocument(parentId, ownerId);
 		List<Document> siblings = List.of(
-			document(afterDocumentId, workspaceId, parentId, "앞 문서", "00000000000000000001"),
-			document(UUID.randomUUID(), workspaceId, parentId, "중간 문서", "00000000000000000002"),
-			document(beforeDocumentId, workspaceId, parentId, "뒤 문서", "00000000000000000003"),
+			document(afterDocumentId, ownerId, parentId, "앞 문서", "00000000000000000001"),
+			document(UUID.randomUUID(), ownerId, parentId, "중간 문서", "00000000000000000002"),
+			document(beforeDocumentId, ownerId, parentId, "뒤 문서", "00000000000000000003"),
 			document
 		);
 		List<Document> targetSiblings = List.of(
@@ -1171,7 +1134,7 @@ class DocumentServiceImplTest {
 		);
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), parentId)).thenReturn(
 			siblings);
 		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), eq(afterDocumentId), eq(beforeDocumentId)))
 			.thenThrow(new IllegalArgumentException("afterDocumentId와 beforeDocumentId는 같은 삽입 간격을 가리켜야 합니다."));
@@ -1187,17 +1150,17 @@ class DocumentServiceImplTest {
 	@Test
 	@DisplayName("실패_정렬 키 공간이 부족하면 재정렬 필요 예외를 던진다")
 	void moveThrowsWhenSortKeySpaceExhausted() {
-		UUID workspaceId = UUID.randomUUID();
+		UUID ownerId = UUID.randomUUID();
 		UUID parentId = UUID.randomUUID();
 		UUID documentId = UUID.randomUUID();
-		Document document = document(documentId, workspaceId, null, "이동 대상", "00000000000000000009");
-		Document parentDocument = parentDocument(parentId, workspaceId);
-		List<Document> siblings = List.of(document(UUID.randomUUID(), workspaceId, parentId, "형제 문서",
+		Document document = document(documentId, ownerId, null, "이동 대상", "00000000000000000009");
+		Document parentDocument = parentDocument(parentId, ownerId);
+		List<Document> siblings = List.of(document(UUID.randomUUID(), ownerId, parentId, "형제 문서",
 			"00000000000000000001"), document);
 		List<Document> targetSiblings = List.of(siblings.get(0));
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
 		when(documentRepository.findByIdAndDeletedAtIsNull(parentId)).thenReturn(Optional.of(parentDocument));
-		when(documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId)).thenReturn(
+		when(documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(ownerId.toString(), parentId)).thenReturn(
 			siblings);
 		when(orderedSortKeyGenerator.generate(eq(targetSiblings), any(), any(), isNull(), isNull()))
 			.thenThrow(new OrderedSortKeyGenerator.SortKeyRebalanceRequiredException());
@@ -1209,44 +1172,46 @@ class DocumentServiceImplTest {
 			.isEqualTo(BusinessErrorCode.SORT_KEY_REBALANCE_REQUIRED);
 	}
 
-	private Workspace workspace(UUID workspaceId) {
-		return Workspace.builder()
-			.id(workspaceId)
-			.name("Docs Root")
-			.build();
+	private Document document(String ownerId, UUID parentId, String title, String sortKey) {
+		return document(UUID.randomUUID(), ownerId, parentId, title, sortKey);
 	}
 
-	private Document document(UUID workspaceId, UUID parentId, String title, String sortKey) {
-		return document(UUID.randomUUID(), workspaceId, parentId, title, sortKey);
+	private Document document(UUID documentId, UUID ownerId, UUID parentId, String title, String sortKey) {
+		return document(documentId, ownerId.toString(), parentId, title, sortKey);
 	}
 
-	private Document document(UUID documentId, UUID workspaceId, UUID parentId, String title, String sortKey) {
+	private Document document(UUID documentId, String ownerId, UUID parentId, String title, String sortKey) {
 		return Document.builder()
 			.id(documentId)
-			.workspace(workspace(workspaceId))
-			.parent(parentId == null ? null : parentDocument(parentId, workspaceId))
+			.parent(parentId == null ? null : parentDocument(parentId, ownerId))
 			.title(title)
 			.sortKey(sortKey)
+			.createdBy(ownerId)
+			.updatedBy(ownerId)
 			.build();
 	}
 
-	private Document parentDocument(UUID documentId, UUID workspaceId) {
-		return document(documentId, workspaceId, null, "부모 문서", "00000000000000000001");
+	private Document parentDocument(UUID documentId, UUID ownerId) {
+		return document(documentId, ownerId, null, "부모 문서", "00000000000000000001");
 	}
 
-	private Document deletedDocument(UUID documentId, UUID workspaceId, UUID parentId, String title, String sortKey) {
-		return deletedDocument(documentId, workspaceId, parentId, title, sortKey, LocalDateTime.now().minusMinutes(1));
+	private Document parentDocument(UUID documentId, String ownerId) {
+		return document(documentId, ownerId, null, "부모 문서", "00000000000000000001");
+	}
+
+	private Document deletedDocument(UUID documentId, UUID ownerId, UUID parentId, String title, String sortKey) {
+		return deletedDocument(documentId, ownerId, parentId, title, sortKey, LocalDateTime.now().minusMinutes(1));
 	}
 
 	private Document deletedDocument(
 		UUID documentId,
-		UUID workspaceId,
+		UUID ownerId,
 		UUID parentId,
 		String title,
 		String sortKey,
 		LocalDateTime deletedAt
 	) {
-		Document document = document(documentId, workspaceId, parentId, title, sortKey);
+		Document document = document(documentId, ownerId, parentId, title, sortKey);
 		document.setDeletedAt(deletedAt);
 		return document;
 	}

@@ -19,31 +19,31 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 	@Query("""
 		select d
 		from Document d
-		where d.workspace.id = :workspaceId
+		where d.createdBy = :userId
 		  and d.deletedAt is null
 		order by
 		  d.sortKey asc,
 		  d.createdAt asc,
 		  d.id asc
 		""")
-	List<Document> findActiveByWorkspaceIdOrderBySortKey(@Param("workspaceId") UUID workspaceId);
+	List<Document> findActiveByCreatedByOrderBySortKey(@Param("userId") String userId);
 
 	@Query("""
 		select d
 		from Document d
-		where d.workspace.id = :workspaceId
+		where d.createdBy = :userId
 		  and d.deletedAt is not null
 		order by
 		  d.deletedAt desc,
 		  d.createdAt asc,
 		  d.id asc
 		""")
-	List<Document> findDeletedByWorkspaceIdOrderByDeletedAtDesc(@Param("workspaceId") UUID workspaceId);
+	List<Document> findDeletedByCreatedByOrderByDeletedAtDesc(@Param("userId") String userId);
 
 	@Query("""
 		select d
 		from Document d
-		where d.workspace.id = :workspaceId
+		where d.createdBy = :userId
 		  and (
 		    (:parentId is null and d.parent is null)
 		    or d.parent.id = :parentId
@@ -54,8 +54,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 		  d.createdAt asc,
 		  d.id asc
 		""")
-	List<Document> findActiveByWorkspaceIdAndParentIdOrderBySortKey(
-		@Param("workspaceId") UUID workspaceId,
+	List<Document> findActiveByCreatedByAndParentIdOrderBySortKey(
+		@Param("userId") String userId,
 		@Param("parentId") UUID parentId
 	);
 
