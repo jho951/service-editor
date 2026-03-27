@@ -36,7 +36,6 @@ public class DocumentApiMapper {
         Long version = document.getVersion() == null ? null : document.getVersion().longValue();
         return DocumentResponse.builder()
                 .id(document.getId())
-                .workspaceId(document.getWorkspaceId())
                 .parentId(document.getParentId())
                 .title(document.getTitle())
                 .icon(documentJsonCodec.read(document.getIconJson()))

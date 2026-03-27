@@ -6,9 +6,9 @@ import java.util.List;
 import java.util.UUID;
 
 public interface DocumentService {
-    Document create(UUID workspaceId, UUID parentId, String title, String iconJson, String coverJson, String actorId);
-    List<Document> getAllByWorkspaceId(UUID workspaceId);
-    List<Document> getTrashByWorkspaceId(UUID workspaceId);
+    Document create(UUID parentId, String title, String iconJson, String coverJson, String actorId);
+    List<Document> getAllByUserId(String userId);
+    List<Document> getTrashByUserId(String userId);
     Document getById(UUID documentId);
     Document update(UUID documentId, String title, String iconJson, String coverJson, Integer version, String actorId);
     Document updateVisibility(UUID documentId, DocumentVisibility visibility, Integer version, String actorId);

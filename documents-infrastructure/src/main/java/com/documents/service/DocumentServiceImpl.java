@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.documents.domain.Document;
 import com.documents.domain.DocumentTrashPolicy;
 import com.documents.domain.DocumentVisibility;
-import com.documents.domain.Workspace;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.DocumentRepository;
@@ -28,25 +27,27 @@ public class DocumentServiceImpl implements DocumentService {
 
 	private final BlockService blockService;
 	private final DocumentRepository documentRepository;
-	private final WorkspaceService workspaceService;
 	private final TextNormalizer textNormalizer;
 	private final OrderedSortKeyGenerator orderedSortKeyGenerator;
 
 	@Override
 	@Transactional
-	public Document create(UUID workspaceId, UUID parentId, String title, String iconJson, String coverJson,
-		String actorId) {
-		Workspace workspace = workspaceService.getById(workspaceId);
-		Document parentDocument = validateParentForWorkspace(workspaceId, parentId);
-
+	public Document create(UUID parentId, String title, String iconJson, String coverJson, String actorId) {
 		String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+		if (normalizedActorId == null) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+
+		Document parentDocument = validateParentForUser(normalizedActorId, parentId);
 		String normalizedTitle = textNormalizer.normalizeRequired(title);
-		List<Document> siblings = documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(workspaceId, parentId);
+		List<Document> siblings = documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(
+			normalizedActorId,
+			parentId
+		);
 		String nextSortKey = generateSortKey(siblings, null, null);
 
 		Document document = Document.builder()
 			.id(UUID.randomUUID())
-			.workspace(workspace)
 			.parent(parentDocument)
 			.title(normalizedTitle)
 			.iconJson(iconJson)
@@ -62,16 +63,24 @@ public class DocumentServiceImpl implements DocumentService {
 
 	@Override
 	@Transactional(readOnly = true)
-	public List<Document> getAllByWorkspaceId(UUID workspaceId) {
-		workspaceService.getById(workspaceId);
-		return documentRepository.findActiveByWorkspaceIdOrderBySortKey(workspaceId);
+	public List<Document> getAllByUserId(String userId) {
+		String normalizedUserId = textNormalizer.normalizeNullable(userId);
+		if (normalizedUserId == null) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+
+		return documentRepository.findActiveByCreatedByOrderBySortKey(normalizedUserId);
 	}
 
 	@Override
 	@Transactional(readOnly = true)
-	public List<Document> getTrashByWorkspaceId(UUID workspaceId) {
-		workspaceService.getById(workspaceId);
-		return documentRepository.findDeletedByWorkspaceIdOrderByDeletedAtDesc(workspaceId);
+	public List<Document> getTrashByUserId(String userId) {
+		String normalizedUserId = textNormalizer.normalizeNullable(userId);
+		if (normalizedUserId == null) {
+			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+		}
+
+		return documentRepository.findDeletedByCreatedByOrderByDeletedAtDesc(normalizedUserId);
 	}
 
 	@Override
@@ -192,8 +201,8 @@ public class DocumentServiceImpl implements DocumentService {
 		Document document = findActiveDocument(documentId);
 		Document targetParentDocument = findValidParentForMove(document, targetParentId);
 
-		List<Document> siblings = documentRepository.findActiveByWorkspaceIdAndParentIdOrderBySortKey(
-			document.getWorkspaceId(),
+		List<Document> siblings = documentRepository.findActiveByCreatedByAndParentIdOrderBySortKey(
+			document.getCreatedBy(),
 			targetParentId
 		);
 
@@ -229,13 +238,13 @@ public class DocumentServiceImpl implements DocumentService {
 		}
 	}
 
-	private Document validateParentForWorkspace(UUID workspaceId, UUID parentId) {
+	private Document validateParentForUser(String userId, UUID parentId) {
 		if (parentId == null) {
 			return null;
 		}
 
 		Document parentDocument = findActiveDocument(parentId);
-		if (!workspaceId.equals(parentDocument.getWorkspaceId())) {
+		if (!userId.equals(parentDocument.getCreatedBy())) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
 		}
 
@@ -253,7 +262,7 @@ public class DocumentServiceImpl implements DocumentService {
 
 		Document parentDocument = findActiveDocument(targetParentId);
 
-		if (!document.getWorkspaceId().equals(parentDocument.getWorkspaceId())) {
+		if (!Objects.equals(document.getCreatedBy(), parentDocument.getCreatedBy())) {
 			throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
 		}
 

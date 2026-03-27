@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.documents.api.auth.CurrentUserId;
@@ -38,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "Document", description = "문서 API")
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/documents")
 public class DocumentController {
 
 	private final BlockService blockService;
@@ -47,37 +49,35 @@ public class DocumentController {
 	private final DocumentTransactionService documentTransactionService;
 	private final DocumentTransactionApiMapper documentTransactionApiMapper;
 
-	@Operation(summary = "워크스페이스 문서 목록 조회")
-	@GetMapping("/workspaces/{workspaceId}/documents")
+	@Operation(summary = "내 문서 목록 조회")
+	@GetMapping
 	public ResponseEntity<GlobalResponse<List<DocumentResponse>>> getDocuments(
-		@PathVariable("workspaceId") UUID workspaceId
+		@CurrentUserId String userId
 	) {
-		List<DocumentResponse> response = documentService.getAllByWorkspaceId(workspaceId).stream()
+		List<DocumentResponse> response = documentService.getAllByUserId(userId).stream()
 			.map(documentApiMapper::toResponse)
 			.toList();
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
 	}
 
-	@Operation(summary = "워크스페이스 휴지통 문서 목록 조회")
-	@GetMapping("/workspaces/{workspaceId}/trash/documents")
+	@Operation(summary = "내 휴지통 문서 목록 조회")
+	@GetMapping("/trash")
 	public ResponseEntity<GlobalResponse<List<TrashDocumentResponse>>> getTrashDocuments(
-		@PathVariable("workspaceId") UUID workspaceId
+		@CurrentUserId String userId
 	) {
-		List<TrashDocumentResponse> response = documentService.getTrashByWorkspaceId(workspaceId).stream()
+		List<TrashDocumentResponse> response = documentService.getTrashByUserId(userId).stream()
 			.map(documentApiMapper::toTrashResponse)
 			.toList();
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
 	}
 
 	@Operation(summary = "문서 생성")
-	@PostMapping("/workspaces/{workspaceId}/documents")
+	@PostMapping
 	public ResponseEntity<GlobalResponse<DocumentResponse>> createDocument(
-		@PathVariable("workspaceId") UUID workspaceId,
 		@Valid @RequestBody CreateDocumentRequest request,
 		@CurrentUserId String userId
 	) {
 		Document createdDocument = documentService.create(
-			workspaceId,
 			request.getParentId(),
 			request.getTitle(),
 			documentApiMapper.serializeIcon(request),
@@ -90,7 +90,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 단건 조회")
-	@GetMapping("/documents/{documentId}")
+	@GetMapping("/{documentId}")
 	public ResponseEntity<GlobalResponse<DocumentResponse>> getDocument(
 		@PathVariable("documentId") UUID documentId
 	) {
@@ -99,7 +99,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 블록 목록 조회")
-	@GetMapping("/documents/{documentId}/blocks")
+	@GetMapping("/{documentId}/blocks")
 	public ResponseEntity<GlobalResponse<List<BlockResponse>>> getBlocks(
 		@PathVariable("documentId") UUID documentId
 	) {
@@ -110,7 +110,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 수정")
-	@PatchMapping("/documents/{documentId}")
+	@PatchMapping("/{documentId}")
 	public ResponseEntity<GlobalResponse<DocumentResponse>> updateDocument(
 		@PathVariable("documentId") UUID documentId,
 		@Valid @RequestBody UpdateDocumentRequest request,
@@ -128,7 +128,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 공개 상태 수정")
-	@PatchMapping("/documents/{documentId}/visibility")
+	@PatchMapping("/{documentId}/visibility")
 	public ResponseEntity<GlobalResponse<DocumentResponse>> updateDocumentVisibility(
 		@PathVariable("documentId") UUID documentId,
 		@Valid @RequestBody UpdateDocumentVisibilityRequest request,
@@ -144,7 +144,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 에디터 transaction 반영")
-	@PostMapping("/documents/{documentId}/transactions")
+	@PostMapping("/{documentId}/transactions")
 	public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> applyTransactions(
 		@PathVariable("documentId") UUID documentId,
 		@Valid @RequestBody DocumentTransactionRequest request,
@@ -157,7 +157,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 삭제")
-	@DeleteMapping("/documents/{documentId}")
+	@DeleteMapping("/{documentId}")
 	public ResponseEntity<GlobalResponse<Void>> deleteDocument(
 		@PathVariable("documentId") UUID documentId,
 		@CurrentUserId String userId
@@ -167,7 +167,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 휴지통 이동")
-	@PatchMapping("/documents/{documentId}/trash")
+	@PatchMapping("/{documentId}/trash")
 	public ResponseEntity<GlobalResponse<Void>> trashDocument(
 		@PathVariable("documentId") UUID documentId,
 		@CurrentUserId String userId
@@ -177,7 +177,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 복구")
-	@PostMapping("/documents/{documentId}/restore")
+	@PostMapping("/{documentId}/restore")
 	public ResponseEntity<GlobalResponse<Void>> restoreDocument(
 		@PathVariable("documentId") UUID documentId,
 		@CurrentUserId String userId
@@ -187,7 +187,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 이동")
-	@PostMapping("/documents/{documentId}/move")
+	@PostMapping("/{documentId}/move")
 	public ResponseEntity<GlobalResponse<Void>> moveDocument(
 		@PathVariable("documentId") UUID documentId,
 		@RequestBody MoveDocumentRequest request,
