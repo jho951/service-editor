@@ -39,8 +39,8 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 
 ## 결정
 
-- 에디터의 표준 write 경로는 `POST /v1/documents/{documentId}/transactions` 하나로 둔다.
-- 에디터의 표준 read 경로는 `GET /v1/documents/{documentId}/blocks`를 사용한다.
+- 에디터의 표준 write 경로는 `POST /documents/{documentId}/transactions` 하나로 둔다.
+- 에디터의 표준 read 경로는 `GET /documents/{documentId}/blocks`를 사용한다.
 - v1 에디터 operation은 다음 4개만 채택한다.
 - `BLOCK_CREATE`
 - `BLOCK_REPLACE_CONTENT`
@@ -70,7 +70,7 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 - conflict 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함한다.
 - conflict 이후 프론트 복구 기준은 실패한 batch payload 복원이 아니라, 현재 로컬 문서 상태 기준 pending 재조립이다.
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되면 다시 pending에 포함될 수 있다.
-- `POST /v1/documents/{documentId}/blocks`, `PATCH /v1/blocks/{blockId}`, `DELETE /v1/blocks/{blockId}`는 에디터 표준 경로가 아니라 보조/운영/관리 경로로 둔다.
+- `POST /documents/{documentId}/blocks`, `PATCH /blocks/{blockId}`, `DELETE /blocks/{blockId}`는 에디터 표준 경로가 아니라 보조/운영/관리 경로로 둔다.
 - 이 설계 자체는 autosave 저장 모델이며, 실시간 브로드캐스트/협업 모델을 포함하지 않는다.
 
 ## 영향

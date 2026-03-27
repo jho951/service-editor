@@ -54,7 +54,7 @@ class DocumentTransactionApiIntegrationTest {
         existingBlock.setContent(content("다른 사용자 수정"));
         blockRepository.save(existingBlock);
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -104,7 +104,7 @@ class DocumentTransactionApiIntegrationTest {
         Block childBlock = block(document, rootBlock, "자식 블록", "000000000001I00000000000");
         Block siblingBlock = block(document, null, "형제 블록", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -141,7 +141,7 @@ class DocumentTransactionApiIntegrationTest {
         Block beforeBlock = block(document, null, "앞 블록", "000000000001000000000000");
         Block movingBlock = block(document, null, "이동 대상", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -178,7 +178,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block movingBlock = block(document, null, "이동 대상", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -220,7 +220,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsUpdatesTempBlockContextAfterMove() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -283,7 +283,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -334,7 +334,7 @@ class DocumentTransactionApiIntegrationTest {
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
         Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -384,7 +384,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsAccumulatesTempBlockStateAcrossMixedOperations() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -471,7 +471,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsRollsBackCreatedBlockWhenDeleteReferencesTempBlock() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -507,7 +507,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -556,7 +556,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -596,7 +596,7 @@ class DocumentTransactionApiIntegrationTest {
         Block parentBlock = block(document, null, "부모 블록", "000000000001000000000000");
         Block childBlock = block(document, parentBlock, "자식 블록", "000000000001I00000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -649,7 +649,7 @@ class DocumentTransactionApiIntegrationTest {
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
         Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -702,7 +702,7 @@ class DocumentTransactionApiIntegrationTest {
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
         Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -775,7 +775,7 @@ class DocumentTransactionApiIntegrationTest {
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
         Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -837,7 +837,7 @@ class DocumentTransactionApiIntegrationTest {
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
         Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -888,7 +888,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -926,7 +926,7 @@ class DocumentTransactionApiIntegrationTest {
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
         Block targetParent = block(document, null, "부모 블록", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -953,7 +953,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsDeletesCreatedTempBlockWithoutVersion() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -987,7 +987,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsDeletesCreatedTempBlockAfterReplaceContent() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1037,7 +1037,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block parentBlock = block(document, null, "부모 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1077,7 +1077,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsReturnsBadRequestWhenTempDeleteIncludesVersion() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1110,7 +1110,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1136,7 +1136,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsRollsBackWhenLaterReplaceReferencesDeletedTempBlock() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1185,7 +1185,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block parentBlock = block(document, null, "부모 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1225,7 +1225,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1274,7 +1274,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1316,7 +1316,7 @@ class DocumentTransactionApiIntegrationTest {
         existingBlock.setContent(content("다른 사용자 수정"));
         blockRepository.save(existingBlock);
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1356,7 +1356,7 @@ class DocumentTransactionApiIntegrationTest {
         Document otherDocument = document("다른 문서");
         Block otherDocumentBlock = block(otherDocument, null, "다른 문서 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", targetDocument.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", targetDocument.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1399,7 +1399,7 @@ class DocumentTransactionApiIntegrationTest {
         Document otherDocument = document("다른 문서");
         Block otherDocumentBlock = block(otherDocument, null, "다른 문서 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", targetDocument.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", targetDocument.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1431,7 +1431,7 @@ class DocumentTransactionApiIntegrationTest {
         existingBlock.setContent(content("다른 사용자 수정"));
         blockRepository.save(existingBlock);
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1471,7 +1471,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block movingBlock = block(document, null, "이동 대상", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1501,7 +1501,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block movingBlock = block(document, null, "이동 대상", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1536,7 +1536,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block movingBlock = block(document, null, "이동 대상", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1568,7 +1568,7 @@ class DocumentTransactionApiIntegrationTest {
         Block middleBlock = block(document, null, "middle", "000000000002000000000000");
         Block lastBlock = block(document, null, "last", "000000000003000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1600,7 +1600,7 @@ class DocumentTransactionApiIntegrationTest {
         Block movingBlock = block(document, null, "moving", "000000000002000000000000");
         Block anchorBlock = block(document, null, "anchor", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1633,7 +1633,7 @@ class DocumentTransactionApiIntegrationTest {
         Block movingBlock = block(document, null, "moving", "000000000002000000000000");
         Block childAnchor = block(document, rootParent, "자식 anchor", "000000000001I00000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1665,7 +1665,7 @@ class DocumentTransactionApiIntegrationTest {
         Block movingBlock = block(document, null, "moving", "000000000002000000000000");
         Block childAnchor = block(document, rootParent, "자식 anchor", "000000000001I00000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1695,7 +1695,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block movingBlock = block(document, null, "이동 대상", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1727,7 +1727,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1770,7 +1770,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -1810,7 +1810,7 @@ class DocumentTransactionApiIntegrationTest {
     @Test
     @DisplayName("실패_존재하지 않는 문서의 transaction 요청은 문서 없음 응답을 반환한다")
     void applyTransactionsReturnsNotFoundWhenDocumentMissing() throws Exception {
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", UUID.randomUUID())
+        mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1839,7 +1839,7 @@ class DocumentTransactionApiIntegrationTest {
         Document otherDocument = document("다른 문서");
         Block otherDocumentBlock = block(otherDocument, null, "다른 문서 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", targetDocument.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", targetDocument.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1867,7 +1867,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsReturnsNotFoundWhenCreateParentMissing() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1895,7 +1895,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsReturnsBadRequestWhenCreateAfterBlockIdIsInvalid() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1924,7 +1924,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block siblingBlock = block(document, null, "형제 블록", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -1953,7 +1953,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsAccumulatesVersionAcrossConsecutiveReplaceContentOperations() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -2016,7 +2016,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsCreatesChildUnderTempParent() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -2055,7 +2055,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsCreatesBlockBetweenTempSiblingAnchors() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -2146,7 +2146,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsReturnsBadRequestWhenCreateParentRefUsesUnknownTemp() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -2174,7 +2174,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsReturnsBadRequestWhenCreateAfterRefUsesUnknownTemp() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -2202,7 +2202,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsReturnsBadRequestWhenCreateBeforeRefUsesUnknownTemp() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -2230,7 +2230,7 @@ class DocumentTransactionApiIntegrationTest {
     void applyTransactionsReturnsBadRequestWhenCreateUsesFutureTempAnchor() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -2265,7 +2265,7 @@ class DocumentTransactionApiIntegrationTest {
         Block rootParent = block(document, null, "루트 부모", "000000000001000000000000");
         Block childAnchor = block(document, rootParent, "자식 anchor", "000000000001I00000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -2294,7 +2294,7 @@ class DocumentTransactionApiIntegrationTest {
         Document document = document("문서");
         Block realAfterBlock = block(document, null, "real-after", "000000000001000000000000");
 
-        mockMvc.perform(post("/v1/documents/{documentId}/transactions", document.getId())
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""

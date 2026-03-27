@@ -30,7 +30,7 @@
 1. 로컬 UI 상태를 먼저 바꾼다.
 2. 변경을 operation queue에 넣는다.
 3. queue 안에서 의미 없는 중간 변경을 정리한다.
-4. debounce 또는 명시적 flush 시점에 `POST /v1/documents/{documentId}/transactions` 한 번으로 보낸다.
+4. debounce 또는 명시적 flush 시점에 `POST /documents/{documentId}/transactions` 한 번으로 보낸다.
 
 즉 프론트 구현의 핵심은 "API 호출 코드"가 아니라 "로컬 상태 + queue + flush 제어"다.
 
@@ -122,11 +122,11 @@
 
 ### 읽기
 
-- `GET /v1/documents/{documentId}/blocks`
+- `GET /documents/{documentId}/blocks`
 
 ### 쓰기
 
-- `POST /v1/documents/{documentId}/transactions`
+- `POST /documents/{documentId}/transactions`
 
 주의:
 
@@ -139,9 +139,9 @@
 
 다음 API는 보조 경로로만 보고, 에디터 주 저장 경로에서는 기본적으로 사용하지 않는다.
 
-- `POST /v1/documents/{documentId}/blocks`
-- `PATCH /v1/blocks/{blockId}`
-- `DELETE /v1/blocks/{blockId}`
+- `POST /documents/{documentId}/blocks`
+- `PATCH /blocks/{blockId}`
+- `DELETE /blocks/{blockId}`
 
 즉 프론트 구현자는 "이벤트마다 다른 API를 호출한다"는 관점으로 접근하면 안 된다.
 

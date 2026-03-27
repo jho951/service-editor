@@ -54,7 +54,7 @@ class WorkspaceControllerWebMvcTest {
         when(workspaceService.create(eq("Team Workspace"), eq("user-123")))
                 .thenReturn(workspace(workspaceId, "Team Workspace", "user-123", 0));
 
-        mockMvc.perform(post("/v1/workspaces")
+        mockMvc.perform(post("/workspaces")
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -75,7 +75,7 @@ class WorkspaceControllerWebMvcTest {
     @Test
     @DisplayName("실패_워크스페이스 이름이 공백이면 유효성 검사 오류를 반환한다")
     void createWorkspaceRejectsBlankName() throws Exception {
-        var result = mockMvc.perform(post("/v1/workspaces")
+        var result = mockMvc.perform(post("/workspaces")
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -90,7 +90,7 @@ class WorkspaceControllerWebMvcTest {
     @Test
     @DisplayName("실패_워크스페이스 이름이 누락되면 유효성 검사 오류를 반환한다")
     void createWorkspaceRejectsMissingName() throws Exception {
-        var result = mockMvc.perform(post("/v1/workspaces")
+        var result = mockMvc.perform(post("/workspaces")
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("{}"));
@@ -103,7 +103,7 @@ class WorkspaceControllerWebMvcTest {
     void createWorkspaceRejectsTooLongName() throws Exception {
         String overLimitName = "a".repeat(101);
 
-        var result = mockMvc.perform(post("/v1/workspaces")
+        var result = mockMvc.perform(post("/workspaces")
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -118,7 +118,7 @@ class WorkspaceControllerWebMvcTest {
     @Test
     @DisplayName("실패_인증 헤더가 없으면 인증 오류를 반환한다")
     void createWorkspaceRequiresUserHeader() throws Exception {
-        var result = mockMvc.perform(post("/v1/workspaces")
+        var result = mockMvc.perform(post("/workspaces")
                         .contentType("application/json")
                         .content("""
                                 {
@@ -136,7 +136,7 @@ class WorkspaceControllerWebMvcTest {
         when(workspaceService.getById(workspaceId))
                 .thenThrow(new BusinessException(BusinessErrorCode.WORKSPACE_NOT_FOUND));
 
-        var result = mockMvc.perform(get("/v1/workspaces/{workspaceId}", workspaceId));
+        var result = mockMvc.perform(get("/workspaces/{workspaceId}", workspaceId));
 
         ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9003, "요청한 워크스페이스를 찾을 수 없습니다.");
     }

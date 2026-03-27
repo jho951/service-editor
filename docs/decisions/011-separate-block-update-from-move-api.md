@@ -11,7 +11,7 @@
 - 블록 수정: 블록 자신의 내용이나 메타데이터 변경
 - 블록 이동: 부모 변경과 순서 변경을 포함한 구조 변경
 
-기존 요구사항에서는 `PATCH /v1/blocks/{blockId}`가 내용 수정과 이동을 함께 담당하도록 되어 있었다. 하지만 이 방식은 다음 문제를 만든다.
+기존 요구사항에서는 `PATCH /blocks/{blockId}`가 내용 수정과 이동을 함께 담당하도록 되어 있었다. 하지만 이 방식은 다음 문제를 만든다.
 
 - 수정과 이동의 검증 규칙이 다르다.
 - 이동에서만 `sortKey` 재계산이 필요하다.
@@ -20,8 +20,8 @@
 
 ## 결정
 
-- `PATCH /v1/blocks/{blockId}`는 블록 내용 또는 블록 자체 메타데이터 수정만 담당한다.
-- 블록 이동은 `POST /v1/blocks/{blockId}/move`에서 별도로 처리한다.
+- `PATCH /blocks/{blockId}`는 블록 내용 또는 블록 자체 메타데이터 수정만 담당한다.
+- 블록 이동은 `POST /blocks/{blockId}/move`에서 별도로 처리한다.
 - 이동 API는 `parentId`, `afterBlockId`, `beforeBlockId`, `version`으로 대상 위치를 해석한다.
 - 이동 처리에서는 기존 `sortKey` 정책을 사용해 새 위치의 `sortKey`를 계산한다.
 - v1에서는 단일 블록 이동 API를 우선 채택하고, 별도 다중 블록 reorder API는 기본 경로로 두지 않는다.

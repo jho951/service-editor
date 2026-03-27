@@ -25,6 +25,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -33,6 +35,9 @@ class BlockApiIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private WebApplicationContext context;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -45,6 +50,9 @@ class BlockApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .defaultRequest(get("/").header("X-User-Id", "user-123"))
+                .build();
         blockRepository.deleteAll();
         documentRepository.deleteAll();
         workspaceRepository.deleteAll();
@@ -67,7 +75,7 @@ class BlockApiIntegrationTest {
                 .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
                 .build());
 
-        mockMvc.perform(get("/v1/documents/{documentId}/blocks", document.getId()))
+        mockMvc.perform(get("/documents/{documentId}/blocks", document.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].content.segments[0].text").value("루트 블록"))
@@ -79,7 +87,7 @@ class BlockApiIntegrationTest {
     void createBlockUsesTransactionContract() throws Exception {
         Document document = document("문서");
 
-        mockMvc.perform(post("/v1/admin/documents/{documentId}/blocks", document.getId())
+        mockMvc.perform(post("/admin/documents/{documentId}/blocks", document.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -112,7 +120,7 @@ class BlockApiIntegrationTest {
         Document document = document("문서");
         Block block = block(document, null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(patch("/v1/admin/blocks/{blockId}", block.getId())
+        mockMvc.perform(patch("/admin/blocks/{blockId}", block.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-456")
                         .content("""
@@ -157,7 +165,7 @@ class BlockApiIntegrationTest {
         Block targetParent = block(document, null, "부모 블록", "000000000001000000000000");
         Block moved = block(document, null, "이동 블록", "000000000002000000000000");
 
-        mockMvc.perform(post("/v1/admin/blocks/{blockId}/move", moved.getId())
+        mockMvc.perform(post("/admin/blocks/{blockId}/move", moved.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -190,7 +198,7 @@ class BlockApiIntegrationTest {
         Block root = block(document, null, "루트 블록", "000000000001000000000000");
         Block child = block(document, root, "자식 블록", "000000000001I00000000000");
 
-        mockMvc.perform(delete("/v1/admin/blocks/{blockId}", root.getId())
+        mockMvc.perform(delete("/admin/blocks/{blockId}", root.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -221,7 +229,7 @@ class BlockApiIntegrationTest {
     void updateBlockRejectsMismatchedBlockReference() throws Exception {
         Block block = block(document("문서"), null, "기존 블록", "000000000001000000000000");
 
-        mockMvc.perform(patch("/v1/admin/blocks/{blockId}", block.getId())
+        mockMvc.perform(patch("/admin/blocks/{blockId}", block.getId())
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""

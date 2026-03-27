@@ -8,7 +8,7 @@
 
 - 백엔드가 어떤 책임을 가져야 하는가
 - 프론트 queue와 백엔드 transaction 처리의 경계가 어디인가
-- `POST /v1/documents/{documentId}/transactions`를 어떤 순서로 검증하고 반영해야 하는가
+- `POST /documents/{documentId}/transactions`를 어떤 순서로 검증하고 반영해야 하는가
 - `tempId`, `version`, conflict, rollback을 어떻게 다뤄야 하는가
 
 관련 문서:
@@ -54,7 +54,7 @@
 
 v1 전제는 다음과 같다.
 
-- 에디터 표준 write 경로는 `POST /v1/documents/{documentId}/transactions`
+- 에디터 표준 write 경로는 `POST /documents/{documentId}/transactions`
 - operation은 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE` 4개
 - `BLOCK_CREATE`는 위치만 다루고 본문은 다루지 않는다.
 - 본문은 `BLOCK_REPLACE_CONTENT`가 담당한다.

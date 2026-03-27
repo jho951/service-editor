@@ -17,6 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -25,6 +27,9 @@ class WorkspaceApiIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private WebApplicationContext context;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -37,6 +42,9 @@ class WorkspaceApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(context)
+                .defaultRequest(get("/").header("X-User-Id", "user-123"))
+                .build();
         blockRepository.deleteAll();
         documentRepository.deleteAll();
         workspaceRepository.deleteAll();
@@ -51,7 +59,7 @@ class WorkspaceApiIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/v1/workspaces")
+        mockMvc.perform(post("/workspaces")
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content(requestBody))
@@ -74,7 +82,7 @@ class WorkspaceApiIntegrationTest {
                 .name("Docs Root")
                 .build());
 
-        mockMvc.perform(get("/v1/workspaces/{workspaceId}", workspace.getId()))
+        mockMvc.perform(get("/workspaces/{workspaceId}", workspace.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.code").value(200))
@@ -91,7 +99,7 @@ class WorkspaceApiIntegrationTest {
                 }
                 """;
 
-        mockMvc.perform(post("/v1/workspaces")
+        mockMvc.perform(post("/workspaces")
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content(requestBody))
@@ -104,8 +112,9 @@ class WorkspaceApiIntegrationTest {
     @Test
     @DisplayName("실패_워크스페이스 생성 API는 인증 헤더가 없으면 인증 오류를 반환한다")
     void createWorkspaceReturnsUnauthorizedWhenHeaderMissing() throws Exception {
-        mockMvc.perform(post("/v1/workspaces")
+        mockMvc.perform(post("/workspaces")
                         .contentType("application/json")
+                        .header("X-User-Id", " ")
                         .content("""
                                 {
                                   "name": "Team Workspace"
