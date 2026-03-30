@@ -1,3 +1,5 @@
+name: documents-service
+
 services:
   mysql:
     image: mysql:8.0
@@ -43,6 +45,16 @@ services:
       - path: ../.env
         required: false
     restart: always
+    networks:
+      default:
+      msa-shared:
+        aliases:
+          - documents-service
 
 volumes:
   mysql_data_dev:
+
+networks:
+  msa-shared:
+    external: true
+    name: ${MSA_SHARED_NETWORK:-msa-shared}
