@@ -1,58 +1,60 @@
-name: documents-service
+ name: documents-service
 
-services:
-  mysql:
-    image: mysql:8.0
-    container_name: documents-mysql-dev
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: documentsdb
-      MYSQL_USER: documents
-      MYSQL_PASSWORD: documents
-      TZ: Asia/Seoul
-    volumes:
-      - mysql_data_dev:/var/lib/mysql
-    command: --default-authentication-plugin=mysql_native_password
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-proot"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
+  services:
+    mysql:
+      image: mysql:8.0
+      container_name: documents-mysql-dev
+      restart: always
+      environment:
+        MYSQL_ROOT_PASSWORD: root
+        MYSQL_DATABASE: documentsdb
+        MYSQL_USER: documents
+        MYSQL_PASSWORD: documents
+        TZ: Asia/Seoul
+      volumes:
+        - mysql_data_dev:/var/lib/mysql
+      command: --default-authentication-plugin=mysql_native_password
+      healthcheck:
+        test: ["CMD", "mysqladmin", "ping", "-proot"]
+        interval: 5s
+        timeout: 3s
+        retries: 20
+      networks:
+        - documents-private
 
-  app:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: documents-app-dev
-    depends_on:
-      mysql:
-        condition: service_healthy
-    ports:
-      - "8083:8083"
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
-      SERVER_PORT: 8083
-      DB_URL: jdbc:mysql://mysql:3306/documentsdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul
-      DB_USERNAME: documents
-      DB_PASSWORD: documents
-      JWT_SECRET: dev_secret
-      SWAGGER_ENABLED: "true"
-      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50"
-    env_file:
-      - path: ../.env
-        required: false
-    restart: always
-    networks:
-      default:
-      msa-shared:
-        aliases:
-          - documents-service
+    app:
+      build:
+        context: ..
+        dockerfile: docker/Dockerfile
+      container_name: documents-app-dev
+      depends_on:
+        mysql:
+          condition: service_healthy
+      environment:
+        SPRING_PROFILES_ACTIVE: dev
+        SERVER_PORT: 8083
+        DB_URL: jdbc:mysql://mysql:3306/documentsdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul
+        DB_USERNAME: documents
+        DB_PASSWORD: documents
+        JWT_SECRET: dev_secret
+        SWAGGER_ENABLED: "true"
+        JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50"
+      env_file:
+        - path: ../.env
+          required: false
+      restart: always
+      networks:
+        documents-private: {}
+        service-backbone-shared:
+          aliases:
+            - documents-service
 
-volumes:
-  mysql_data_dev:
+  volumes:
+    mysql_data_dev:
 
-networks:
-  msa-shared:
-    external: true
-    name: ${MSA_SHARED_NETWORK:-msa-shared}
+  networks:
+    documents-private:
+      driver: bridge
+    service-backbone-shared:
+      external: true
+      name: ${SERVICE_SHARED_NETWORK:-service-backbone-shared

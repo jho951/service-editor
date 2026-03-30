@@ -103,11 +103,6 @@
 
 이 저장소는 서비스 아키텍처의 한 구성 요소입니다.
 
-Role
-- 인증 서버
-- OAuth 로그인 처리
-- SSO 세션 발급
-
 Stack
 - Spring Boot
 - Spring Security
@@ -118,12 +113,6 @@ Key Endpoints
 - /auth/exchange
 - /auth/me
 ```
-
-이 정보를 포함하면 AI가 다음을 더 정확하게 이해할 수 있습니다.
-
-- 이 repo의 역할
-- 기술 스택
-- API 구조
 
 ## PR Expectations
 
