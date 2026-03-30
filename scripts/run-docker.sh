@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 DOCKER_DIR="${REPO_ROOT}/docker"
-MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK:-msa-shared}"
+SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK:-service-backbone-shared}"
 
 ENV_NAME="dev"
 ACTION="up"
@@ -44,36 +44,36 @@ case "${ENV_NAME}" in
     ;;
 esac
 
-docker network inspect "${MSA_SHARED_NETWORK}" >/dev/null 2>&1 || docker network create "${MSA_SHARED_NETWORK}" >/dev/null
+docker network inspect "${SERVICE_SHARED_NETWORK}" >/dev/null 2>&1 || docker network create "${SERVICE_SHARED_NETWORK}" >/dev/null
 
 case "${ACTION}" in
   all)
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" build --no-cache
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" up -d
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" build --no-cache
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" up -d
     docker logs "${APP_CONTAINER}" --tail=200 -f
     ;;
   build)
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" build
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" build
     ;;
   up)
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" up -d
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" up -d
     ;;
   down)
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" down
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" down
     ;;
   logs)
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" logs -f
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" logs -f
     ;;
   restart)
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" down
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" up -d
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" down
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" up -d
     ;;
   nuke)
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" down -v
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" down -v
     docker image prune -f
     ;;
   ps)
-    MSA_SHARED_NETWORK="${MSA_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" ps
+    SERVICE_SHARED_NETWORK="${SERVICE_SHARED_NETWORK}" docker compose -f "${COMPOSE_FILE}" ps
     ;;
   *)
     echo "지원하지 않는 동작입니다: ${ACTION}"
