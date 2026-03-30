@@ -7,3 +7,4 @@
 - Step 4: 기존 `docker/docker.sh`는 호환 래퍼로 전환하고 README 실행 가이드를 갱신했다.
 - 검증: `bash -n`으로 스크립트 문법을 점검했다.
 - Step 5: 스크립트를 `scripts/` 디렉토리로 이동하고, `run-docker.sh`는 인자 없이 실행 시 `dev up` 기본 동작으로 보정했다. `.env` 파일은 선택 로딩으로 변경했다.
+- Step 6: compose 파일에서 호스트 포트 노출을 제거하고, `documents-private` + `service-backbone-shared` 이중 네트워크로 전환했다. 앱은 `documents-service` 별칭으로 서비스 백본 네트워크에 붙는다.

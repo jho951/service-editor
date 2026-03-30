@@ -9,8 +9,6 @@ services:
       MYSQL_USER: documents
       MYSQL_PASSWORD: documents
       TZ: Asia/Seoul
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data_dev:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
@@ -19,6 +17,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    networks:
+      - documents-private
 
   app:
     build:
@@ -28,8 +28,6 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    ports:
-      - "8083:8083"
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SERVER_PORT: 8083
@@ -43,6 +41,18 @@ services:
       - path: ../.env
         required: false
     restart: always
+    networks:
+      documents-private: {}
+      service-backbone-shared:
+        aliases:
+          - documents-service
 
 volumes:
   mysql_data_dev:
+
+networks:
+  documents-private:
+    driver: bridge
+  service-backbone-shared:
+    external: true
+    name: ${SERVICE_SHARED_NETWORK:-service-backbone-shared}
