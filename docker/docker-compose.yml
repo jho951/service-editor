@@ -11,8 +11,6 @@ services:
       MYSQL_USER: documents
       MYSQL_PASSWORD: documents
       TZ: Asia/Seoul
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data_dev:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
