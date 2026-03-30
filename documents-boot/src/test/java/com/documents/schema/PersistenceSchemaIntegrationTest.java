@@ -20,9 +20,11 @@ class PersistenceSchemaIntegrationTest {
     void primaryKeyColumnsUseDomainSpecificNames() {
         assertThat(countColumn("DOCUMENTS", "DOCUMENT_ID")).isEqualTo(1);
         assertThat(countColumn("DOCUMENTS", "ID")).isZero();
+        assertThat(characterMaximumLength("DOCUMENTS", "DOCUMENT_ID")).isEqualTo(36);
 
         assertThat(countColumn("BLOCKS", "BLOCK_ID")).isEqualTo(1);
         assertThat(countColumn("BLOCKS", "ID")).isZero();
+        assertThat(characterMaximumLength("BLOCKS", "BLOCK_ID")).isEqualTo(36);
     }
 
     @Test

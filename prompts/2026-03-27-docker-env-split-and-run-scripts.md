@@ -10,3 +10,4 @@
 - Step 6: compose 파일에서 호스트 포트 노출을 제거하고, `documents-private` + `service-backbone-shared` 이중 네트워크로 전환했다. 앱은 `documents-service` 별칭으로 서비스 백본 네트워크에 붙는다.
 - Step 7: `CONTRACT_SYNC.md`를 추가하고 contract repo main SHA(`79dcbadd3428749cd2f4d0615f8443bdfe8aae5a`)로 env 계약 동기화를 기록했다.
 - Step 8: YAML 파싱 오류를 일으키던 compose 들여쓰기를 복구하고, `run-docker.sh`의 공유 네트워크 변수명을 `SERVICE_SHARED_NETWORK`로 맞췄다.
+- Step 9: `Document`와 `Block`의 UUID PK를 `@JdbcTypeCode(SqlTypes.CHAR)`로 고정하고, 스키마 테스트에서 `document_id`/`block_id`가 문자형 UUID로 생성되는지 검증하도록 보강했다.

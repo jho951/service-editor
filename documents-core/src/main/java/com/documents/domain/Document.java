@@ -26,6 +26,8 @@ import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Setter
@@ -39,6 +41,7 @@ public class Document extends BaseEntity {
 
     @Id
     @Column(name = "document_id", nullable = false, updatable = false, columnDefinition = "char(36)")
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
