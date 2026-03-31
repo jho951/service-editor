@@ -49,4 +49,4 @@ application-local.yaml
 .DS_Store
 
 ### Custom ###
-/docs/explainers/learn/**
+/docs/learn/**
