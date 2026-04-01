@@ -589,9 +589,10 @@ Block {
 - 에디터 queue의 coalescing, 상쇄, 최종 batch 조립은 클라이언트가 담당한다.
 - 서버는 클라이언트가 보낸 최종 transaction batch를 검증하고 반영한다.
 - 에디터 v1 operation은 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE` 4개만 사용한다.
-- `BLOCK_CREATE`는 위치만 확정하고, 본문은 같은 batch의 `BLOCK_REPLACE_CONTENT`가 담당한다.
-- 서버는 `BLOCK_CREATE` 처리 시 DB의 `block.content` not null 규칙을 만족시키기 위해 새 `TEXT` 블록에 기본 empty structured content를 먼저 부여할 수 있다.
-- 이 기본 empty content는 외부 API 계약상 `BLOCK_CREATE`가 본문을 받는다는 뜻이 아니라, 서버 내부 기본값이다.
+- `BLOCK_CREATE`는 위치를 항상 확정하고, 필요하면 새 블록의 초기 `content`를 함께 받을 수 있다.
+- `BLOCK_CREATE.content`가 없으면 서버는 DB의 `block.content` not null 규칙을 만족시키기 위해 새 `TEXT` 블록에 기본 empty structured content를 저장한다.
+- `BLOCK_CREATE.content`가 있으면 서버는 그 값을 새 블록의 초기 `content`로 저장한다.
+- 새 temp block에 대한 `BLOCK_CREATE`와 `BLOCK_REPLACE_CONTENT`가 같은 batch에 함께 있으면, 프론트는 flush 전에 이를 `BLOCK_CREATE(content=latestContent)` 하나로 coalescing할 수 있어야 한다.
 - `BLOCK_REPLACE_CONTENT`는 range patch가 아니라 block `content` 전체 교체로 처리한다.
 - 모든 transaction operation은 블록 참조값으로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.

@@ -103,8 +103,9 @@ v1 에디터 표준 operation은 4개만 사용한다.
 - `BLOCK_CREATE`의 `blockRef` 값은 새 블록을 가리키는 `tempId`다.
 - 위치 참조는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
 - `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
-- 이 operation은 위치만 다루고, 본문은 다루지 않는다.
-- 본문은 같은 batch의 `BLOCK_REPLACE_CONTENT`가 최종 본문을 맡는다.
+- 이 operation은 위치를 항상 다루고, 필요하면 초기 `content`도 함께 받을 수 있다.
+- `content`가 없으면 서버는 empty structured content fallback으로 새 블록을 만든다.
+- `content`가 있으면 서버는 그 값을 새 블록의 초기 본문으로 저장한다.
 
 ### `BLOCK_REPLACE_CONTENT`
 
@@ -130,9 +131,9 @@ v1 에디터 표준 operation은 4개만 사용한다.
 중요한 점:
 
 - 생성은 `BLOCK_CREATE`
-- 내용은 `BLOCK_REPLACE_CONTENT`
+- 기존 블록의 후속 내용 변경은 `BLOCK_REPLACE_CONTENT`
 
-즉 "블록을 만든다"와 "그 안에 무엇을 쓴다"를 분리한다.
+즉 "블록 존재와 위치를 만든다"와 "이미 존재하는 블록의 본문을 다시 바꾼다"를 분리한다.
 
 이 분리가 필요한 이유는 다음과 같다.
 
@@ -155,16 +156,17 @@ v1 에디터 표준 operation은 4개만 사용한다.
 
 1. 사용자가 엔터나 `+` 버튼으로 새 블록을 만든다.
 2. 프론트는 로컬에서 임시 블록을 화면에 먼저 그린다.
-3. queue에는 `BLOCK_CREATE(blockRef=tempId)`를 넣는다.
-4. 사용자가 내용을 입력하면 queue에는 `BLOCK_REPLACE_CONTENT(blockRef=tempId, content)`를 넣는다.
-5. debounce 만료 또는 `Ctrl+S` 시 queue를 `transactions` 한 요청으로 보낸다.
-6. 서버는 실제 `blockId`, `sortKey`, `version`을 만들고 응답으로 돌려준다.
-7. 클라이언트는 `tempId -> blockId`를 매핑한다.
+3. queue에는 우선 `BLOCK_CREATE(blockRef=tempId)`를 넣는다.
+4. 사용자가 debounce 전에 바로 입력하면 프론트는 이를 `BLOCK_CREATE(blockRef=tempId, content=latestContent)` 하나로 접을 수 있다.
+5. 필요하면 temp block을 참조하는 `BLOCK_REPLACE_CONTENT`를 함께 보낼 수도 있다.
+6. debounce 만료 또는 `Ctrl+S` 시 queue를 `transactions` 한 요청으로 보낸다.
+7. 서버는 실제 `blockId`, `sortKey`, `version`을 만들고 응답으로 돌려준다.
+8. 클라이언트는 `tempId -> blockId`를 매핑한다.
 
 즉 서버보다 UI가 먼저 반응한다.
 여기서 `tempId`는 클라이언트 로컬 식별자일 뿐이고, DB에는 서버가 만든 실제 `blockId`가 저장된다.
-또한 서버는 새 `TEXT` 블록 저장 시 not null 제약을 만족시키기 위해 기본 empty structured content를 먼저 넣을 수 있다.
-이 기본값은 외부 transaction 계약이 아니라 서버 내부 영속 규칙이다.
+또한 서버는 `BLOCK_CREATE.content`가 없을 때 not null 제약을 만족시키기 위해 기본 empty structured content를 넣을 수 있다.
+이 기본값은 새 블록 초기 content의 fallback이다.
 또한 temp 참조 해석은 `blockRef`뿐 아니라 `parentRef`, `afterRef`, `beforeRef`까지 같은 request 순서 컨텍스트에서 처리한다.
 
 ---

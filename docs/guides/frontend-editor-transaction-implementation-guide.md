@@ -169,9 +169,10 @@ v1에서 프론트가 다루는 operation은 4개다.
 
 주의:
 
-- `BLOCK_CREATE`는 위치만 다룬다.
-- 본문은 비워 둔다.
-- 생성 직후 입력 내용은 `BLOCK_REPLACE_CONTENT`가 맡는다.
+- `BLOCK_CREATE`는 위치를 항상 다룬다.
+- 필요하면 새 블록의 초기 `content`를 함께 담을 수 있다.
+- `content`가 없으면 서버가 empty structured content fallback으로 처리한다.
+- 생성 직후 입력 내용은 `BLOCK_REPLACE_CONTENT`로 별도 남길 수도 있지만, flush 전에는 `BLOCK_CREATE(content=latestContent)` 하나로 접는 것을 우선 권장한다.
 
 ### 블록 내용 바꾸기
 
@@ -274,6 +275,23 @@ queue는 다음 정리 규칙을 수행해야 한다.
 - 관련 `BLOCK_MOVE` 제거
 
 서버에는 아무것도 보내지 않는다.
+
+### 규칙 2-1. 새 블록 create와 replace_content는 가능하면 create 하나로 접는다
+
+아직 flush 전인 새 블록에 대해
+
+- `BLOCK_CREATE`
+- `BLOCK_REPLACE_CONTENT`
+
+가 함께 있으면:
+
+- 마지막 content를 `BLOCK_CREATE.content`에 넣는다.
+- temp block을 참조하는 별도 `BLOCK_REPLACE_CONTENT`는 제거할 수 있다.
+
+다만 프론트 구현이 모든 케이스를 완전히 접지 못하더라도, 서버는 temp block 대상 `BLOCK_REPLACE_CONTENT`를 계속 처리할 수 있다고 가정해도 된다.
+
+즉 이 규칙은 "반드시 collapse해야만 올바른 요청이 된다"는 뜻이 아니다.
+의도는 네트워크/쓰기 최적화와 queue 단순화에 있고, 서버는 미적용 batch를 호환 경로로 계속 수용해야 한다.
 
 ### 규칙 3. 삭제된 블록의 후속 수정은 제거한다
 
@@ -447,8 +465,8 @@ queue는 다음 정리 규칙을 수행해야 한다.
 4. queue에 `BLOCK_CREATE(blockRef=tempId)`를 넣는다.
 5. 사용자가 바로 입력한다.
 6. 로컬 content를 갱신한다.
-7. queue에 `BLOCK_REPLACE_CONTENT(blockRef=tempId, latestContent)`를 넣는다.
-8. debounce 또는 max autosave interval 시점에 create + replace_content를 함께 flush 한다.
+7. queue는 이를 `BLOCK_CREATE(blockRef=tempId, content=latestContent)` 하나로 접는 것을 우선 시도한다.
+8. debounce 또는 max autosave interval 시점에 coalesced create를 flush 한다.
 
 구현 포인트:
 
