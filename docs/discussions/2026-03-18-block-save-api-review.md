@@ -20,8 +20,8 @@
 
 ## 연결된 회의 메모
 
-- [2026-03-18 블록 저장 API 전략 검토 메모](https://github.com/jho951/Block-server/blob/714caddbb7becd96c78a1390b37bc90f83a1545d/docs/discussions/2026-03-18-block-save-api-strategy.md)
-- [2026-03-18 저장 API와 PATCH API 공존 검토 메모](https://github.com/jho951/Block-server/blob/714caddbb7becd96c78a1390b37bc90f83a1545d/docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md)
+- [2026-03-18 블록 저장 API 전략 검토 메모](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-block-save-api-strategy.md)
+- [2026-03-18 저장 API와 PATCH API 공존 검토 메모](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md)
 
 ## 핵심 배경
 
