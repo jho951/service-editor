@@ -34,7 +34,7 @@
 ## 고려한 자료와 사례
 
 - 내부 요구사항: [docs/REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
-- 내부 작업 로그: [prompts/2026-03-20-document-restore-api.md](https://github.com/jho951/Block-server/blob/dev/prompts/2026-03-20-document-restore-api.md)
+- 내부 작업 로그: [prompts/worklog/2026-03/2026-03-20-document-restore-api.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-document-restore-api.md)
 - Notion Help, Duplicate, delete, and restore content: <https://www.notion.com/help/duplicate-delete-and-restore-content>
 - Notion Help, Reset Notion: <https://www.notion.com/help/reset-notion>
 - Google Docs Editors Help, Find out what's changed in a file: <https://support.google.com/docs/answer/190843>
@@ -167,4 +167,4 @@
 - [docs/REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
 - [docs/decisions/013-adopt-session-scoped-browser-undo-and-drop-block-restore-api.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/013-adopt-session-scoped-browser-undo-and-drop-block-restore-api.md)
 - [docs/roadmap/v2/blocks/block-restore.md](https://github.com/jho951/Block-server/blob/dev/docs/roadmap/v2/blocks/block-restore.md)
-- [prompts/2026-03-20-block-restore-policy.md](https://github.com/jho951/Block-server/blob/dev/prompts/2026-03-20-block-restore-policy.md)
+- [prompts/worklog/2026-03/2026-03-20-block-restore-policy.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-block-restore-policy.md)

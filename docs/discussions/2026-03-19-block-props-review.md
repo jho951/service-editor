@@ -168,4 +168,4 @@
 
 - [docs/REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
 - [docs/decisions/011-separate-block-update-from-move-api.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/011-separate-block-update-from-move-api.md)
-- `prompts/2026-03-19-block-props-review.md`
+- [prompts/worklog/2026-03/2026-03-19-block-structured-content-migration.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-19-block-structured-content-migration.md)

@@ -104,4 +104,4 @@
 
 - `docs/decisions/018-remove-workspace-from-v1-document-flow.md`
 - `docs/REQUIREMENTS.md`
-- `prompts/2026-03-27-v1-remove-workspace-from-document-flow.md`
+- [prompts/worklog/2026-03/2026-03-27-v1-remove-workspace-from-document-flow.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-27-v1-remove-workspace-from-document-flow.md)

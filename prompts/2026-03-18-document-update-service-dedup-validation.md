@@ -1,4 +1,0 @@
-- 작업 목적: 문서 수정 서비스에서 요청 DTO와 중복되는 제목 공백 검증 제거
-- 구현 변경: `DocumentServiceImpl#applyTitle` 에서 빈 문자열 재검증과 `VALIDATION_ERROR` 분기를 제거하고 정규화 결과만 적용하도록 단순화
-- 테스트 변경: `DocumentServiceImplTest` 에서 DTO가 대신 보장하는 공백 제목 서비스 검증 케이스를 삭제
-- 요구사항 변경: 없음. 요청단 검증과 서비스 책임 분리 정리

@@ -14,6 +14,7 @@
 - 개인 이해를 위한 설명 요청은 `learn`으로, 팀 선택 검토는 `docs/discussions/`로, 실제 채택된 내용은 `docs/decisions/` ADR로 승격한다.
 - `prompts/`는 팀 또는 프로젝트 단위의 의미 있는 작업 기록이 필요할 때만 남긴다. 개인 학습용 설명 요청, 간단한 질의응답, 잠깐 확인하고 끝나는 요청은 남기지 않는다.
 - `prompts/`를 다룰 때는 먼저 `prompts/README.md`를 읽고 그 기준을 따른다.
+- `prompts/worklog/`는 원본 작업 로그 보관용이고, `prompts/topics/`는 주제별 탐색용이다.
 - 문서 내부 링크는 로컬 절대 경로 대신 GitHub 저장소 기준 `https://github.com/jho951/Block-server/blob/dev/...` 링크를 사용한다.
 - 중요한 기술 선택과 되돌리기 어려운 정책 변경은 반드시 ADR 또는 관련 문서까지 함께 반영한다.
 

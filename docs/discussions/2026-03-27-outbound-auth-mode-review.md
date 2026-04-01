@@ -104,4 +104,4 @@
 
 - `docs/decisions/017-adopt-outbound-auth-mode-separation.md`
 - `docs/REQUIREMENTS.md`
-- `prompts/2026-03-27-outbound-auth-mode-separation.md`
+- [prompts/worklog/2026-03/2026-03-27-outbound-auth-mode-separation.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-27-outbound-auth-mode-separation.md)

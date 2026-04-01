@@ -262,4 +262,4 @@
 - [docs/discussions/2026-03-19-block-props-review.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-19-block-props-review.md)
 - [docs/discussions/2026-03-18-block-save-api-strategy.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-block-save-api-strategy.md)
 - [docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md)
-- `prompts/2026-03-19-block-structured-content-strategy.md`
+- [prompts/worklog/2026-03/2026-03-19-block-structured-content-migration.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-19-block-structured-content-migration.md)

@@ -106,4 +106,4 @@
 
 - `docs/decisions/016-remove-v1-prefix-from-internal-apis.md`
 - `docs/REQUIREMENTS.md`
-- `prompts/2026-03-27-internal-api-remove-v1-prefix.md`
+- [prompts/worklog/2026-03/2026-03-27-internal-api-remove-v1-prefix.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-27-internal-api-remove-v1-prefix.md)
