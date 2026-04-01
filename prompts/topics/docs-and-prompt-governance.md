@@ -7,6 +7,8 @@
 ## 관련 worklog
 
 - [2026-03-13-agents-repository-context.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-13-agents-repository-context.md)
+- [2026-03-31-agents-and-directory-guide-cleanup.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-31-agents-and-directory-guide-cleanup.md)
+- [2026-03-31-troubleshooting-doc-system.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-31-troubleshooting-doc-system.md)
 
 ## 관련 문서
 
