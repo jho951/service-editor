@@ -1,4 +1,0 @@
-- 작업 목적: 현재 `UpdateDocumentRequest.title` 이 `@NotBlank` 인 상태에 맞춰 문서 수정 테스트를 재정렬
-- 테스트 변경: parent 검증 관련 PATCH 테스트들에 `title` 필드를 추가해 비즈니스 검증까지 도달하도록 수정
-- 테스트 변경: WebMvc/통합 테스트에 `title` 누락 시 유효성 검사 실패 케이스를 추가
-- 요구사항 변경: 없음. 현재 요청 DTO 제약을 테스트에 반영

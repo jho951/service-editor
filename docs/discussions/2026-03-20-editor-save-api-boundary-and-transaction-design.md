@@ -430,4 +430,4 @@
 - `docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md`
 - `docs/discussions/2026-03-19-block-structured-content-strategy.md`
 - `docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md`
-- `prompts/2026-03-20-editor-save-api-boundary.md`
+- [prompts/worklog/2026-03/2026-03-20-editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-editor-transaction-save-model.md)
