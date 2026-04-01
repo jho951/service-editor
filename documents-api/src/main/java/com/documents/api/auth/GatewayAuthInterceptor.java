@@ -9,6 +9,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import com.documents.api.code.ErrorCode;
+import com.documents.api.audit.BlockAuditLogService;
 import com.documents.api.exception.GlobalException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +19,11 @@ import jakarta.servlet.http.HttpServletResponse;
 public class GatewayAuthInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(GatewayAuthInterceptor.class);
+    private final BlockAuditLogService auditLogService;
+
+    public GatewayAuthInterceptor(BlockAuditLogService auditLogService) {
+        this.auditLogService = auditLogService;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -38,6 +44,15 @@ public class GatewayAuthInterceptor implements HandlerInterceptor {
 
         String userId = normalize(request.getHeader(GatewayAuthContext.USER_ID_HEADER));
         if (userId == null) {
+            auditLogService.logRequest(
+                request.getMethod(),
+                request.getRequestURI(),
+                requestId,
+                null,
+                HttpServletResponse.SC_UNAUTHORIZED,
+                0L,
+                "missing_or_blank_user_id"
+            );
             log.warn(
                 "gateway auth rejected method={} path={} status=401 reason=missing_or_blank_user_id requestId={}",
                 request.getMethod(),
@@ -58,6 +73,16 @@ public class GatewayAuthInterceptor implements HandlerInterceptor {
 
         String requestId = stringAttribute(request, GatewayAuthContext.REQUEST_ID_ATTRIBUTE);
         String userId = stringAttribute(request, GatewayAuthContext.REQUEST_USER_ID_ATTRIBUTE);
+
+        auditLogService.logRequest(
+            request.getMethod(),
+            request.getRequestURI(),
+            requestId,
+            userId,
+            response.getStatus(),
+            durationMs,
+            ex == null ? "request_completed" : "request_completed_with_exception"
+        );
 
         log.info(
             "gateway audit method={} path={} status={} userId={} requestId={} durationMs={}",

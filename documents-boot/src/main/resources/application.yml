@@ -12,3 +12,12 @@ spring:
       - classpath:application-db.yml
       - classpath:application-auth.yml
       - classpath:application-docs.yml
+
+auditlog:
+  enabled: ${AUDITLOG_ENABLED:true}
+  service-name: ${AUDITLOG_SERVICE_NAME:${spring.application.name}}
+  env: ${AUDITLOG_ENV:${SPRING_PROFILES_ACTIVE:dev}}
+  file-path: ${AUDITLOG_FILE_PATH:./logs/audit.log}
+  async-enabled: ${AUDITLOG_ASYNC_ENABLED:true}
+  async-thread-count: ${AUDITLOG_ASYNC_THREAD_COUNT:2}
+  async-queue-capacity: ${AUDITLOG_ASYNC_QUEUE_CAPACITY:1000}

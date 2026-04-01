@@ -3,16 +3,22 @@
 문서와 블록 데이터를 관리하는 Spring Boot 기반 백엔드 서비스입니다. 현재 저장소는 Gradle 멀티모듈 구조로 정리되어 있으며, 문서(Document)와 블록(Block) CRUD를 확장해 나가는 기준 프로젝트입니다.
 
 ## Contract Source
+- Contract Repo: https://github.com/jho951/contract
+- Contract Sync: `CONTRACT_SYNC.md`
+- Repo Role: frontend consumer
+- Branch: main
 
-- 공통 계약 레포: `https://github.com/jho951/contract`
-- 이 서비스의 코드 SoT: `Block-server` `dev`
-- 인터페이스 변경 시 본 저장소 구현보다 계약 레포 변경을 먼저 반영합니다.
+## Contract Scope
+- Node-based document, page, and block flows
+- Tree operations: list, detail, edit, save, move, restore, trash
+- Editor Node API and block-service flows exposed through the gateway
 
 ## 프로젝트 개요
 
 - 문서 메타데이터와 문서 내부 블록 구조를 저장, 조회, 수정, 삭제하는 서비스를 목표로 합니다.
 - 현재는 멀티모듈 백엔드 구조와 실행 환경이 정리된 상태이며, 문서/블록 CRUD는 단계적으로 구현할 예정입니다.
 - 데이터 저장은 MySQL, 애플리케이션 실행은 Spring Boot, 영속 계층은 Spring Data JPA를 사용합니다.
+- 요청 감사 이벤트는 `audit-log` 공통 모듈로 발행합니다.
 
 ## 현재 사용되는 아키텍처
 
