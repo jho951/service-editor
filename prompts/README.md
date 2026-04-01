@@ -4,11 +4,11 @@
 
 ## 디렉토리 구조
 
-- `prompts/worklog/`
+- [prompts/worklog/](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/README.md)
   - 원본 작업 로그 보관
   - 월 단위 디렉토리(`YYYY-MM/`) 아래에 날짜별 로그 파일 유지
 
-- `prompts/topics/`
+- [prompts/topics/](https://github.com/jho951/Block-server/blob/dev/prompts/topics/README.md)
   - 주제별 탐색 문서
   - 관련 worklog, REQUIREMENTS, discussion, ADR, explainer, guide 링크를 모아 다시 찾기 쉽게 정리
 
@@ -28,7 +28,7 @@
 - 개인 학습용 설명 요청, 간단한 질의응답, 잠깐 확인하고 끝나는 요청은 로그를 남기지 않는다.
 - 작업 로그 안의 내부 문서 링크는 로컬 절대 경로 대신 GitHub 저장소 기준 `blob/dev` 링크를 사용한다.
 - 작업 로그는 가능한 한 목표 단위의 단일 파일로 유지한다.
-- 작업 로그는 `prompts/worklog/YYYY-MM/` 아래에 둔다.
+- 작업 로그는 [prompts/worklog/](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/README.md) 아래 `YYYY-MM/` 디렉토리에 둔다.
 - 로그 파일명은 가능하면 `날짜 + 목표명` 형태의 고정 파일명으로 잡고, 같은 주제의 후속 이행과 검증도 해당 파일에 계속 누적한다.
 - 같은 목표 아래 이어지는 작업은 새 파일을 계속 만들지 말고 기존 파일에 `Step`을 추가하는 방식으로 누적한다.
 - 작업 목표는 사용자가 요청한 상위 흐름 기준으로 잡는다. 구현 중 파생된 세부 수정, 문서 보강, 후속 검증, 리팩터링은 같은 사용자 목표를 계속 수행하는 한 별도 파일로 분리하지 않는다.

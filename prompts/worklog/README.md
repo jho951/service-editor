@@ -6,8 +6,8 @@
 
 - 월 단위 디렉토리를 사용한다.
 - 예:
-  - `prompts/worklog/2026-03/`
-  - `prompts/worklog/2026-04/`
+  - [prompts/worklog/2026-03/](https://github.com/jho951/Block-server/tree/dev/prompts/worklog/2026-03)
+  - [prompts/worklog/2026-04/](https://github.com/jho951/Block-server/tree/dev/prompts/worklog/2026-04)
 
 ## 파일명 규칙
 

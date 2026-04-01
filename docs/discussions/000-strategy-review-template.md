@@ -118,9 +118,10 @@
 
 ## 관련 문서
 
-- 연결된 `docs/discussions/` 문서
-- 관련 `docs/decisions/` ADR
-- 작업 로그 `prompts/` 경로
+- 연결된 discussion 문서 링크
+- 관련 ADR 링크
+- 채택되었다면 대응 ADR 링크를 반드시 추가한다.
+- 작업 로그 링크
 
 ## 작성 규칙
 

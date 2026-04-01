@@ -46,3 +46,8 @@
 - 기존 `text` 중심 API와 엔티티, 테스트, 요구사항 문서를 함께 수정해야 한다.
 - 같은 블록 안의 독립적 수정도 v1에서는 block 단위 충돌로 처리될 수 있다.
 - 향후 operation 기반 저장으로 확장할 때 API 계약 일부를 다시 넓혀야 할 수 있다.
+
+## 관련 문서
+
+- [2026-03-19-block-structured-content-strategy.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-19-block-structured-content-strategy.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)

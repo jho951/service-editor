@@ -31,4 +31,4 @@
 - 단순 아이디어 메모가 아니라 실제 후속 구현 시 참고할 수 있는 수준으로 적는다.
 - 방금 구현한 기능 기준으로 남은 과제를 적는다. 아직 만들지 않은 전혀 다른 기능의 신규 API 목록을 적는 공간으로 쓰지 않는다.
 - 같은 기능의 후속 항목은 흩어 쓰지 말고 해당 기능/버전 문서에 누적한다.
-- 제품 요구사항으로 확정된 내용은 최종적으로 `docs/REQUIREMENTS.md`와 ADR에 반영한다.
+- 제품 요구사항으로 확정된 내용은 최종적으로 [docs/REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)와 ADR에 반영한다.

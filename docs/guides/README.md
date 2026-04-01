@@ -14,11 +14,11 @@
 ## 무엇을 여기에 두지 않는가
 
 - 채택 전 전략 비교
-  - `docs/discussions/`
+  - [docs/discussions/](https://github.com/jho951/Block-server/blob/dev/docs/discussions/README.md)
 - 채택된 공식 결정
-  - `docs/decisions/`
+  - [docs/decisions/](https://github.com/jho951/Block-server/blob/dev/docs/decisions/README.md)
 - 핵심 구조 설명 자체가 중심인 문서
-  - `docs/explainers/`
+  - [docs/explainers/](https://github.com/jho951/Block-server/blob/dev/docs/explainers/README.md)
 
 ## 작성 기준
 

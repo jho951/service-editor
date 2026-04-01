@@ -104,6 +104,6 @@
 
 ## 관련 문서
 
-- `docs/decisions/016-remove-v1-prefix-from-internal-apis.md`
-- `docs/REQUIREMENTS.md`
-- [prompts/worklog/2026-03/2026-03-27-internal-api-remove-v1-prefix.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-27-internal-api-remove-v1-prefix.md)
+- [016-remove-v1-prefix-from-internal-apis.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/016-remove-v1-prefix-from-internal-apis.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
+- [2026-03-27-internal-api-remove-v1-prefix.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-27-internal-api-remove-v1-prefix.md)
