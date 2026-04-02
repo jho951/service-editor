@@ -47,7 +47,7 @@ public class DocumentTransactionOperationRequest {
 
         if (type == DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT) {
             return hasText(blockRef)
-                    && content != null
+                    && hasContentValue()
                     && parentRef == null
                     && afterRef == null
                     && beforeRef == null;
@@ -55,7 +55,7 @@ public class DocumentTransactionOperationRequest {
 
         if (type == DocumentTransactionOperationType.BLOCK_DELETE) {
             return hasText(blockRef)
-                    && content == null
+                    && !hasContentValue()
                     && parentRef == null
                     && afterRef == null
                     && beforeRef == null;
@@ -63,7 +63,7 @@ public class DocumentTransactionOperationRequest {
 
         if (type == DocumentTransactionOperationType.BLOCK_MOVE) {
             return hasText(blockRef)
-                    && content == null;
+                    && !hasContentValue();
         }
 
         return false;
@@ -71,5 +71,9 @@ public class DocumentTransactionOperationRequest {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private boolean hasContentValue() {
+        return content != null && !content.isNull();
     }
 }
