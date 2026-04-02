@@ -53,12 +53,13 @@ public class DocumentTransactionOperationExecutor {
     ) {
         validateBlockReferenceIsUnique(operation.blockReference(), context);
         ResolvedPositionReferences resolvedPositionReferences = resolvePositionReferences(operation, context);
+        String initialContent = resolveCreateContent(operation);
 
         Block createdBlock = blockService.create(
                 document,
                 resolvedPositionReferences.parentId(),
                 BlockType.TEXT,
-                EMPTY_TEXT_BLOCK_CONTENT,
+                initialContent,
                 resolvedPositionReferences.afterBlockId(),
                 resolvedPositionReferences.beforeBlockId(),
                 actorId
@@ -76,6 +77,13 @@ public class DocumentTransactionOperationExecutor {
                 createdBlock.getSortKey(),
                 null
         );
+    }
+
+    private String resolveCreateContent(DocumentTransactionOperationCommand operation) {
+        if (operation.content() != null) {
+            return operation.content();
+        }
+        return EMPTY_TEXT_BLOCK_CONTENT;
     }
 
     private DocumentTransactionAppliedOperationResult applyReplaceContent(

@@ -42,8 +42,7 @@ public class DocumentTransactionOperationRequest {
 
         if (type == DocumentTransactionOperationType.BLOCK_CREATE) {
             return hasText(blockRef)
-                    && version == null
-                    && content == null;
+                    && version == null;
         }
 
         if (type == DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT) {
