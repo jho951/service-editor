@@ -272,6 +272,336 @@ class DocumentTransactionApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("성공_create에 content가 오면 초기 본문으로 저장한다")
+    void applyTransactionsCreatesBlockWithInitialContent() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-create-with-content",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "created with content",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0));
+
+        Block createdBlock = blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()).get(0);
+        assertThat(createdBlock.getContent()).isEqualTo(content("created with content"));
+        assertThat(createdBlock.getVersion()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("성공_create에 content와 parentRef가 함께 오면 초기 본문과 위치를 함께 반영한다")
+    void applyTransactionsCreatesBlockWithContentUnderParent() throws Exception {
+        Document document = document("문서");
+        Block parentBlock = block(document, null, "부모 블록", "000000000001000000000000");
+
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-create-with-content-parent",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1",
+                                      "parentRef": "%s",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "child with content",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(parentBlock.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0));
+
+        Block createdBlock = blockRepository.findActiveChildrenByParentIdOrderBySortKey(parentBlock.getId()).get(0);
+        assertThat(createdBlock.getParentId()).isEqualTo(parentBlock.getId());
+        assertThat(createdBlock.getContent()).isEqualTo(content("child with content"));
+    }
+
+    @Test
+    @DisplayName("성공_create에 content가 없으면 기본 empty structured content를 저장한다")
+    void applyTransactionsCreatesBlockWithEmptyFallbackContent() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-create-empty-fallback",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1"
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0));
+
+        Block createdBlock = blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()).get(0);
+        assertThat(createdBlock.getContent()).isEqualTo(content(""));
+        assertThat(createdBlock.getVersion()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("성공_create에 content가 null이면 기본 empty structured content를 저장한다")
+    void applyTransactionsCreatesBlockWithNullFallbackContent() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-create-null-fallback",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1",
+                                      "content": null
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"))
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0));
+
+        Block createdBlock = blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()).get(0);
+        assertThat(createdBlock.getContent()).isEqualTo(content(""));
+        assertThat(createdBlock.getVersion()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("실패_create에 content 스키마가 맞지 않으면 유효성 검사 오류를 반환한다")
+    void applyTransactionsRejectsCreateWithInvalidContentSchema() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-invalid-create-content",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 2,
+                                        "segments": [
+                                          {
+                                            "text": "invalid content",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9016))
+                .andExpect(jsonPath("$.message").value("요청 필드 유효성 검사에 실패했습니다."));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("성공_create에 initial content가 있어도 같은 temp block replace_content를 이어서 적용할 수 있다")
+    void applyTransactionsReplacesTempBlockAfterCreateWithInitialContent() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-create-with-content-and-replace",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "initial content",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "replaced content",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].version").value(0))
+                .andExpect(jsonPath("$.data.appliedOperations[1].version").value(1));
+
+        Block createdBlock = blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()).get(0);
+        assertThat(createdBlock.getContent()).isEqualTo(content("replaced content"));
+        assertThat(createdBlock.getVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("실패_create에 initial content가 있어도 뒤 operation이 충돌하면 생성까지 전체 rollback한다")
+    void applyTransactionsRollsBackCreateWithInitialContentWhenLaterOperationConflicts() throws Exception {
+        Document document = document("문서");
+        Block existingBlock = block(document, null, "기존 블록", "000000000001000000000000");
+
+        existingBlock.setContent(content("다른 사용자 수정"));
+        blockRepository.save(existingBlock);
+
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-create-with-content-conflict",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_CREATE",
+                                      "blockRef": "tmp:block:1",
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "created with content",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "충돌 내용",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(existingBlock.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.httpStatus").value("CONFLICT"))
+                .andExpect(jsonPath("$.code").value(9005))
+                .andExpect(jsonPath("$.message").value("요청이 현재 리소스 상태와 충돌합니다."));
+
+        assertThat(blockRepository.countActiveByDocumentId(document.getId())).isEqualTo(1);
+        assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()))
+                .extracting(Block::getId)
+                .containsExactly(existingBlock.getId());
+        assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId()).get(0).getContent())
+                .isEqualTo(content("다른 사용자 수정"));
+    }
+
+    @Test
+    @DisplayName("실패_replace_content에 content가 null이면 유효성 검사 오류를 반환한다")
+    void applyTransactionsRejectsReplaceContentWithNullContent() throws Exception {
+        Document document = document("문서");
+
+        mockMvc.perform(post("/documents/{documentId}/transactions", document.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-456")
+                        .content("""
+                                {
+                                  "clientId": "web-editor",
+                                  "batchId": "batch-invalid-null-replace",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": null
+                                    }
+                                  ]
+                                }
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9016))
+                .andExpect(jsonPath("$.message").value("요청 필드 유효성 검사에 실패했습니다."));
+    }
+
+    @Test
     @DisplayName("성공_block_move no-op 뒤 replace_content는 기존 version으로 후속 수정에 성공한다")
     void applyTransactionsReplacesContentAfterMoveNoOp() throws Exception {
         Document document = document("문서");

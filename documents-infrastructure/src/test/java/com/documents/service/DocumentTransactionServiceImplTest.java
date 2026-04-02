@@ -179,6 +179,66 @@ class DocumentTransactionServiceImplTest {
     }
 
     @Test
+    @DisplayName("성공_create에 content가 오면 초기 본문으로 저장한다")
+    void applyCreatesBlockWithInitialContent() {
+        UUID documentId = UUID.randomUUID();
+        UUID blockId = UUID.randomUUID();
+        Block createdBlock = block(blockId, documentId, "000000000001000000000000", 0);
+        createdBlock.setContent(REPLACED_CONTENT);
+
+        when(blockService.create(
+                any(Document.class),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(REPLACED_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        )).thenReturn(createdBlock);
+        when(documentRepository.findByIdAndDeletedAtIsNull(documentId))
+                .thenReturn(Optional.of(document(documentId, 0)))
+                .thenReturn(Optional.of(document(documentId, 1)));
+        doNothing().when(blockRepository).flush();
+
+        DocumentTransactionResult result = documentTransactionService.apply(
+                documentId,
+                new DocumentTransactionCommand(
+                        "web-editor",
+                        "batch-create-with-content",
+                        List.of(
+                                new DocumentTransactionOperationCommand(
+                                        "op-1",
+                                        DocumentTransactionOperationType.BLOCK_CREATE,
+                                        "tmp:block:1",
+                                        null,
+                                        REPLACED_CONTENT,
+                                        null,
+                                        null,
+                                        null
+                                )
+                        )
+                ),
+                ACTOR_ID
+        );
+
+        assertThat(result.appliedOperations()).hasSize(1);
+        assertThat(result.appliedOperations().get(0).blockId()).isEqualTo(blockId);
+        assertThat(result.appliedOperations().get(0).version()).isEqualTo(0);
+        assertThat(result.documentVersion()).isEqualTo(1);
+
+        verify(blockService).create(
+                any(Document.class),
+                eq(null),
+                eq(BlockType.TEXT),
+                eq(REPLACED_CONTENT),
+                eq(null),
+                eq(null),
+                eq(ACTOR_ID)
+        );
+        verify(blockService, never()).update(any(UUID.class), anyString(), anyInt(), anyString());
+    }
+
+    @Test
     @DisplayName("성공_block_delete는 version 검증 후 블록 삭제와 삭제 시각 응답을 반환한다")
     void applyDeletesBlock() {
         UUID documentId = UUID.randomUUID();
