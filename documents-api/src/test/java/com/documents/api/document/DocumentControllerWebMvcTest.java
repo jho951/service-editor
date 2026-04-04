@@ -1,5 +1,6 @@
 package com.documents.api.document;
 
+import static com.documents.service.transaction.DocumentTransactionOperationType.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -598,8 +599,246 @@ class DocumentControllerWebMvcTest {
 	}
 
 	@Test
-	@DisplayName("실패_create에 content가 함께 오면 유효성 검사 오류를 반환한다")
-	void applyTransactionsRejectsCreateWithContent() throws Exception {
+	@DisplayName("실패_replace_content에 content가 null이면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsReplaceContentWithNullContent() throws Exception {
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_REPLACE_CONTENT",
+				      "blockRef": "tmp:block:1",
+				      "content": null
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("성공_create에 content가 함께 오면 transaction command로 전달한다")
+	void applyTransactionsAllowsCreateWithContent() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+		String createContent = "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"초기 본문\",\"marks\":[]}]}";
+
+		when(documentTransactionService.apply(
+			eq(documentId),
+			argThat(command -> command.operations().size() == 1
+				&& command.operations().get(0).type() == BLOCK_CREATE
+				&& createContent.equals(command.operations().get(0).content())),
+			eq(ACTOR_ID)
+		)).thenReturn(new DocumentTransactionResult(
+			documentId,
+			1,
+			"batch-1",
+			List.of(
+				new DocumentTransactionAppliedOperationResult(
+					"op-1",
+					DocumentTransactionOperationStatus.APPLIED,
+					"tmp:block:1",
+					blockId,
+					0,
+					"000000000001000000000000",
+					null
+				)
+			)
+		));
+
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE",
+				      "blockRef": "tmp:block:1",
+				      "content": {
+				        "format": "rich_text",
+				        "schemaVersion": 1,
+				        "segments": [
+				          {
+				            "text": "초기 본문",
+				            "marks": []
+				          }
+				        ]
+				      }
+				    }
+				  ]
+				}
+				"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.documentVersion").value(1))
+			.andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(0));
+	}
+
+	@Test
+	@DisplayName("성공_create에 content가 null이면 empty fallback 경로로 전달한다")
+	void applyTransactionsAllowsCreateWithNullContentAsFallback() throws Exception {
+		UUID documentId = UUID.randomUUID();
+		UUID blockId = UUID.randomUUID();
+
+		when(documentTransactionService.apply(
+			eq(documentId),
+			argThat(command -> command.operations().size() == 1
+				&& command.operations().get(0).type() == BLOCK_CREATE
+				&& command.operations().get(0).content() == null),
+			eq(ACTOR_ID)
+		)).thenReturn(new DocumentTransactionResult(
+			documentId,
+			1,
+			"batch-1",
+			List.of(
+				new DocumentTransactionAppliedOperationResult(
+					"op-1",
+					DocumentTransactionOperationStatus.APPLIED,
+					"tmp:block:1",
+					blockId,
+					0,
+					"000000000001000000000000",
+					null
+				)
+			)
+		));
+
+		mockMvc.perform(post("/documents/{documentId}/transactions", documentId)
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE",
+				      "blockRef": "tmp:block:1",
+				      "content": null
+				    }
+				  ]
+				}
+				"""))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.documentId").value(documentId.toString()))
+			.andExpect(jsonPath("$.data.documentVersion").value(1))
+			.andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].tempId").value("tmp:block:1"))
+			.andExpect(jsonPath("$.data.appliedOperations[0].blockId").value(blockId.toString()))
+			.andExpect(jsonPath("$.data.appliedOperations[0].version").value(0));
+	}
+
+	@Test
+	@DisplayName("실패_create에 content 스키마가 맞지 않으면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsCreateWithInvalidContentSchema() throws Exception {
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE",
+				      "blockRef": "tmp:block:1",
+				      "content": {
+				        "format": "rich_text",
+				        "schemaVersion": 2,
+				        "segments": [
+				          {
+				            "text": "잘못된 create",
+				            "marks": []
+				          }
+				        ]
+				      }
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_create에 content format이 맞지 않으면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsCreateWithInvalidContentFormat() throws Exception {
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE",
+				      "blockRef": "tmp:block:1",
+				      "content": {
+				        "format": "plain_text",
+				        "schemaVersion": 1,
+				        "segments": [
+				          {
+				            "text": "잘못된 format",
+				            "marks": []
+				          }
+				        ]
+				      }
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_create에 content segments가 비어 있으면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsCreateWithEmptySegments() throws Exception {
+		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
+			.contentType("application/json")
+			.header(USER_ID_HEADER, ACTOR_ID)
+			.content("""
+				{
+				  "clientId": "web-editor",
+				  "batchId": "batch-1",
+				  "operations": [
+				    {
+				      "opId": "op-1",
+				      "type": "BLOCK_CREATE",
+				      "blockRef": "tmp:block:1",
+				      "content": {
+				        "format": "rich_text",
+				        "schemaVersion": 1,
+				        "segments": []
+				      }
+				    }
+				  ]
+				}
+				"""));
+
+		ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9016, "요청 필드 유효성 검사에 실패했습니다.");
+	}
+
+	@Test
+	@DisplayName("실패_create에 content textColor 값이 잘못되면 유효성 검사 오류를 반환한다")
+	void applyTransactionsRejectsCreateWithInvalidTextColorMark() throws Exception {
 		var result = mockMvc.perform(post("/documents/{documentId}/transactions", UUID.randomUUID())
 			.contentType("application/json")
 			.header(USER_ID_HEADER, ACTOR_ID)
@@ -617,8 +856,13 @@ class DocumentControllerWebMvcTest {
 				        "schemaVersion": 1,
 				        "segments": [
 				          {
-				            "text": "잘못된 create",
-				            "marks": []
+				            "text": "잘못된 색상",
+				            "marks": [
+				              {
+				                "type": "textColor",
+				                "value": "red"
+				              }
+				            ]
 				          }
 				        ]
 				      }

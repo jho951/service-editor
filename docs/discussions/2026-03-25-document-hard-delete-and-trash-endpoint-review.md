@@ -229,7 +229,7 @@
 
 ## 관련 문서
 
-- `docs/REQUIREMENTS.md`
-- `docs/roadmap/v2/documents/document-trash.md`
-- [prompts/worklog/2026-03/2026-03-18-document-delete.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-18-document-delete.md)
-- [prompts/worklog/2026-03/2026-03-20-document-restore-api.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-document-restore-api.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
+- [document-trash.md](https://github.com/jho951/Block-server/blob/dev/docs/roadmap/v2/documents/document-trash.md)
+- [2026-03-18-document-delete.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-18-document-delete.md)
+- [2026-03-20-document-restore-api.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-document-restore-api.md)

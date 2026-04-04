@@ -28,3 +28,8 @@
 - 단점:
   - 추후 Workspace 재도입 시 문서 소유 모델 재조정 필요
   - 현재 `createdBy`가 소유 기준과 감사 필드를 함께 담당
+
+## 관련 문서
+
+- [2026-03-27-v1-remove-workspace-from-document-flow-review.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-27-v1-remove-workspace-from-document-flow-review.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)

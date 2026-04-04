@@ -74,3 +74,10 @@
 - 변경 내용: `docs/REQUIREMENTS.md`와 `docs/explainers/editor-transaction-save-model.md`에 admin block API의 transaction 기반 계약을 반영했다.
 - 테스트 변경: `AdminBlockControllerWebMvcTest`, `BlockApiIntegrationTest`, `DocumentTransactionServiceImplTest`, `BlockServiceImplTest`, `DocumentTransactionApiIntegrationTest`, `DocumentTransactionConcurrencyIntegrationTest`를 새 구조 기준으로 재검증했다.
 - 테스트 결과: 관련 WebMvc, 서비스, 통합 테스트와 `./gradlew test`까지 통과했다.
+
+## Step 13. create 초기 content 허용 방향 문서화
+
+- 목적: 새 블록 생성 후 바로 입력하는 흔한 autosave 경로에서 `BLOCK_CREATE + BLOCK_REPLACE_CONTENT`를 항상 분리해야 하는지 다시 검토한다.
+- 변경 내용: `docs/discussions/2026-04-01-block-create-initial-content-review.md`에서 `BLOCK_CREATE`의 선택적 초기 `content` 허용안을 검토하고, 채택 방향을 정리했다.
+- 결정 기록: `docs/decisions/020-allow-optional-content-on-block-create-in-transactions.md`를 추가해 새 블록 생성 시 선택적 초기 content를 함께 저장할 수 있도록 ADR을 남겼다.
+- 문서 보강: `docs/REQUIREMENTS.md`, `docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md`, `docs/explainers/editor-transaction-save-model.md`, `docs/guides/frontend-editor-transaction-implementation-guide.md`, `docs/guides/backend-editor-transaction-processing-guide.md`, `docs/decisions/014-adopt-transaction-centered-editor-save-model.md`를 새 계약 기준으로 갱신했다.

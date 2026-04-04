@@ -94,5 +94,5 @@
 
 ## 관련 문서
 
-- `docs/decisions/015-trust-gateway-injected-user-header-and-enforce-request-audit.md`
-- `docs/REQUIREMENTS.md`
+- [015-trust-gateway-injected-user-header-and-enforce-request-audit.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/015-trust-gateway-injected-user-header-and-enforce-request-audit.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)

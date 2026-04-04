@@ -164,7 +164,7 @@
 
 ## 관련 문서
 
-- [docs/REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
-- [docs/decisions/013-adopt-session-scoped-browser-undo-and-drop-block-restore-api.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/013-adopt-session-scoped-browser-undo-and-drop-block-restore-api.md)
-- [docs/roadmap/v2/blocks/block-restore.md](https://github.com/jho951/Block-server/blob/dev/docs/roadmap/v2/blocks/block-restore.md)
-- [prompts/worklog/2026-03/2026-03-20-block-restore-policy.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-block-restore-policy.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
+- [013-adopt-session-scoped-browser-undo-and-drop-block-restore-api.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/013-adopt-session-scoped-browser-undo-and-drop-block-restore-api.md)
+- [block-restore.md](https://github.com/jho951/Block-server/blob/dev/docs/roadmap/v2/blocks/block-restore.md)
+- [2026-03-20-block-restore-policy.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-block-restore-policy.md)

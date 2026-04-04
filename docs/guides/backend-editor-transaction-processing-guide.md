@@ -56,16 +56,16 @@ v1 전제는 다음과 같다.
 
 - 에디터 표준 write 경로는 `POST /documents/{documentId}/transactions`
 - operation은 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE` 4개
-- `BLOCK_CREATE`는 위치만 다루고 본문은 다루지 않는다.
-- 본문은 `BLOCK_REPLACE_CONTENT`가 담당한다.
+- `BLOCK_CREATE`는 위치를 항상 다루고, 필요하면 초기 `content`를 함께 받을 수 있다.
+- 기존 서버 block의 본문 변경은 `BLOCK_REPLACE_CONTENT`가 담당한다.
 - 모든 transaction operation은 블록 참조 필드로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.
 - `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
 - 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
 - `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
 - 서버는 `blockRef`, `parentRef`, `afterRef`, `beforeRef`를 모두 같은 transaction 컨텍스트에서 해석해야 한다.
-- 다만 서버 내부에서는 `blocks.content_json` not null 제약을 만족시키기 위해 `BLOCK_CREATE` 시 기본 empty structured content를 먼저 저장할 수 있다.
-- 이 값은 외부 API 계약이 아니라 서버 영속 기본값이며, 같은 batch의 `BLOCK_REPLACE_CONTENT`가 오면 최종 본문으로 교체된다.
+- `BLOCK_CREATE.content`가 없으면 서버는 `blocks.content_json` not null 제약을 만족시키기 위해 기본 empty structured content를 저장할 수 있다.
+- `BLOCK_CREATE.content`가 있으면 서버는 그 값을 새 블록의 초기 content로 저장한다.
 - 기존 block 수정/이동/삭제는 `version`이 필요하다.
 - 실패 정책은 전체 rollback이다.
 
@@ -107,8 +107,8 @@ v1 전제는 다음과 같다.
 
 예:
 
-1. `BLOCK_CREATE(blockRef=tmp-1)`
-2. `BLOCK_REPLACE_CONTENT(blockRef=tmp-1)`
+1. `BLOCK_CREATE(blockRef=tmp-1, content=...)`
+2. 필요하면 `BLOCK_REPLACE_CONTENT(blockRef=tmp-1)`
 3. `BLOCK_MOVE(blockRef=real-id)`
 4. `BLOCK_DELETE(blockRef=real-id)`
 
@@ -133,7 +133,7 @@ v1 전제는 다음과 같다.
 
 ## 4.1 백엔드 처리 시퀀스
 
-### 시나리오 1. create + replace_content 성공
+### 시나리오 1. create with content 성공
 
 ```mermaid
 sequenceDiagram
@@ -143,17 +143,14 @@ sequenceDiagram
     participant B as Block Service/Domain
     participant DB as Database
 
-    C->>API: POST /transactions (create, replace_content)
+    C->>API: POST /transactions (create with content)
     API->>S: request 전달
     S->>S: 상위 request / operation 형식 검증
     S->>DB: transaction 시작
-    S->>B: BLOCK_CREATE(blockRef=tempId, parentRef/afterRef/beforeRef 해석)
+    S->>B: BLOCK_CREATE(blockRef=tempId, content, parentRef/afterRef/beforeRef 해석)
     B->>DB: block insert
     DB-->>B: realBlockId, version=0
     B-->>S: tempId 매핑 등록
-    S->>B: BLOCK_REPLACE_CONTENT(realBlockId, content)
-    B->>DB: content update
-    DB-->>B: version 증가
     S->>DB: commit
     S-->>API: success response 조립
     API-->>C: tempId->blockId, version 반환
@@ -219,13 +216,14 @@ sequenceDiagram
 - sibling 조회
 - sortKey 생성
 - 빈 TEXT block 생성
+- `content`가 있으면 그 값을 초기 content로 사용
 - 생성된 block을 `tempId` 매핑 컨텍스트에 등록
 - 이후 `parentRef`, `afterRef`, `beforeRef`의 temp 값도 같은 컨텍스트로 해석
 
 중요:
 
-- create는 위치만 처리한다.
-- 본문은 여기서 채우지 않는다.
+- create는 위치를 항상 처리한다.
+- `content`가 있으면 새 블록의 초기 본문도 여기서 함께 저장한다.
 
 ### `BLOCK_REPLACE_CONTENT`
 
@@ -274,6 +272,8 @@ sequenceDiagram
 - `BLOCK_DELETE`는 subtree 단위로 적용되며, 같은 batch 뒤 operation이 삭제된 루트나 자식을 다시 참조하면 `BLOCK_NOT_FOUND`로 실패한다.
 - `BLOCK_MOVE`는 self-anchor, reversed anchor, same-anchor, target parent와 맞지 않는 anchor를 잘못된 요청으로 거절한다.
 - temp block은 같은 batch 안에서 create, replace, move, delete를 같은 context로 이어서 처리할 수 있다.
+- 프론트는 새 temp block의 create와 replace_content를 collapse하는 것을 우선 권장하지만, 이는 최적화일 뿐 서버 계약의 필수 전제가 아니다.
+- temp block 대상 `BLOCK_REPLACE_CONTENT`는 여전히 허용하며, 서버는 collapse되지 않은 batch도 같은 transaction 컨텍스트에서 정상 처리할 수 있어야 한다.
 - 기존 서버 block은 첫 참조에서만 DB와 동시성을 검증하고, 같은 batch의 뒤 operation은 서버가 내부 최신 version을 이어받아 처리한다.
 - 대신 같은 real block에 대해 batch 안에서 서로 다른 base `version`을 섞어 보내면 conflict로 실패한다.
 - `BLOCK_DELETE`도 실제 soft delete 시점에 root block version을 where 절에 함께 걸어, 검증 이후 다른 사용자가 먼저 바꾼 경우 conflict로 막는다.

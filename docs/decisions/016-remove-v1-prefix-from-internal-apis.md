@@ -26,3 +26,8 @@
 - 단점:
   - 컨트롤러, 테스트, 문서를 함께 수정해야 함
   - gateway rewrite 누락 시 라우팅 실패 가능
+
+## 관련 문서
+
+- [2026-03-27-internal-api-path-without-v1-review.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-27-internal-api-path-without-v1-review.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
