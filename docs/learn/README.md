@@ -13,6 +13,7 @@
 - 공유용 참조나 PR 본문 링크 대상으로 사용하지 않는다.
 - 다른 사람이 저장소 기준으로 공식 산출물을 찾는 경로처럼 다루지 않는다.
 - 문제 해결 과정을 기록하는 문서는 [docs/learn/troubleshooting/](https://github.com/jho951/Block-server/blob/dev/docs/learn/troubleshooting/README.md)에 두고, 해당 경로를 다룰 때는 [docs/learn/troubleshooting/README.md](https://github.com/jho951/Block-server/blob/dev/docs/learn/troubleshooting/README.md)를 먼저 읽는다.
+- 공통 문서 흐름, 중복 제거, 외부 자료 표기 원칙은 먼저 [docs/README.md](https://github.com/jho951/Block-server/blob/dev/docs/README.md)를 따른다.
 
 ## 기본 디렉토리 규칙
 
@@ -76,6 +77,7 @@
 - 정의만 나열하지 말고 "그래서 여기서는 무엇을 보면 되는가"까지 연결한다.
 - 비교가 필요하면 좋은 경우와 나쁜 경우를 같이 적는다.
 - follow-up 질문이 예상되면 문서 마지막에 다음 질문 후보를 남긴다.
+- 개인 학습 문서는 교과서 요약보다 현재 저장소 맥락 연결을 더 강하게 우선한다.
 
 ## 새 요청이 왔을 때 작성 플로우
 
