@@ -26,6 +26,7 @@
 
 - 작업 로그는 팀 또는 프로젝트 단위의 의미 있는 작업 기록이 필요할 때만 남긴다.
 - 개인 학습용 설명 요청, 간단한 질의응답, 잠깐 확인하고 끝나는 요청은 로그를 남기지 않는다.
+- worklog와 topic에는 공식 문서 경로에 다시 정리된 내용만 남긴다. `docs/learn/` 링크를 직접 싣지 않는다.
 - 작업 로그 안의 내부 문서 링크는 로컬 절대 경로 대신 GitHub 저장소 기준 `blob/dev` 링크를 사용한다.
 - 작업 로그는 가능한 한 목표 단위의 단일 파일로 유지한다.
 - 작업 로그는 [prompts/worklog/](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/README.md) 아래 `YYYY-MM/` 디렉토리에 둔다.

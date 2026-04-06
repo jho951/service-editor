@@ -12,6 +12,7 @@
 - Git 저장소에 반영되거나 PR로 공유되는 공식 문서라고 가정하지 않는다.
 - 공유용 참조나 PR 본문 링크 대상으로 사용하지 않는다.
 - 다른 사람이 저장소 기준으로 공식 산출물을 찾는 경로처럼 다루지 않는다.
+- 이 경로에서 정리한 내용은 다른 공식 문서 경로로 다시 정리되기 전까지, `docs/`, `prompts/`, PR 산출물의 직접 근거나 링크 대상으로 사용하지 않는다.
 - 문제 해결 과정을 기록하는 문서는 [docs/learn/troubleshooting/](https://github.com/jho951/Block-server/blob/dev/docs/learn/troubleshooting/README.md)에 두고, 해당 경로를 다룰 때는 [docs/learn/troubleshooting/README.md](https://github.com/jho951/Block-server/blob/dev/docs/learn/troubleshooting/README.md)를 먼저 읽는다.
 
 ## 기본 디렉토리 규칙

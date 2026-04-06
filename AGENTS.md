@@ -1,7 +1,8 @@
 # AGENTS 가이드
 
 - 작업 성격에 맞게 `docs/`, `prompts/`를 함께 갱신한다.
-- `docs/` 하위 문서를 다룰 때는 먼저 [docs/README.md](https://github.com/jho951/Block-server/blob/dev/docs/README.md)를 읽고, 해당 디렉토리에 `README.md`가 있으면 그 기준을 따른다.
+- `docs/` 하위 문서를 다룰 때는 항상 [docs/README.md](https://github.com/jho951/Block-server/blob/dev/docs/README.md)부터 읽고, 작업 경로까지 내려가는 동안 추가로 만나는 디렉토리 `README.md`를 순서대로 읽는다.
+  - 예: `docs/discussions/...` 작업이면 `docs/README.md -> docs/discussions/README.md`
 - 현재 유효한 제품 요구사항과 채택된 정책은 `docs/REQUIREMENTS.md`에 반영한다.
 - 채택 전 전략 검토, 회의 메모, 비교 문서는 `docs/discussions/`에 남기고, 작성 기준은 `docs/discussions/README.md`를 따른다.
 - 채택된 기술 결정과 되돌리기 어려운 정책 변경은 `docs/decisions/` ADR로 기록하고, 운영 기준은 `docs/decisions/README.md`를 따른다.
@@ -11,12 +12,20 @@
 - `docs/learn/`는 개인 학습용 로컬 문서 영역이며, 운영 기준은 `docs/learn/README.md`를 따른다.
 - 문제 원인 분석, 비교 검토, 채택 이유, 결과 정리처럼 트러블슈팅 기록은 `docs/learn/troubleshooting/`에 남기고, 작성 기준은 `docs/learn/troubleshooting/README.md`를 따른다.
 - 프론트/서버 구현 계약, 작업 순서, 체크리스트, 역할 분담 기준은 `docs/guides/`에 정리하고, 운영 기준은 `docs/guides/README.md`를 따른다.
-- 개인 이해를 위한 설명 요청은 `learn`으로, 팀 선택 검토는 `docs/discussions/`로, 실제 채택된 내용은 `docs/decisions/` ADR로 승격한다.
 - `prompts/`는 팀 또는 프로젝트 단위의 의미 있는 작업 기록이 필요할 때만 남긴다. 개인 학습용 설명 요청, 간단한 질의응답, 잠깐 확인하고 끝나는 요청은 남기지 않는다.
 - `prompts/`를 다룰 때는 먼저 `prompts/README.md`를 읽고 그 기준을 따른다.
 - `prompts/worklog/`는 원본 작업 로그 보관용이고, `prompts/topics/`는 주제별 탐색용이다.
-- 문서 내부 링크는 로컬 절대 경로 대신 GitHub 저장소 기준 `https://github.com/jho951/Block-server/blob/dev/...` 링크를 사용한다.
-- 중요한 기술 선택과 되돌리기 어려운 정책 변경은 반드시 ADR 또는 관련 문서까지 함께 반영한다.
+- 문서 체계나 규칙을 바꾸는 요청은 항상 규칙 소유 위치를 먼저 정한다.
+  - `AGENTS.md`: 진입 규칙과 작업 절차
+  - 상위 `README.md`: 전역 규칙
+  - 하위 `README.md`: 디렉토리 전용 규칙
+  - 템플릿: 문서 구조와 입력 지침
+- 상위 소유 위치에 이미 있는 규칙은 하위 `README.md`나 템플릿에 다시 적지 않는다. 읽기 편의를 이유로 같은 규칙을 하위에 복제하지 않는다.
+- 문서 체계나 규칙을 바꾸는 요청은 관련 파일을 묶어서 수정하고, 한 파일만 고친 뒤 완료로 판단하지 않는다.
+- 문서 체계나 규칙을 바꾼 뒤에는 `docs/README.md`, 대상 디렉토리 `README.md`, 사용한 템플릿을 다시 대조하고 아래 항목을 확인하기 전에는 완료로 판단하지 않는다.
+  - 전역 규칙이 하위 README나 템플릿에 다시 복제되지 않았는가
+  - 문서 구조가 대상 디렉토리 README와 템플릿에 맞는가
+  - 헤더 깊이, 리스트 형식, 문단 길이, 구분선 사용이 현재 Markdown 가독성 규칙에 맞는가
 
 
 # AGENTS Working Agreement
@@ -64,8 +73,6 @@
 
 ## Personal Learning Docs Policy
 
-- 개인 학습용 설명 문서의 파일 구성, 흐름, 네이밍 기준은 `docs/learn/README.md`를 따른다.
-- 트러블슈팅 성격의 작업이면 `docs/learn/troubleshooting/README.md`를 먼저 읽고, 그 기준과 템플릿에 따라 같은 문제 축의 단일 문서로 누적 작성한다.
 - 개인 학습용 `learn` 문서 생성이나 갱신만 있는 요청은 원칙적으로 `prompts/`에 남기지 않는다.
 - 다만 같은 작업 안에서 팀 정책, 프로젝트 구조, 공식 문서 체계 변경까지 함께 일어나면 그때만 프로젝트 작업으로 보고 `prompts/`에 남긴다.
 - 사용자가 "가르쳐줘", "이해하고 싶어", "공부하고 싶어", "왜 이런지 설명해줘"처럼 개인 이해를 목표로 요청하면 우선 `learn`으로 분류한다.
