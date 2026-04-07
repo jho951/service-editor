@@ -3,6 +3,7 @@
 - 작업 성격에 맞게 `docs/`, `prompts/`를 함께 갱신한다.
 - `docs/` 하위 문서를 다룰 때는 항상 [docs/README.md](https://github.com/jho951/Block-server/blob/dev/docs/README.md)부터 읽고, 작업 경로까지 내려가는 동안 추가로 만나는 디렉토리 `README.md`를 순서대로 읽는다.
   - 예: `docs/discussions/...` 작업이면 `docs/README.md -> docs/discussions/README.md`
+- 검색이나 직접 경로로 `docs/`의 하위 문서를 먼저 찾았더라도, 내용을 반영하기 전에는 반드시 `AGENTS.md -> docs/README.md -> 경로상의 상위 README.md` 순서로 다시 확인한다.
 - 현재 유효한 제품 요구사항과 채택된 정책은 `docs/REQUIREMENTS.md`에 반영한다.
 - 채택 전 전략 검토, 회의 메모, 비교 문서는 `docs/discussions/`에 남기고, 작성 기준은 `docs/discussions/README.md`를 따른다.
 - 채택된 기술 결정과 되돌리기 어려운 정책 변경은 `docs/decisions/` ADR로 기록하고, 운영 기준은 `docs/decisions/README.md`를 따른다.
@@ -43,6 +44,8 @@
 ## Ground Rules
 
 - 기존 제품 코드(`app/`, `components/`, `libs/` 등)의 동작을 바꾸는 변경은 목적, 근거, 영향 범위를 PR에 꼭 명시한다.
+- 저장소 규칙과 각 경로의 소유 위치 규칙은 에이전트의 일반적인 작업 습관보다 항상 우선한다.
+- 추가 설명이나 섹션 보강이 필요하면, 먼저 기존 규칙이 허용하는 경로와 소유 위치 안에서만 확장한다.
 - 요구사항/가정이 바뀌면 어떤 이유로 바뀌었는지 설명하고 `docs/REQUIREMENTS.md` 갱신 여부를 묻고, 수락 시 `docs/REQUIREMENTS.md`를 함께 갱신한다.
 - 채택 전 설계 검토, 전략 비교, 회의 메모는 `docs/discussions/`에 남기고, 실제 채택된 결정만 `docs/decisions/` ADR로 승격한다.
 - 중요한 기술적 결정(트레이드오프, 정책 변경, 되돌리기 어려운 선택)은 ADR로 남긴다.

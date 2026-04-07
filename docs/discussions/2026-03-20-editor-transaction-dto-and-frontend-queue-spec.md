@@ -387,7 +387,7 @@ PendingOperation
 
 ## 프론트 전처리 체크리스트
 
-자세한 이벤트 흐름 예시는 `docs/guides/frontend-editor-transaction-implementation-guide.md`의 "프론트 전처리 시나리오"를 기준으로 본다.
+자세한 이벤트 흐름 예시는 `docs/guides/editor/frontend-editor-guideline.md`의 "프론트 전처리 시나리오"를 기준으로 본다.
 
 ### 공통
 

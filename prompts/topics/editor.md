@@ -1,8 +1,8 @@
-# Editor Transaction
+# Editor
 
 ## 목적
 
-에디터 저장 transaction 모델, 배치 처리, temp ref 해석, 동시성, admin 단건 정렬 작업을 다시 찾기 쉽게 묶는다.
+editor 기능군의 save, move, transaction 기반 저장 모델, temp ref 해석, 동시성, 관련 가이드를 다시 찾기 쉽게 묶는다.
 
 ## 관련 worklog
 
@@ -14,19 +14,24 @@
 
 - [docs/REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
 - [docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
+- [docs/discussions/2026-04-05-node-domain-abstraction-review.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-04-05-node-domain-abstraction-review.md)
 - [docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
 - [docs/decisions/014-adopt-transaction-centered-editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
+- [docs/decisions/021-adopt-editor-operation-controller-boundary.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/021-adopt-editor-operation-controller-boundary.md)
 - [docs/explainers/editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-transaction-save-model.md)
-- [docs/guides/frontend-editor-transaction-implementation-guide.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/frontend-editor-transaction-implementation-guide.md)
-- [docs/guides/backend-editor-transaction-processing-guide.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/backend-editor-transaction-processing-guide.md)
+- [docs/guides/editor/editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
+- [docs/guides/editor/frontend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/frontend-editor-guideline.md)
+- [docs/guides/editor/backend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/backend-editor-guideline.md)
 
 ## 현재 기준
 
-- 표준 에디터 저장 경로는 document transaction API 기준으로 본다.
+- 표준 에디터 저장 경로는 editor operation family의 document save endpoint 기준으로 본다.
+- move는 `POST /editor-operations/move` 단일 endpoint에서 문서 이동과 블록 이동을 함께 처리한다.
+- move는 drag 중간 상태를 저장하지 않고, drop 확정 시점의 최종 위치만 반영하는 explicit action으로 본다.
 - 단건 block API와 admin API는 transaction 모델과 정합되게 유지한다.
 - 동시성은 document version과 block version 정책을 함께 봐야 한다.
 
 ## 열어둘 질문
 
-- transaction operation 종류를 더 확장할지 여부
+- editor operation 종류를 더 확장할지 여부
 - 프론트 queue/rollback 정책을 v2에서 어떻게 보강할지

@@ -2,7 +2,7 @@
 
 ## 목적
 
-이 문서는 v1 에디터 저장 모델이 어떤 문제를 해결하는지, 왜 블록 단건 API 대신 `transactions` 하나로 저장하는지, 그리고 생성/수정/이동/삭제가 어떤 시나리오로 흘러가는지 설명하기 위한 문서다.
+이 문서는 v1 에디터 저장 모델이 어떤 문제를 해결하는지, 왜 블록 단건 API 대신 `save` endpoint 하나로 저장하는지, 그리고 생성/수정/이동/삭제가 어떤 시나리오로 흘러가는지 설명하기 위한 문서다.
 
 대상 범위는 다음과 같다.
 
@@ -70,7 +70,7 @@
 ### 에디터가 표준으로 사용하는 API
 
 - `GET /documents/{documentId}/blocks`
-- `POST /documents/{documentId}/transactions`
+- `POST /editor-operations/documents/{documentId}/save`
 
 쓰기 요청 top-level은 `clientId`, `batchId`, `operations`를 사용한다.
 동시성 검사는 transaction 전체의 문서 snapshot이 아니라 각 block operation의 `version`으로 처리한다.
@@ -159,7 +159,7 @@ v1 에디터 표준 operation은 4개만 사용한다.
 3. queue에는 우선 `BLOCK_CREATE(blockRef=tempId)`를 넣는다.
 4. 사용자가 debounce 전에 바로 입력하면 프론트는 이를 `BLOCK_CREATE(blockRef=tempId, content=latestContent)` 하나로 접을 수 있다.
 5. 필요하면 temp block을 참조하는 `BLOCK_REPLACE_CONTENT`를 함께 보낼 수도 있다.
-6. debounce 만료 또는 `Ctrl+S` 시 queue를 `transactions` 한 요청으로 보낸다.
+6. debounce 만료 또는 `Ctrl+S` 시 queue를 `save` 한 요청으로 보낸다.
 7. 서버는 실제 `blockId`, `sortKey`, `version`을 만들고 응답으로 돌려준다.
 8. 클라이언트는 `tempId -> blockId`를 매핑한다.
 
@@ -461,4 +461,4 @@ v1에서는 이 단순함이 더 중요하다.
 
 이 모델의 핵심은 다음과 같다.
 
-> 생성, 수정, 이동, 삭제를 로컬 queue에 먼저 쌓고, 서버에는 `transactions` 한 경로로 의미 있는 최종 변경만 저장한다.
+> 생성, 수정, 이동, 삭제를 로컬 queue에 먼저 쌓고, 서버에는 `save` 한 경로로 의미 있는 최종 변경만 저장한다.

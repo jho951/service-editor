@@ -1,12 +1,13 @@
-# Frontend Editor Transaction Implementation Guide
+# Frontend Editor Guideline
 
 ## 목적
 
-이 문서는 프론트 구현자가 v1 에디터 저장 모델을 실제 코드로 옮길 때 필요한 기준을 한곳에 정리한 문서다.
+이 문서는 프론트 구현자가 editor operation API를 실제 코드로 옮길 때 필요한 기준을 정리한 문서다.
 
 이 문서만 읽어도 다음을 이해할 수 있도록 작성한다.
 
 - 왜 에디터 저장을 단건 CRUD가 아니라 transaction queue로 다루는가
+- editor operation family 안에서 save와 move를 어떤 기준으로 구분하는가
 - 프론트가 어떤 상태를 들고 있어야 하는가
 - 어떤 이벤트가 어떤 operation으로 바뀌는가
 - 언제 flush하고, 실패하면 어떻게 처리하는가
@@ -14,10 +15,20 @@
 
 관련 문서:
 
-- `docs/explainers/editor-transaction-save-model.md`
-- `docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md`
-- `docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md`
-- `docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md`
+- [editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
+- [editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-transaction-save-model.md)
+- [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
+- [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
+- [ADR 012](https://github.com/jho951/Block-server/blob/dev/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
+
+현재 이 문서의 상세 범위는 document `save` endpoint가 중심이다.
+move는 `POST /editor-operations/move` 단일 endpoint를 기준으로 두고, 문서 이동과 블록 이동의 프론트 시나리오는 구현이 진행되면 같은 문서 안에 이어서 확장한다.
+
+move 호출 기준은 다음으로 고정한다.
+
+- drag 중간 상태는 로컬 UI에만 반영한다.
+- `POST /editor-operations/move`는 drop 확정 시점에만 1회 호출한다.
+- 같은 위치로 drop된 no-op 이동은 클라이언트에서 먼저 걸러도 되고, 서버 성공 no-op으로 처리해도 된다.
 
 ---
 
@@ -30,7 +41,7 @@
 1. 로컬 UI 상태를 먼저 바꾼다.
 2. 변경을 operation queue에 넣는다.
 3. queue 안에서 의미 없는 중간 변경을 정리한다.
-4. debounce 또는 명시적 flush 시점에 `POST /documents/{documentId}/transactions` 한 번으로 보낸다.
+4. debounce 또는 명시적 flush 시점에 `POST /editor-operations/documents/{documentId}/save` 한 번으로 보낸다.
 
 즉 프론트 구현의 핵심은 "API 호출 코드"가 아니라 "로컬 상태 + queue + flush 제어"다.
 
@@ -126,7 +137,7 @@
 
 ### 쓰기
 
-- `POST /documents/{documentId}/transactions`
+- `POST /editor-operations/documents/{documentId}/save`
 
 주의:
 
@@ -490,7 +501,7 @@ sequenceDiagram
     E->>E: 로컬 content 갱신
     E->>Q: BLOCK_REPLACE_CONTENT(blockRef=tempId, latestContent)
     E->>Q: 같은 block의 이전 content op 정리
-    S->>A: POST /transactions
+    S->>A: POST /editor-operations/documents/{documentId}/save
     A-->>E: tempId -> realId, version 반환
     E->>E: tempId 매핑 반영
 ```
@@ -700,7 +711,7 @@ sequenceDiagram
     E->>E: 부모 포함 시 자식 delete 제거
     E->>Q: 각 루트마다 BLOCK_DELETE 적재
     E->>E: 로컬 subtree 제거
-    Q->>A: POST /transactions
+    Q->>A: POST /editor-operations/documents/{documentId}/save
 ```
 
 ### 시나리오 7. 오래 타이핑 후 동시성 충돌
@@ -927,7 +938,7 @@ v1 프론트 구현자는 이 둘을 섞어서 설계하면 안 된다.
 
 ### 4단계
 
-- `POST /transactions` 직렬화
+- `POST /editor-operations/documents/{documentId}/save` 직렬화
 - 성공 응답의 tempId/version 반영
 
 ### 5단계

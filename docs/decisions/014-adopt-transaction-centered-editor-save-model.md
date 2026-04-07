@@ -71,6 +71,7 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 - `POST /documents/{documentId}/blocks`, `PATCH /blocks/{blockId}`, `DELETE /blocks/{blockId}`는 에디터 표준 경로가 아니라 보조/운영/관리 경로로 둔다.
 - 이 설계 자체는 autosave 저장 모델이며, 실시간 브로드캐스트/협업 모델을 포함하지 않는다.
 - 이후 새 블록 생성 후 바로 입력하는 경로를 더 직접적으로 표현하기 위해, `BLOCK_CREATE`가 선택적 초기 `content`를 함께 받을 수 있도록 `ADR 020`에서 계약을 확장했다.
+- 이후 API 진입 경계는 `ADR 021`에서 `EditorOperationController` 기준으로 재배치했고, 표준 save entry path는 `POST /editor-operations/documents/{documentId}/save`로 옮겼다.
 
 ## 영향
 
@@ -93,4 +94,5 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 
 - [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
 - [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
+- [021-adopt-editor-operation-controller-boundary.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/021-adopt-editor-operation-controller-boundary.md)
 - [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)

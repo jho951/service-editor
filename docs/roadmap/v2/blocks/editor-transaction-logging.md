@@ -2,7 +2,7 @@
 
 ## 현재 기준
 
-- v1 에디터 저장은 `POST /v1/documents/{documentId}/transactions` 한 경로를 표준으로 사용한다.
+- v1 에디터 저장은 `POST /v1/editor-operations/documents/{documentId}/save` 한 경로를 표준으로 사용한다.
 - v1 priority는 안정적인 autosave, 단순한 충돌 처리, 예측 가능한 UX다.
 - v1 충돌 처리는 block version 기반 optimistic lock과 전체 rollback을 우선한다.
 - v1에서는 저장 자체를 먼저 안정화하고, 별도 transaction 로그 테이블은 당장 도입하지 않는다.

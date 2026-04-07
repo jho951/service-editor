@@ -1,22 +1,33 @@
-# Backend Editor Transaction Processing Guide
+# Backend Editor Guideline
 
 ## 목적
 
-이 문서는 백엔드 구현자가 프론트가 전처리해 보낸 editor transaction batch를 어떻게 받아 처리해야 하는지 정리한 문서다.
+이 문서는 백엔드 구현자가 editor operation API를 어떻게 받아 처리해야 하는지 정리한 문서다.
 
 이 문서만 읽어도 다음을 이해할 수 있도록 작성한다.
 
 - 백엔드가 어떤 책임을 가져야 하는가
 - 프론트 queue와 백엔드 transaction 처리의 경계가 어디인가
-- `POST /documents/{documentId}/transactions`를 어떤 순서로 검증하고 반영해야 하는가
+- editor operation family 안에서 save와 move를 어떤 서비스 경계로 나눌 것인가
+- `POST /editor-operations/documents/{documentId}/save`를 어떤 순서로 검증하고 반영해야 하는가
 - `tempId`, `version`, conflict, rollback을 어떻게 다뤄야 하는가
 
 관련 문서:
 
-- `docs/explainers/editor-transaction-save-model.md`
-- `docs/guides/frontend-editor-transaction-implementation-guide.md`
-- `docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md`
-- `docs/decisions/014-adopt-transaction-centered-editor-save-model.md`
+- [editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
+- [editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-transaction-save-model.md)
+- [frontend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/frontend-editor-guideline.md)
+- [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
+- [ADR 014](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
+
+현재 이 문서의 상세 범위는 document `save` endpoint가 중심이다.
+move는 `POST /editor-operations/move` 단일 endpoint를 기준으로 두고, 문서 이동과 블록 이동의 service 연결과 검증 기준은 구현이 진행되면 같은 문서 안에 이어서 확장한다.
+
+move 처리 기준은 다음으로 고정한다.
+
+- drag 중간 상태를 저장하는 API로 사용하지 않는다.
+- drop 확정 시점의 최종 위치만 1회 반영하는 explicit action으로 처리한다.
+- 같은 위치로 drop된 no-op 이동은 성공으로 처리할 수 있지만, 실제 갱신과 버전 증가는 없어야 한다.
 
 ---
 
@@ -54,7 +65,7 @@
 
 v1 전제는 다음과 같다.
 
-- 에디터 표준 write 경로는 `POST /documents/{documentId}/transactions`
+- 에디터 표준 write 경로는 `POST /editor-operations/documents/{documentId}/save`
 - operation은 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE` 4개
 - `BLOCK_CREATE`는 위치를 항상 다루고, 필요하면 초기 `content`를 함께 받을 수 있다.
 - 기존 서버 block의 본문 변경은 `BLOCK_REPLACE_CONTENT`가 담당한다.
@@ -143,7 +154,7 @@ sequenceDiagram
     participant B as Block Service/Domain
     participant DB as Database
 
-    C->>API: POST /transactions (create with content)
+    C->>API: POST /editor-operations/documents/{documentId}/save (create with content)
     API->>S: request 전달
     S->>S: 상위 request / operation 형식 검증
     S->>DB: transaction 시작
@@ -166,7 +177,7 @@ sequenceDiagram
     participant B as Block Service/Domain
     participant DB as Database
 
-    C->>API: POST /transactions (replace_content, version=5)
+    C->>API: POST /editor-operations/documents/{documentId}/save (replace_content, version=5)
     API->>S: request 전달
     S->>DB: transaction 시작
     S->>B: BLOCK_REPLACE_CONTENT(blockRef, version=5)
@@ -189,7 +200,7 @@ sequenceDiagram
     participant B as Block Service/Domain
     participant DB as Database
 
-    C->>API: POST /transactions (delete root A, delete root B)
+    C->>API: POST /editor-operations/documents/{documentId}/save (delete root A, delete root B)
     API->>S: request 전달
     S->>DB: transaction 시작
     loop 각 delete root
