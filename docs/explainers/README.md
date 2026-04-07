@@ -2,8 +2,6 @@
 
 이 디렉토리는 코드만 읽어서는 빠르게 파악하기 어려운 기술 구조, 내부 동작 흐름, 핵심 정책 배경을 설명하는 문서를 둔다.
 
-공통 문서 흐름, 중복 제거, 외부 자료 표기 원칙은 먼저 [docs/README.md](https://github.com/jho951/Block-server/blob/dev/docs/README.md)를 따른다.
-
 ## 무엇을 여기에 두는가
 
 - 알고리즘 설명
