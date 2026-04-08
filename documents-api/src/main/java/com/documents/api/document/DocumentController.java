@@ -187,6 +187,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 이동")
+	@Deprecated
 	@PostMapping("/{documentId}/move")
 	public ResponseEntity<GlobalResponse<Void>> moveDocument(
 		@PathVariable("documentId") UUID documentId,

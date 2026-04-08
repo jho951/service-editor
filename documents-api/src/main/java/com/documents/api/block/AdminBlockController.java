@@ -86,6 +86,7 @@ public class AdminBlockController {
     }
 
     @Operation(summary = "블록 이동")
+    @Deprecated
     @PostMapping("/blocks/{blockId}/move")
     public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> moveBlock(
             @PathVariable("blockId") UUID blockId,

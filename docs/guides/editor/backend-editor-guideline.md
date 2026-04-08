@@ -21,13 +21,16 @@
 - [ADR 014](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
 
 현재 이 문서의 상세 범위는 document `save` endpoint가 중심이다.
-move는 `POST /editor-operations/move` 단일 endpoint를 기준으로 두고, 문서 이동과 블록 이동의 service 연결과 검증 기준은 구현이 진행되면 같은 문서 안에 이어서 확장한다.
+move는 `POST /editor-operations/move` 단일 endpoint를 사용하고, request DTO는 `EditorMoveOperationRequest`를 기준으로 받는다.
 
 move 처리 기준은 다음으로 고정한다.
 
 - drag 중간 상태를 저장하는 API로 사용하지 않는다.
 - drop 확정 시점의 최종 위치만 1회 반영하는 explicit action으로 처리한다.
 - 같은 위치로 drop된 no-op 이동은 성공으로 처리할 수 있지만, 실제 갱신과 버전 증가는 없어야 한다.
+- `resourceType=DOCUMENT`면 기존 `DocumentService.move(...)`를 그대로 호출한다.
+- `resourceType=BLOCK`면 기존 `BlockService.move(...)`를 그대로 호출한다.
+- 문서/블록 move 알고리즘은 새 endpoint에서 따로 재구현하지 않고 기존 서비스 구현을 재사용한다.
 
 ---
 

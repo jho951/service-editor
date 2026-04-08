@@ -22,13 +22,15 @@
 - [ADR 012](https://github.com/jho951/Block-server/blob/dev/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
 
 현재 이 문서의 상세 범위는 document `save` endpoint가 중심이다.
-move는 `POST /editor-operations/move` 단일 endpoint를 기준으로 두고, 문서 이동과 블록 이동의 프론트 시나리오는 구현이 진행되면 같은 문서 안에 이어서 확장한다.
+move는 `POST /editor-operations/move` 단일 endpoint를 기준으로 두고, 문서 이동과 블록 이동 모두 `EditorMoveOperationRequest`를 사용한다.
 
 move 호출 기준은 다음으로 고정한다.
 
 - drag 중간 상태는 로컬 UI에만 반영한다.
 - `POST /editor-operations/move`는 drop 확정 시점에만 1회 호출한다.
 - 같은 위치로 drop된 no-op 이동은 클라이언트에서 먼저 걸러도 되고, 서버 성공 no-op으로 처리해도 된다.
+- 문서 이동은 `resourceType=DOCUMENT`와 `resourceId=documentId`를 사용한다.
+- 블록 이동은 `resourceType=BLOCK`, `resourceId=blockId`, `version=현재 block version`을 사용한다.
 
 ---
 
