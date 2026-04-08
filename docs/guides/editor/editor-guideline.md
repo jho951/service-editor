@@ -239,7 +239,7 @@ public class EditorSaveResponse {
 }
 ```
 
-초기 구현에서는 외부 endpoint만 `save`로 옮기고, 내부 DTO와 mapper는 기존 `DocumentTransactionRequest`, `DocumentTransactionResponse`를 재사용해도 된다.
+현재 구현도 외부 endpoint만 `save`로 옮기고, 내부 DTO와 mapper는 기존 `DocumentTransactionRequest`, `DocumentTransactionResponse`를 그대로 재사용한다.
 
 ### move request
 

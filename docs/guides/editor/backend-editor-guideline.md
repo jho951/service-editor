@@ -31,6 +31,7 @@ move 처리 기준은 다음으로 고정한다.
 - `resourceType=DOCUMENT`면 기존 `DocumentService.move(...)`를 그대로 호출한다.
 - `resourceType=BLOCK`면 기존 `BlockService.move(...)`를 그대로 호출한다.
 - 문서/블록 move 알고리즘은 새 endpoint에서 따로 재구현하지 않고 기존 서비스 구현을 재사용한다.
+- save는 `POST /editor-operations/documents/{documentId}/save`에서 시작하지만, 내부에서는 기존 `DocumentTransactionService`, `DocumentTransactionApiMapper`, `DocumentTransactionRequest/Response`를 그대로 재사용한다.
 
 ---
 

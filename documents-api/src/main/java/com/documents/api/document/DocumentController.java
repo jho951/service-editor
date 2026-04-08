@@ -144,6 +144,7 @@ public class DocumentController {
 	}
 
 	@Operation(summary = "문서 에디터 transaction 반영")
+	@Deprecated
 	@PostMapping("/{documentId}/transactions")
 	public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> applyTransactions(
 		@PathVariable("documentId") UUID documentId,

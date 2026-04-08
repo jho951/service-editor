@@ -31,6 +31,7 @@ move 호출 기준은 다음으로 고정한다.
 - 같은 위치로 drop된 no-op 이동은 클라이언트에서 먼저 걸러도 되고, 서버 성공 no-op으로 처리해도 된다.
 - 문서 이동은 `resourceType=DOCUMENT`와 `resourceId=documentId`를 사용한다.
 - 블록 이동은 `resourceType=BLOCK`, `resourceId=blockId`, `version=현재 block version`을 사용한다.
+- save payload는 현재도 기존 transaction payload shape를 그대로 사용한다. 즉 외부 path만 `save`로 바뀌고 body는 `clientId`, `batchId`, `operations` 구조를 유지한다.
 
 ---
 
