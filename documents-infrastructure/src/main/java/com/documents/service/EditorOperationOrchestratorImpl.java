@@ -1,10 +1,8 @@
 package com.documents.service;
 
-import static com.documents.service.transaction.DocumentTransactionOperationStatus.*;
-
+import java.util.UUID;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,38 +11,38 @@ import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.DocumentRepository;
-import com.documents.service.transaction.DocumentTransactionAppliedOperationResult;
-import com.documents.service.transaction.DocumentTransactionCommand;
-import com.documents.service.transaction.DocumentTransactionContext;
-import com.documents.service.transaction.DocumentTransactionResult;
+import com.documents.service.editor.EditorSaveAppliedOperationResult;
+import com.documents.service.editor.EditorSaveCommand;
+import com.documents.service.editor.EditorSaveContext;
+import com.documents.service.editor.EditorSaveOperationStatus;
+import com.documents.service.editor.EditorSaveResult;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
-@Deprecated
 @RequiredArgsConstructor
-public class DocumentTransactionServiceImpl implements DocumentTransactionService {
+public class EditorOperationOrchestratorImpl implements EditorOperationOrchestrator {
 
-    private final DocumentTransactionOperationExecutor operationExecutor;
+    private final EditorSaveOperationExecutor editorSaveOperationExecutor;
     private final DocumentRepository documentRepository;
 
     @Override
     @Transactional
-    public DocumentTransactionResult apply(UUID documentId, DocumentTransactionCommand command, String actorId) {
+    public EditorSaveResult save(UUID documentId, EditorSaveCommand command, String actorId) {
         Document document = findActiveDocument(documentId);
-        DocumentTransactionContext context = new DocumentTransactionContext();
-        List<DocumentTransactionAppliedOperationResult> appliedOperations = command.operations().stream()
+        EditorSaveContext context = new EditorSaveContext();
+        List<EditorSaveAppliedOperationResult> appliedOperations = command.operations().stream()
                 .map(operation -> DocumentVersionIncrementContext.runWithoutIncrement(
-                        () -> operationExecutor.apply(documentId, document, operation, actorId, context)
+                        () -> editorSaveOperationExecutor.apply(documentId, document, operation, actorId, context)
                 ))
                 .toList();
 
-        Integer documentVersion = document.getVersion();
+        Long documentVersion = document.getVersion().longValue();
         if (hasEditorChange(appliedOperations)) {
-            documentVersion = incrementDocumentVersion(documentId, actorId);
+            documentVersion = incrementDocumentVersion(documentId, actorId).longValue();
         }
 
-        return new DocumentTransactionResult(documentId, documentVersion, command.batchId(), appliedOperations);
+        return new EditorSaveResult(documentId, documentVersion, command.batchId(), appliedOperations);
     }
 
     private Document findActiveDocument(UUID documentId) {
@@ -52,9 +50,9 @@ public class DocumentTransactionServiceImpl implements DocumentTransactionServic
                 .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
     }
 
-    private boolean hasEditorChange(List<DocumentTransactionAppliedOperationResult> appliedOperations) {
+    private boolean hasEditorChange(List<EditorSaveAppliedOperationResult> appliedOperations) {
         return appliedOperations.stream()
-                .anyMatch(result -> result.status() == APPLIED);
+                .anyMatch(result -> result.status() == EditorSaveOperationStatus.APPLIED);
     }
 
     private Integer incrementDocumentVersion(UUID documentId, String actorId) {

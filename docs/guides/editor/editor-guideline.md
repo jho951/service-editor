@@ -160,7 +160,8 @@ EditorOperationController
 
 단순 라우팅만 하는 facade 계층은 만들지 않는다.
 
-endpoint가 이미 분리되어 있으면 controller가 각 서비스로 직접 연결해도 충분하다.
+다만 editor 공통 API 경계를 조율하는 `EditorOperationOrchestrator` 자체는 둔다.
+문제는 "공통 orchestrator"가 아니라, 의미 없이 전달만 하는 facade다.
 
 ## 7. 역할 분리
 
@@ -173,14 +174,14 @@ endpoint가 이미 분리되어 있으면 controller가 각 서비스로 직접 
 
 ### 백엔드가 이 문서에서 가져가야 하는 것
 
-- controller 경계는 공통 operation 축이지만, 도메인 service는 계속 분리한다는 점
-- save는 기존 transaction orchestration을 그대로 재사용한다는 점
-- move는 단일 endpoint로 받되 `resourceType`에 따라 validation과 service 연결을 분기한다는 점
+- controller 경계 아래에는 `EditorOperationOrchestrator` 하나를 두되, 현재 명시적 오케스트레이션 범위는 save라는 점
+- save는 public editor 진입점과 실행 구조 모두 `EditorSave*` 기준으로 정리하고, 기존 transaction save 알고리즘만 유지한다는 점
+- move는 단일 endpoint로 받되 현재는 기존 구현 경계를 유지하고, orchestrator 편입은 후속 단계라는 점
 
 ### `EditorOperationController`
 
 - operation endpoint를 노출한다.
-- path variable과 request body를 받아 application service 호출로 연결한다.
+- path variable과 request body를 받아 save는 `EditorOperationOrchestrator` 호출로, move는 현재 구현 경계로 연결한다.
 - 공통 응답 포맷, 인증 사용자 식별, mapper 호출만 담당한다.
 - 도메인 정책 분기 허브가 되면 안 된다.
 
@@ -193,23 +194,24 @@ endpoint가 이미 분리되어 있으면 controller가 각 서비스로 직접 
 
 ### mapper
 
-- save는 기존 `DocumentTransactionApiMapper`를 우선 재사용한다.
+- save는 `EditorSaveApiMapper`를 기준으로 받고, command/result/operation type도 `EditorSave*` family로 맞춘다.
 - move 계열도 필요하면 endpoint 전용 mapper를 둘 수 있지만, 단순 필드 전달이면 mapper를 억지로 만들지 않는다.
 
 ### service
 
-- save는 기존 `DocumentTransactionService`가 계속 중심이다.
-- move는 공통 endpoint로 받되, 문서 이동은 `DocumentService.move(...)`, 블록 이동은 block 이동 정책 서비스가 담당한다.
-- controller 경계가 생긴다고 해서 공통 `EditorOperationService`를 반드시 만들 필요는 없다.
+- editor 공통 orchestrator는 `EditorOperationOrchestrator` 하나로 둔다.
+- save는 `EditorOperationOrchestrator.save(...)`가 editor 경계의 진입점이 되고, 내부 실행도 `EditorSaveOperationExecutor`, `EditorSaveContext` 같은 editor save 구조로 수행한다.
+- move는 editor endpoint로 제공하지만, 현재 단계에서는 controller가 기존 문서/블록 이동 서비스로 직접 연결한다.
+- orchestrator는 editor 유스케이스 조립 계층이지, 모든 도메인 로직을 직접 구현하는 계층이 아니다.
 
 ## 8. DTO 기준
 
-save DTO는 외부 계약 분리 시점까지 기존 transaction request/response 재사용을 허용한다.
+save DTO는 `EditorSaveRequest`, `EditorSaveResponse` 기준으로 정리한다.
 move DTO는 현재 `EditorMoveOperationRequest`, `EditorMoveResourceType` 기준으로 구현한다.
 
 ### save request / response
 
-save는 외부 API 이름을 `save`로 드러내되, 내부 transaction 모델은 그대로 유지한다.
+save는 외부 API 이름뿐 아니라 public command/response/type도 `EditorSave*` family로 정리한다.
 
 ```java
 public class EditorSaveRequest {
@@ -239,7 +241,8 @@ public class EditorSaveResponse {
 }
 ```
 
-현재 구현도 외부 endpoint만 `save`로 옮기고, 내부 DTO와 mapper는 기존 `DocumentTransactionRequest`, `DocumentTransactionResponse`를 그대로 재사용한다.
+현재 save의 public DTO는 `EditorSaveRequest`, `EditorSaveResponse`를 사용한다.
+내부 실행 구조도 `EditorSaveOperationType`, `EditorSaveCommand`, `EditorSaveResult`, `EditorSaveOperationExecutor` 기준으로 맞춘다.
 
 ### move request
 

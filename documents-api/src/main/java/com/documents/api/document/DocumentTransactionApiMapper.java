@@ -12,6 +12,7 @@ import com.documents.service.transaction.DocumentTransactionResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+@Deprecated
 @Component
 @RequiredArgsConstructor
 public class DocumentTransactionApiMapper {

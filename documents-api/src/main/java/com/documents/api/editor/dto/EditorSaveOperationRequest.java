@@ -1,8 +1,9 @@
-package com.documents.api.document.dto;
+package com.documents.api.editor.dto;
 
 import com.documents.api.block.validation.ValidBlockContent;
-import com.documents.service.transaction.DocumentTransactionOperationType;
+import com.documents.service.editor.EditorSaveOperationType;
 import com.fasterxml.jackson.databind.JsonNode;
+
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -10,17 +11,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Deprecated
 @Getter
 @Setter
 @NoArgsConstructor
-public class DocumentTransactionOperationRequest {
+public class EditorSaveOperationRequest {
 
     @NotBlank
     private String opId;
 
     @NotNull
-    private DocumentTransactionOperationType type;
+    private EditorSaveOperationType type;
 
     private String blockRef;
 
@@ -41,12 +41,12 @@ public class DocumentTransactionOperationRequest {
             return true;
         }
 
-        if (type == DocumentTransactionOperationType.BLOCK_CREATE) {
+        if (type == EditorSaveOperationType.BLOCK_CREATE) {
             return hasText(blockRef)
                     && version == null;
         }
 
-        if (type == DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT) {
+        if (type == EditorSaveOperationType.BLOCK_REPLACE_CONTENT) {
             return hasText(blockRef)
                     && hasContentValue()
                     && parentRef == null
@@ -54,7 +54,7 @@ public class DocumentTransactionOperationRequest {
                     && beforeRef == null;
         }
 
-        if (type == DocumentTransactionOperationType.BLOCK_DELETE) {
+        if (type == EditorSaveOperationType.BLOCK_DELETE) {
             return hasText(blockRef)
                     && !hasContentValue()
                     && parentRef == null
@@ -62,7 +62,7 @@ public class DocumentTransactionOperationRequest {
                     && beforeRef == null;
         }
 
-        if (type == DocumentTransactionOperationType.BLOCK_MOVE) {
+        if (type == EditorSaveOperationType.BLOCK_MOVE) {
             return hasText(blockRef)
                     && !hasContentValue();
         }

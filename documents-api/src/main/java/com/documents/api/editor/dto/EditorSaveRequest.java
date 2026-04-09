@@ -1,18 +1,18 @@
-package com.documents.api.document.dto;
+package com.documents.api.editor.dto;
+
+import java.util.List;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
-import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Deprecated
 @Getter
 @Setter
 @NoArgsConstructor
-public class DocumentTransactionRequest {
+public class EditorSaveRequest {
 
     @NotBlank
     private String clientId;
@@ -22,5 +22,5 @@ public class DocumentTransactionRequest {
 
     @Valid
     @NotEmpty
-    private List<DocumentTransactionOperationRequest> operations;
+    private List<EditorSaveOperationRequest> operations;
 }

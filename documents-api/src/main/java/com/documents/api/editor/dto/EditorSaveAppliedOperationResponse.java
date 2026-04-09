@@ -1,14 +1,14 @@
-package com.documents.api.document.dto;
+package com.documents.api.editor.dto;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
+
 import lombok.Builder;
 import lombok.Getter;
 
-@Deprecated
 @Getter
 @Builder
-public class DocumentTransactionAppliedOperationResponse {
+public class EditorSaveAppliedOperationResponse {
 
     private String opId;
     private String status;

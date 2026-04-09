@@ -28,10 +28,12 @@ move 처리 기준은 다음으로 고정한다.
 - drag 중간 상태를 저장하는 API로 사용하지 않는다.
 - drop 확정 시점의 최종 위치만 1회 반영하는 explicit action으로 처리한다.
 - 같은 위치로 drop된 no-op 이동은 성공으로 처리할 수 있지만, 실제 갱신과 버전 증가는 없어야 한다.
-- `resourceType=DOCUMENT`면 기존 `DocumentService.move(...)`를 그대로 호출한다.
-- `resourceType=BLOCK`면 기존 `BlockService.move(...)`를 그대로 호출한다.
+- controller는 현재 save만 `EditorOperationOrchestrator`로 연결한다.
+- move는 이번 단계에서 orchestrator로 올리지 않고 기존 문서/블록 이동 서비스 연결을 유지한다.
 - 문서/블록 move 알고리즘은 새 endpoint에서 따로 재구현하지 않고 기존 서비스 구현을 재사용한다.
-- save는 `POST /editor-operations/documents/{documentId}/save`에서 시작하지만, 내부에서는 기존 `DocumentTransactionService`, `DocumentTransactionApiMapper`, `DocumentTransactionRequest/Response`를 그대로 재사용한다.
+- save는 `POST /editor-operations/documents/{documentId}/save`에서 시작하고, public 경계는 `EditorSaveRequest/Response`, `EditorSaveApiMapper` 기준으로 받는다.
+- `EditorOperationOrchestrator.save(...)`는 `EditorSaveCommand`, `EditorSaveResult`, `EditorSaveOperationType`, `EditorSaveOperationExecutor`, `EditorSaveContext` 기준으로 직접 저장 흐름을 조율한다.
+- 기존 save 알고리즘은 유지하되, editor 경계 안에서는 `DocumentTransactionService`를 새 중심 경로로 사용하지 않는다.
 
 ---
 

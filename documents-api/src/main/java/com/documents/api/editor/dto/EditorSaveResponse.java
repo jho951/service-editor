@@ -1,17 +1,17 @@
-package com.documents.api.document.dto;
+package com.documents.api.editor.dto;
 
 import java.util.List;
 import java.util.UUID;
+
 import lombok.Builder;
 import lombok.Getter;
 
-@Deprecated
 @Getter
 @Builder
-public class DocumentTransactionResponse {
+public class EditorSaveResponse {
 
     private UUID documentId;
     private Long documentVersion;
     private String batchId;
-    private List<DocumentTransactionAppliedOperationResponse> appliedOperations;
+    private List<EditorSaveAppliedOperationResponse> appliedOperations;
 }
