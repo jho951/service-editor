@@ -196,7 +196,7 @@ public class DocumentServiceImpl implements DocumentService {
 
 	@Override
 	@Transactional
-	public void move(UUID documentId, UUID targetParentId, UUID afterDocumentId, UUID beforeDocumentId,
+	public Document move(UUID documentId, UUID targetParentId, UUID afterDocumentId, UUID beforeDocumentId,
 		String actorId) {
 		Document document = findActiveDocument(documentId);
 		Document targetParentDocument = findValidParentForMove(document, targetParentId);
@@ -214,12 +214,13 @@ public class DocumentServiceImpl implements DocumentService {
 
 		if (Objects.equals(document.getParentId(), targetParentId)
 			&& Objects.equals(document.getSortKey(), nextSortKey)) {
-			return;
+			return document;
 		}
 
 		document.setParent(targetParentDocument);
 		document.setSortKey(nextSortKey);
 		document.setUpdatedBy(textNormalizer.normalizeNullable(actorId));
+		return document;
 	}
 
 	private String generateSortKey(List<Document> siblings, UUID afterDocumentId, UUID beforeDocumentId) {

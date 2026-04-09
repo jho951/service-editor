@@ -15,7 +15,7 @@
 
 - [ADR 021](https://github.com/jho951/Block-server/blob/dev/docs/decisions/021-adopt-editor-operation-controller-boundary.md)
 - [ADR 014](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
-- [editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-transaction-save-model.md)
+- [editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-save-model.md)
 - [frontend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/frontend-editor-guideline.md)
 - [backend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/backend-editor-guideline.md)
 
@@ -27,7 +27,7 @@
 - `POST /editor-operations/move`
 
 이 중 문서화 깊이는 아직 save가 가장 크다.
-save는 기존 transaction 기반 설명을 이 기능군 안으로 편입해 상세 기준을 유지하고, move는 `EditorOperationController`의 단일 endpoint로 구현한 뒤 같은 문서군 안에서 점진적으로 보강한다.
+save는 기존 저장 알고리즘을 editor save 경계 안으로 옮겨 상세 기준을 유지하고, move는 `EditorOperationController`의 단일 endpoint로 구현한 뒤 같은 문서군 안에서 점진적으로 보강한다.
 
 ## 2. 문서 구조와 확장 기준
 
@@ -97,14 +97,14 @@ v1 구현 시작점은 아래 2개로 고정한다.
 
 - 역할:
 - document context 안의 editor save batch 반영
-- 기존 transaction-centered save model의 외부 진입점
+- editor save model의 외부 진입점
 
 - 프론트 기준:
 - autosave / 명시적 save / leave flush가 모두 이 endpoint로 간다.
 
 - 백엔드 기준:
-- `DocumentTransactionApiMapper`
-- `DocumentTransactionService`
+- `EditorSaveApiMapper`
+- `EditorOperationOrchestrator.save(...)`
 
 ### 2. move
 
@@ -120,8 +120,8 @@ v1 구현 시작점은 아래 2개로 고정한다.
 - drag 중간 hover 변화마다 호출하지 않고, drop 확정 시점에만 1회 호출한다.
 
 - 백엔드 기준:
-- `resourceType=DOCUMENT`면 `DocumentService.move(...)`로 연결한다.
-- `resourceType=BLOCK`면 block 이동 정책을 가진 서비스로 연결한다.
+- `resourceType=DOCUMENT`면 기존 `DocumentService.move(...)`로 연결한다.
+- `resourceType=BLOCK`면 기존 `BlockService.move(...)`로 연결한다.
 - controller는 move contract를 받고 `resourceType`에 따라 validation과 service 연결을 분기한다.
 - no-op drop이면 성공으로 처리할 수 있지만 실제 갱신과 버전 증가는 생기지 않게 한다.
 
@@ -155,7 +155,7 @@ POST /editor-operations
 EditorOperationController
   -> EditorOperationFacade
     -> switch(type)
-      -> DocumentService / BlockService / DocumentTransactionService
+      -> DocumentService / BlockService / EditorOperationOrchestrator
 ```
 
 단순 라우팅만 하는 facade 계층은 만들지 않는다.
@@ -174,14 +174,14 @@ EditorOperationController
 
 ### 백엔드가 이 문서에서 가져가야 하는 것
 
-- controller 경계 아래에는 `EditorOperationOrchestrator` 하나를 두되, 현재 명시적 오케스트레이션 범위는 save라는 점
-- save는 public editor 진입점과 실행 구조 모두 `EditorSave*` 기준으로 정리하고, 기존 transaction save 알고리즘만 유지한다는 점
-- move는 단일 endpoint로 받되 현재는 기존 구현 경계를 유지하고, orchestrator 편입은 후속 단계라는 점
+- controller 경계 아래에는 `EditorOperationOrchestrator` 하나를 두고, save와 move를 같은 editor operation family로 읽는다는 점
+- save는 public editor 진입점과 실행 구조 모두 `EditorSave*` 기준으로 정리하고, 기존 save 알고리즘만 유지한다는 점
+- move는 `EditorMove*` 기준으로 orchestrator에 편입하되, 기존 문서/블록 이동 알고리즘은 그대로 재사용한다는 점
 
 ### `EditorOperationController`
 
 - operation endpoint를 노출한다.
-- path variable과 request body를 받아 save는 `EditorOperationOrchestrator` 호출로, move는 현재 구현 경계로 연결한다.
+- path variable과 request body를 받아 save와 move를 모두 `EditorOperationOrchestrator` 호출로 연결한다.
 - 공통 응답 포맷, 인증 사용자 식별, mapper 호출만 담당한다.
 - 도메인 정책 분기 허브가 되면 안 된다.
 
@@ -195,19 +195,19 @@ EditorOperationController
 ### mapper
 
 - save는 `EditorSaveApiMapper`를 기준으로 받고, command/result/operation type도 `EditorSave*` family로 맞춘다.
-- move 계열도 필요하면 endpoint 전용 mapper를 둘 수 있지만, 단순 필드 전달이면 mapper를 억지로 만들지 않는다.
+- move는 `EditorMoveApiMapper`, `EditorMoveCommand`, core `EditorMoveResourceType` 기준으로 같은 family 안에서 정리한다.
 
 ### service
 
 - editor 공통 orchestrator는 `EditorOperationOrchestrator` 하나로 둔다.
 - save는 `EditorOperationOrchestrator.save(...)`가 editor 경계의 진입점이 되고, 내부 실행도 `EditorSaveOperationExecutor`, `EditorSaveContext` 같은 editor save 구조로 수행한다.
-- move는 editor endpoint로 제공하지만, 현재 단계에서는 controller가 기존 문서/블록 이동 서비스로 직접 연결한다.
+- move는 `EditorOperationOrchestrator.move(...)`가 editor 경계의 진입점이 되고, 문서 이동은 `DocumentService.move(...)`, 블록 이동은 editor save의 `BLOCK_MOVE` 실행 경로를 재사용한다.
 - orchestrator는 editor 유스케이스 조립 계층이지, 모든 도메인 로직을 직접 구현하는 계층이 아니다.
 
 ## 8. DTO 기준
 
 save DTO는 `EditorSaveRequest`, `EditorSaveResponse` 기준으로 정리한다.
-move DTO는 현재 `EditorMoveOperationRequest`, `EditorMoveResourceType` 기준으로 구현한다.
+move DTO는 현재 `EditorMoveOperationRequest`와 core `EditorMoveResourceType` 기준으로 구현한다.
 
 ### save request / response
 
@@ -264,6 +264,17 @@ public enum EditorMoveResourceType {
 }
 ```
 
+```java
+public class EditorMoveResponse {
+    private EditorMoveResourceType resourceType;
+    private UUID resourceId;
+    private UUID parentId;
+    private Long version;
+    private Long documentVersion;
+    private String sortKey;
+}
+```
+
 주의:
 
 - `resourceType=DOCUMENT`면 `targetParentId`, `afterId`, `beforeId`를 문서 ID 기준으로 해석한다.
@@ -271,10 +282,14 @@ public enum EditorMoveResourceType {
 - `version`은 block move에서는 필수, document move에서는 선택 또는 미사용으로 둘 수 있다.
 - 이 request는 move 하나만 공통화한 contract다. create/update/delete까지 같은 방식으로 확장하지 않는다.
 
+현재 move는 `EditorMoveOperationRequest`가 core `EditorMoveResourceType`를 직접 사용하고, `EditorMoveApiMapper`, `EditorMoveCommand`를 거쳐 `EditorOperationOrchestrator.move(...)`로 연결한다.
+문서 이동은 기존 `DocumentService.move(...)`, 블록 이동은 editor save의 `BLOCK_MOVE` 실행 경로를 재사용한다.
+응답은 `EditorMoveResponse`로 돌려주고, 프론트가 후속 상태 동기화에 필요한 `resourceId`, `parentId`, `version`, `documentVersion`, `sortKey`를 포함한다.
+
 ## 9. 구현 순서
 
 1. `EditorOperationController`를 추가한다.
-2. document save endpoint를 먼저 옮기고 기존 transaction 서비스 재사용을 확인한다.
+2. document save endpoint를 먼저 옮기고 기존 저장 알고리즘이 editor save 구조 안에서 유지되는지 확인한다.
 3. 단일 move endpoint를 추가하고 문서/블록 이동 요청을 모두 이 경계로 옮긴다.
 4. `resourceType` 기준 validation과 service 연결을 정리한다.
 5. Swagger 태그와 summary를 operation 성격에 맞게 정리한다.
@@ -284,7 +299,7 @@ public enum EditorMoveResourceType {
 
 - `DocumentController`에는 문서 메타데이터 / 조회 / 휴지통 / 복구만 남는가
 - `EditorOperationController`가 범용 `type` 분기 endpoint로 무너지지 않는가
-- save endpoint가 기존 transaction orchestration을 그대로 재사용하는가
+- save endpoint가 기존 저장 알고리즘을 editor save 구조 안에서 그대로 유지하는가
 - move endpoint가 단일 contract를 쓰더라도 `resourceType`별 검증과 service 연결이 분명한가
 - 프론트와 백엔드 guide가 이 guideline을 공통 계약 문서로 참조하고 있는가
 - admin block 보조 API와 editor operation 표준 API의 역할이 문서상 분명한가

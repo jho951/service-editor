@@ -4,7 +4,7 @@ public record EditorSaveOperationCommand(
         String opId,
         EditorSaveOperationType type,
         String blockReference,
-        Integer version,
+        Long version,
         String content,
         String parentReference,
         String afterReference,

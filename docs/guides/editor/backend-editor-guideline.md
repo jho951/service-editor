@@ -7,7 +7,7 @@
 이 문서만 읽어도 다음을 이해할 수 있도록 작성한다.
 
 - 백엔드가 어떤 책임을 가져야 하는가
-- 프론트 queue와 백엔드 transaction 처리의 경계가 어디인가
+- 프론트 queue와 백엔드 save batch 처리의 경계가 어디인가
 - editor operation family 안에서 save와 move를 어떤 서비스 경계로 나눌 것인가
 - `POST /editor-operations/documents/{documentId}/save`를 어떤 순서로 검증하고 반영해야 하는가
 - `tempId`, `version`, conflict, rollback을 어떻게 다뤄야 하는가
@@ -15,25 +15,28 @@
 관련 문서:
 
 - [editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
-- [editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-transaction-save-model.md)
+- [editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-save-model.md)
 - [frontend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/frontend-editor-guideline.md)
 - [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
 - [ADR 014](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
 
 현재 이 문서의 상세 범위는 document `save` endpoint가 중심이다.
 move는 `POST /editor-operations/move` 단일 endpoint를 사용하고, request DTO는 `EditorMoveOperationRequest`를 기준으로 받는다.
+응답은 `EditorMoveResponse`를 사용하고, `resourceType`, `resourceId`, `parentId`, `version`, `documentVersion`, `sortKey`를 반환한다.
 
 move 처리 기준은 다음으로 고정한다.
 
 - drag 중간 상태를 저장하는 API로 사용하지 않는다.
 - drop 확정 시점의 최종 위치만 1회 반영하는 explicit action으로 처리한다.
 - 같은 위치로 drop된 no-op 이동은 성공으로 처리할 수 있지만, 실제 갱신과 버전 증가는 없어야 한다.
-- controller는 현재 save만 `EditorOperationOrchestrator`로 연결한다.
-- move는 이번 단계에서 orchestrator로 올리지 않고 기존 문서/블록 이동 서비스 연결을 유지한다.
-- 문서/블록 move 알고리즘은 새 endpoint에서 따로 재구현하지 않고 기존 서비스 구현을 재사용한다.
+- controller는 save와 move를 모두 `EditorOperationOrchestrator`로 연결한다.
+- `EditorOperationOrchestrator.move(...)`는 `EditorMoveCommand`, `EditorMoveResourceType` 기준으로 받고, 문서 이동은 기존 `DocumentService.move(...)`, 블록 이동은 `EditorSaveOperationExecutor`의 `BLOCK_MOVE` 실행 경로를 재사용한다.
+- 문서/블록 move 알고리즘은 새 endpoint에서 따로 재구현하지 않고 기존 구현을 그대로 재사용한다.
+- block move 응답에는 갱신된 `version`, `documentVersion`, `sortKey`를 포함한다.
+- document move 응답도 현재 위치 반영 결과와 최신 `documentVersion`을 같은 response 구조로 돌려준다.
 - save는 `POST /editor-operations/documents/{documentId}/save`에서 시작하고, public 경계는 `EditorSaveRequest/Response`, `EditorSaveApiMapper` 기준으로 받는다.
 - `EditorOperationOrchestrator.save(...)`는 `EditorSaveCommand`, `EditorSaveResult`, `EditorSaveOperationType`, `EditorSaveOperationExecutor`, `EditorSaveContext` 기준으로 직접 저장 흐름을 조율한다.
-- 기존 save 알고리즘은 유지하되, editor 경계 안에서는 `DocumentTransactionService`를 새 중심 경로로 사용하지 않는다.
+- 기존 save 알고리즘은 유지하되, editor 경계 안에서는 deprecated `DocumentTransactionService`를 새 중심 경로로 사용하지 않는다.
 
 ---
 
@@ -75,12 +78,12 @@ v1 전제는 다음과 같다.
 - operation은 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE` 4개
 - `BLOCK_CREATE`는 위치를 항상 다루고, 필요하면 초기 `content`를 함께 받을 수 있다.
 - 기존 서버 block의 본문 변경은 `BLOCK_REPLACE_CONTENT`가 담당한다.
-- 모든 transaction operation은 블록 참조 필드로 `blockRef`를 사용한다.
+- save operation은 블록 참조 필드로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.
 - `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
 - 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
 - `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`다.
-- 서버는 `blockRef`, `parentRef`, `afterRef`, `beforeRef`를 모두 같은 transaction 컨텍스트에서 해석해야 한다.
+- 서버는 `blockRef`, `parentRef`, `afterRef`, `beforeRef`를 모두 같은 editor save 컨텍스트에서 해석해야 한다.
 - `BLOCK_CREATE.content`가 없으면 서버는 `blocks.content_json` not null 제약을 만족시키기 위해 기본 empty structured content를 저장할 수 있다.
 - `BLOCK_CREATE.content`가 있으면 서버는 그 값을 새 블록의 초기 content로 저장한다.
 - 기존 block 수정/이동/삭제는 `version`이 필요하다.
@@ -104,7 +107,7 @@ v1 전제는 다음과 같다.
 - `version`이 필요한 op에 들어왔는지
 - `content`가 structured content validation을 통과하는지
 
-### 3. transaction 컨텍스트 생성
+### 3. editor save 컨텍스트 생성
 
 - 같은 batch 안에서 사용할 `tempId -> real block` 매핑 컨텍스트 준비
 - success 응답용 applied operation 결과 수집 컨텍스트 준비
@@ -281,7 +284,7 @@ sequenceDiagram
 
 현재 구현은 아래 정책을 명시적으로 보장한다.
 
-- transaction 실패 정책은 부분 적용이 아니라 전체 rollback이다.
+- save 실패 정책은 부분 적용이 아니라 전체 rollback이다.
 - `BLOCK_CREATE`, `BLOCK_DELETE`는 성공 시 항상 `APPLIED`다.
 - `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`는 실제 상태 변화가 없으면 `NO_OP`, 변화가 있으면 `APPLIED`다.
 - `NO_OP`에서는 version과 `updatedBy`를 증가시키지 않는다.
@@ -290,13 +293,13 @@ sequenceDiagram
 - `BLOCK_MOVE`는 self-anchor, reversed anchor, same-anchor, target parent와 맞지 않는 anchor를 잘못된 요청으로 거절한다.
 - temp block은 같은 batch 안에서 create, replace, move, delete를 같은 context로 이어서 처리할 수 있다.
 - 프론트는 새 temp block의 create와 replace_content를 collapse하는 것을 우선 권장하지만, 이는 최적화일 뿐 서버 계약의 필수 전제가 아니다.
-- temp block 대상 `BLOCK_REPLACE_CONTENT`는 여전히 허용하며, 서버는 collapse되지 않은 batch도 같은 transaction 컨텍스트에서 정상 처리할 수 있어야 한다.
+- temp block 대상 `BLOCK_REPLACE_CONTENT`는 여전히 허용하며, 서버는 collapse되지 않은 batch도 같은 editor save 컨텍스트에서 정상 처리할 수 있어야 한다.
 - 기존 서버 block은 첫 참조에서만 DB와 동시성을 검증하고, 같은 batch의 뒤 operation은 서버가 내부 최신 version을 이어받아 처리한다.
 - 대신 같은 real block에 대해 batch 안에서 서로 다른 base `version`을 섞어 보내면 conflict로 실패한다.
 - `BLOCK_DELETE`도 실제 soft delete 시점에 root block version을 where 절에 함께 걸어, 검증 이후 다른 사용자가 먼저 바꾼 경우 conflict로 막는다.
 - `BLOCK_DELETE`는 soft delete 시 삭제되는 subtree version도 함께 증가시켜, 동시에 열려 있던 update/move가 삭제 상태를 되살리지 못하게 막는다.
 
-즉 백엔드는 queue coalescing을 다시 하지 않고, 프론트가 보낸 최종 batch를 현재 서버 상태와 transaction 규칙에 따라 검증하고 일괄 반영한다.
+즉 백엔드는 queue coalescing을 다시 하지 않고, 프론트가 보낸 최종 batch를 현재 서버 상태와 editor save 규칙에 따라 검증하고 일괄 반영한다.
 
 ---
 
@@ -392,7 +395,7 @@ v1 conflict 기준은 block 단위 version이다.
 백엔드:
 
 - 각 delete root subtree soft delete
-- 전체 transaction 안에서 적용
+- 전체 save batch 안에서 적용
 
 ---
 

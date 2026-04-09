@@ -13,6 +13,7 @@ import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.BlockRepository;
+import com.documents.service.editor.EditorMoveAppliedResult;
 import com.documents.service.editor.EditorSaveAppliedOperationResult;
 import com.documents.service.editor.EditorSaveContext;
 import com.documents.service.editor.EditorSaveOperationCommand;
@@ -45,6 +46,32 @@ public class EditorSaveOperationExecutor {
         };
     }
 
+    public EditorMoveAppliedResult applyMove(
+            UUID blockId,
+            UUID parentId,
+            UUID afterBlockId,
+            UUID beforeBlockId,
+            Long version,
+            String actorId
+    ) {
+        Block movedBlock = blockService.move(
+                blockId,
+                parentId,
+                afterBlockId,
+                beforeBlockId,
+                toEntityVersion(version),
+                actorId
+        );
+        blockRepository.flush();
+
+        return new EditorMoveAppliedResult(
+                movedBlock.getId(),
+                movedBlock.getParentId(),
+                movedBlock.getVersion().longValue(),
+                movedBlock.getSortKey()
+        );
+    }
+
     private EditorSaveAppliedOperationResult applyCreate(
             Document document,
             EditorSaveOperationCommand operation,
@@ -66,7 +93,7 @@ public class EditorSaveOperationExecutor {
         );
         blockRepository.flush();
 
-        context.put(operation.blockReference(), createdBlock.getId(), createdBlock.getVersion(), null, true);
+        context.put(operation.blockReference(), createdBlock.getId(), createdBlock.getVersion().longValue(), null, true);
 
         return new EditorSaveAppliedOperationResult(
                 operation.opId(),
@@ -96,7 +123,7 @@ public class EditorSaveOperationExecutor {
         Block updatedBlock = blockService.update(
                 resolvedBlockReference.realBlockId(),
                 operation.content(),
-                resolvedBlockReference.version(),
+                toEntityVersion(resolvedBlockReference.version()),
                 actorId
         );
         blockRepository.flush();
@@ -104,7 +131,7 @@ public class EditorSaveOperationExecutor {
         context.put(
                 operation.blockReference(),
                 updatedBlock.getId(),
-                updatedBlock.getVersion(),
+                updatedBlock.getVersion().longValue(),
                 resolvedBlockReference.clientVersion(),
                 resolvedBlockReference.temporary()
         );
@@ -134,7 +161,7 @@ public class EditorSaveOperationExecutor {
                 resolvedPositionReferences.parentId(),
                 resolvedPositionReferences.afterBlockId(),
                 resolvedPositionReferences.beforeBlockId(),
-                resolvedBlockReference.version(),
+                toEntityVersion(resolvedBlockReference.version()),
                 actorId
         );
         blockRepository.flush();
@@ -142,7 +169,7 @@ public class EditorSaveOperationExecutor {
         context.put(
                 operation.blockReference(),
                 movedBlock.getId(),
-                movedBlock.getVersion(),
+                movedBlock.getVersion().longValue(),
                 resolvedBlockReference.clientVersion(),
                 resolvedBlockReference.temporary()
         );
@@ -207,7 +234,7 @@ public class EditorSaveOperationExecutor {
         }
 
         Block block = resolveFirstExistingBlock(documentId, operation);
-        return new ResolvedBlockReference(block.getId(), block.getVersion(), operation.version(), false);
+        return new ResolvedBlockReference(block.getId(), block.getVersion().longValue(), operation.version(), false);
     }
 
     private void validateBlockReferenceIsUnique(String blockReference, EditorSaveContext context) {
@@ -279,14 +306,14 @@ public class EditorSaveOperationExecutor {
         }
     }
 
-    private void validateBlockVersion(Integer version, Block block) {
-        if (!block.getVersion().equals(version)) {
+    private void validateBlockVersion(Long version, Block block) {
+        if (!Long.valueOf(block.getVersion()).equals(version)) {
             throw new BusinessException(BusinessErrorCode.CONFLICT);
         }
     }
 
     private void validateRepeatedReferenceVersion(
-            Integer version,
+            Long version,
             EditorSaveContext.BlockReferenceState state
     ) {
         if (state.temporary()) {
@@ -302,20 +329,30 @@ public class EditorSaveOperationExecutor {
         }
     }
 
-    private void validateVersionIsPresent(Integer version) {
+    private void validateVersionIsPresent(Long version) {
         if (version == null) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
         }
     }
 
-    private EditorSaveOperationStatus resolveAppliedStatus(Integer requestedVersion, Block block) {
-        return block.getVersion().equals(requestedVersion) ? NO_OP : APPLIED;
+    private EditorSaveOperationStatus resolveAppliedStatus(Long requestedVersion, Block block) {
+        return Long.valueOf(block.getVersion()).equals(requestedVersion) ? NO_OP : APPLIED;
+    }
+
+    private Integer toEntityVersion(Long version) {
+        validateVersionIsPresent(version);
+
+        if (version > Integer.MAX_VALUE || version < Integer.MIN_VALUE) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
+        return version.intValue();
     }
 
     private record ResolvedBlockReference(
             UUID realBlockId,
-            Integer version,
-            Integer clientVersion,
+            Long version,
+            Long clientVersion,
             boolean temporary
     ) {
     }

@@ -16,7 +16,7 @@ public class EditorSaveContext {
         return blockReferenceStates.get(blockReference);
     }
 
-    public void put(String blockReference, UUID realBlockId, Integer currentVersion, Integer clientVersion, boolean temporary) {
+    public void put(String blockReference, UUID realBlockId, Long currentVersion, Long clientVersion, boolean temporary) {
         blockReferenceStates.put(
                 blockReference,
                 new BlockReferenceState(realBlockId, currentVersion, clientVersion, temporary)
@@ -25,8 +25,8 @@ public class EditorSaveContext {
 
     public record BlockReferenceState(
             UUID realBlockId,
-            Integer currentVersion,
-            Integer clientVersion,
+            Long currentVersion,
+            Long clientVersion,
             boolean temporary
     ) {
     }

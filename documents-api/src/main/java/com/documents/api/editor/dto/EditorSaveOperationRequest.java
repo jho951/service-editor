@@ -24,7 +24,7 @@ public class EditorSaveOperationRequest {
 
     private String blockRef;
 
-    private Integer version;
+    private Long version;
 
     @ValidBlockContent
     private JsonNode content;

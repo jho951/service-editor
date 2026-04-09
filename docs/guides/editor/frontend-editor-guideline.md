@@ -6,7 +6,7 @@
 
 이 문서만 읽어도 다음을 이해할 수 있도록 작성한다.
 
-- 왜 에디터 저장을 단건 CRUD가 아니라 transaction queue로 다루는가
+- 왜 에디터 저장을 단건 CRUD가 아니라 save queue로 다루는가
 - editor operation family 안에서 save와 move를 어떤 기준으로 구분하는가
 - 프론트가 어떤 상태를 들고 있어야 하는가
 - 어떤 이벤트가 어떤 operation으로 바뀌는가
@@ -16,7 +16,7 @@
 관련 문서:
 
 - [editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
-- [editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-transaction-save-model.md)
+- [editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-save-model.md)
 - [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
 - [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
 - [ADR 012](https://github.com/jho951/Block-server/blob/dev/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
@@ -31,7 +31,8 @@ move 호출 기준은 다음으로 고정한다.
 - 같은 위치로 drop된 no-op 이동은 클라이언트에서 먼저 걸러도 되고, 서버 성공 no-op으로 처리해도 된다.
 - 문서 이동은 `resourceType=DOCUMENT`와 `resourceId=documentId`를 사용한다.
 - 블록 이동은 `resourceType=BLOCK`, `resourceId=blockId`, `version=현재 block version`을 사용한다.
-- save payload는 현재도 기존 transaction payload shape를 그대로 사용한다. 즉 외부 path만 `save`로 바뀌고 body는 `clientId`, `batchId`, `operations` 구조를 유지한다.
+- move 응답은 `resourceType`, `resourceId`, `parentId`, `version`, `documentVersion`, `sortKey`를 포함한다고 보고 로컬 상태를 동기화한다.
+- save payload는 editor save payload shape를 사용한다. body는 `clientId`, `batchId`, `operations` 구조를 유지한다.
 
 ---
 
@@ -144,7 +145,7 @@ move 호출 기준은 다음으로 고정한다.
 
 주의:
 
-- transaction top-level에는 `clientId`, `batchId`, `operations`를 담는다.
+- save top-level에는 `clientId`, `batchId`, `operations`를 담는다.
 - 동시성 기준은 문서 전체 snapshot이 아니라 각 block operation의 `version`이다.
 - 성공 응답의 `documentVersion`은 최신 문서 snapshot으로 갱신해 로컬 상태에 반영한다.
 - temp block 대상 `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`에는 여전히 `version`을 넣지 않는다.
@@ -163,7 +164,7 @@ move 호출 기준은 다음으로 고정한다.
 
 - 이벤트를 operation으로 바꾼다.
 - operation들을 queue에 적재한다.
-- queue를 transaction 요청으로 직렬화한다.
+- queue를 save 요청으로 직렬화한다.
 
 ---
 
@@ -391,7 +392,7 @@ queue는 다음 정리 규칙을 수행해야 한다.
 
 ---
 
-## 9. transaction 요청을 만들 때
+## 9. save 요청을 만들 때
 
 프론트는 queue 내부 구조를 그대로 보내지 말고, flush 직전에 서버 계약에 맞는 payload로 직렬화해야 한다.
 
@@ -439,7 +440,7 @@ queue는 다음 정리 규칙을 수행해야 한다.
 
 프론트 queue 구현은 아래 서버 규칙을 전제로 맞추는 것이 안전하다.
 
-- transaction은 부분 성공이 아니라 전체 commit 또는 전체 rollback이다.
+- save batch는 부분 성공이 아니라 전체 commit 또는 전체 rollback이다.
 - `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`는 요청이 유효하지만 실제 상태 변화가 없으면 `status=NO_OP`로 응답한다.
 - `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`의 no-op는 version을 올리지 않는다.
 - `BLOCK_DELETE` 뒤 같은 batch에서 같은 block 또는 그 subtree 자식을 다시 `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`로 참조하면 실패하고 전체 rollback 된다.
@@ -573,7 +574,7 @@ sequenceDiagram
 4. 사용자가 다시 block A로 돌아와 `" there"`를 입력한다.
 5. 프론트는 block A의 로컬 content를 `"Hi there"`로 갱신한다.
 6. queue에는 `BLOCK_MOVE(blockRef=blockB)`와 함께 block A의 최신 `BLOCK_REPLACE_CONTENT(blockRef=blockA)`가 공존한다.
-7. flush 시 두 operation을 같은 transaction batch로 보낼 수 있다.
+7. flush 시 두 operation을 같은 save batch로 보낼 수 있다.
 
 구현 포인트:
 

@@ -34,13 +34,12 @@
 - v1 기준 우선 반영 대상은 다음 2개다.
 - `POST /editor-operations/documents/{documentId}/save`
 - `POST /editor-operations/move`
-- `EditorOperationController` 아래에는 editor 공통 application 계층인 `EditorOperationOrchestrator`를 두되, 현재 도입 범위는 save에 한정한다.
-- 현재 `EditorOperationController`는 save만 `EditorOperationOrchestrator`로 연결하고, move는 기존 구조를 유지한 채 다음 단계에서 오케스트레이션 편입을 검토한다.
+- `EditorOperationController` 아래에는 editor 공통 application 계층인 `EditorOperationOrchestrator`를 둔다.
 - save endpoint는 editor 통합 구조 안에서 `EditorOperationOrchestrator.save(...)`로 받고, save 실행 구조도 `EditorSave*` 계열로 editor 문맥 안에 둔다.
 - 기존 save 로직의 실행 알고리즘은 유지하되, editor 경계에서는 `DocumentTransaction*`가 아니라 `EditorSave*` 이름과 구조를 중심으로 사용한다.
 - move는 문서 이동과 블록 이동을 하나의 명시적 move endpoint로 통합한다.
 - move request는 `resourceType`, `resourceId`, `targetParentId`, `afterId`, `beforeId`, `version` 기준으로 설계한다.
-- 현재 move의 validation과 service 연결은 기존 구현 경계를 유지하고, orchestrator 편입은 후속 단계에서 진행한다.
+- move는 `EditorOperationOrchestrator.move(...)`로 받고, 문서 이동은 기존 `DocumentService.move(...)`, 블록 이동은 editor save의 `BLOCK_MOVE` 실행 경로를 재사용한다.
 - 이 분기는 모든 operation을 받는 범용 dispatcher가 아니라, move 하나만 공통화한 단일 operation contract 안에서만 허용한다.
 - move API는 drag 중간 상태를 저장하지 않고, drop 확정 시점의 최종 위치만 1회 반영하는 explicit structure action으로 사용한다.
 - create/read/update/delete/trash/restore 같은 리소스 CRUD는 기존 `DocumentController`, block 전용 controller 경계에 남긴다.
@@ -50,12 +49,12 @@
 - 장점:
 - 리소스 CRUD와 editor operation write 경계가 분명해진다.
 - `Document`와 `Block`의 공통화를 영속 모델이 아니라 operation 경계에서만 가져갈 수 있다.
-- save는 기존 orchestration 구조를 유지하고, move는 하나의 명시적 endpoint로 문서/블록 이동을 함께 처리할 수 있다.
+- save와 move를 같은 editor orchestrator 경계에서 읽되, 기존 저장/이동 알고리즘은 그대로 재사용할 수 있다.
 - move API를 호출하는 쪽에서는 대상 종류만 바꿔 같은 contract를 재사용할 수 있다.
 
 - 단점:
 - 기존 `DocumentController`의 save / move path와 책임을 재배치해야 한다.
-- move를 orchestrator로 편입할 때 `resourceType`별 validation과 service 연결 규칙을 명확히 관리해야 한다.
+- move 편입 이후에도 `resourceType`별 validation과 service 연결 규칙을 명확히 관리해야 한다.
 - 기존 admin block 보조 API와 새 operation path의 역할을 문서와 구현에서 명확히 구분해야 한다.
 
 ## 관련 문서

@@ -2,6 +2,8 @@ package com.documents.api.editor.dto;
 
 import java.util.UUID;
 
+import com.documents.service.editor.EditorMoveResourceType;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
@@ -33,7 +35,7 @@ public class EditorMoveOperationRequest {
     private UUID beforeId;
 
     @Schema(description = "클라이언트가 기준으로 삼은 블록 버전", example = "3", nullable = true)
-    private Integer version;
+    private Long version;
 
     @AssertTrue(message = "resourceType이 BLOCK이면 version이 필요합니다.")
     public boolean hasVersionWhenBlockMove() {
