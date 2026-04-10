@@ -1,6 +1,6 @@
 package com.documents.service;
 
-import static com.documents.service.transaction.DocumentTransactionOperationStatus.APPLIED;
+import static com.documents.service.editor.EditorSaveOperationStatus.APPLIED;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,45 +14,45 @@ import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.repository.DocumentRepository;
-import com.documents.service.transaction.DocumentTransactionAppliedOperationResult;
-import com.documents.service.transaction.DocumentTransactionContext;
-import com.documents.service.transaction.DocumentTransactionOperationCommand;
-import com.documents.service.transaction.DocumentTransactionOperationType;
-import com.documents.service.transaction.DocumentTransactionResult;
+import com.documents.service.editor.EditorSaveAppliedOperationResult;
+import com.documents.service.editor.EditorSaveContext;
+import com.documents.service.editor.EditorSaveOperationCommand;
+import com.documents.service.editor.EditorSaveOperationType;
+import com.documents.service.editor.EditorSaveResult;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class AdminBlockTransactionServiceImpl implements AdminBlockTransactionService {
+public class AdminBlockOperationServiceImpl implements AdminBlockOperationService {
 
     private final BlockService blockService;
     private final DocumentRepository documentRepository;
-    private final DocumentTransactionOperationExecutor operationExecutor;
+    private final EditorSaveOperationExecutor operationExecutor;
 
     @Override
     @Transactional
-    public DocumentTransactionResult applyCreate(
+    public EditorSaveResult applyCreate(
             UUID documentId,
             String batchId,
-            DocumentTransactionOperationCommand operation,
+            EditorSaveOperationCommand operation,
             String actorId
     ) {
         Document document = findActiveDocument(documentId);
-        validateOperationType(operation, DocumentTransactionOperationType.BLOCK_CREATE);
+        validateOperationType(operation, EditorSaveOperationType.BLOCK_CREATE);
         return applySingleOperation(documentId, document, batchId, operation, actorId);
     }
 
     @Override
     @Transactional
-    public DocumentTransactionResult applyReplaceContent(
+    public EditorSaveResult applyReplaceContent(
             UUID blockId,
             String batchId,
-            DocumentTransactionOperationCommand operation,
+            EditorSaveOperationCommand operation,
             String actorId
     ) {
         Block block = blockService.getById(blockId);
-        validateOperationType(operation, DocumentTransactionOperationType.BLOCK_REPLACE_CONTENT);
+        validateOperationType(operation, EditorSaveOperationType.BLOCK_REPLACE_CONTENT);
         validateBlockReferenceMatches(blockId, operation);
         Document document = findActiveDocument(block.getDocumentId());
         return applySingleOperation(document.getId(), document, batchId, operation, actorId);
@@ -60,14 +60,14 @@ public class AdminBlockTransactionServiceImpl implements AdminBlockTransactionSe
 
     @Override
     @Transactional
-    public DocumentTransactionResult applyMove(
+    public EditorSaveResult applyMove(
             UUID blockId,
             String batchId,
-            DocumentTransactionOperationCommand operation,
+            EditorSaveOperationCommand operation,
             String actorId
     ) {
         Block block = blockService.getById(blockId);
-        validateOperationType(operation, DocumentTransactionOperationType.BLOCK_MOVE);
+        validateOperationType(operation, EditorSaveOperationType.BLOCK_MOVE);
         validateBlockReferenceMatches(blockId, operation);
         Document document = findActiveDocument(block.getDocumentId());
         return applySingleOperation(document.getId(), document, batchId, operation, actorId);
@@ -75,48 +75,48 @@ public class AdminBlockTransactionServiceImpl implements AdminBlockTransactionSe
 
     @Override
     @Transactional
-    public DocumentTransactionResult applyDelete(
+    public EditorSaveResult applyDelete(
             UUID blockId,
             String batchId,
-            DocumentTransactionOperationCommand operation,
+            EditorSaveOperationCommand operation,
             String actorId
     ) {
         Block block = blockService.getById(blockId);
-        validateOperationType(operation, DocumentTransactionOperationType.BLOCK_DELETE);
+        validateOperationType(operation, EditorSaveOperationType.BLOCK_DELETE);
         validateBlockReferenceMatches(blockId, operation);
         Document document = findActiveDocument(block.getDocumentId());
         return applySingleOperation(document.getId(), document, batchId, operation, actorId);
     }
 
-    private DocumentTransactionResult applySingleOperation(
+    private EditorSaveResult applySingleOperation(
             UUID documentId,
             Document document,
             String batchId,
-            DocumentTransactionOperationCommand operation,
+            EditorSaveOperationCommand operation,
             String actorId
     ) {
-        DocumentTransactionAppliedOperationResult appliedOperation = DocumentVersionIncrementContext.runWithoutIncrement(
-                () -> operationExecutor.apply(documentId, document, operation, actorId, new DocumentTransactionContext())
+        EditorSaveAppliedOperationResult appliedOperation = DocumentVersionIncrementContext.runWithoutIncrement(
+                () -> operationExecutor.apply(documentId, document, operation, actorId, new EditorSaveContext())
         );
 
-        Integer documentVersion = document.getVersion();
+        Long documentVersion = document.getVersion().longValue();
         if (appliedOperation.status() == APPLIED) {
-            documentVersion = incrementDocumentVersion(documentId, actorId);
+            documentVersion = incrementDocumentVersion(documentId, actorId).longValue();
         }
 
-        return new DocumentTransactionResult(documentId, documentVersion, batchId, List.of(appliedOperation));
+        return new EditorSaveResult(documentId, documentVersion, batchId, List.of(appliedOperation));
     }
 
     private void validateOperationType(
-            DocumentTransactionOperationCommand operation,
-            DocumentTransactionOperationType expectedType
+            EditorSaveOperationCommand operation,
+            EditorSaveOperationType expectedType
     ) {
         if (operation == null || operation.type() != expectedType) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
         }
     }
 
-    private void validateBlockReferenceMatches(UUID blockId, DocumentTransactionOperationCommand operation) {
+    private void validateBlockReferenceMatches(UUID blockId, EditorSaveOperationCommand operation) {
         if (!blockId.toString().equals(operation.blockReference())) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
         }

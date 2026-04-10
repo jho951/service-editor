@@ -13,12 +13,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.documents.api.auth.CurrentUserId;
 import com.documents.api.code.SuccessCode;
-import com.documents.api.document.DocumentTransactionApiMapper;
-import com.documents.api.document.dto.DocumentTransactionRequest;
-import com.documents.api.document.dto.DocumentTransactionResponse;
 import com.documents.api.dto.GlobalResponse;
-import com.documents.service.AdminBlockTransactionService;
-import com.documents.service.transaction.DocumentTransactionCommand;
+import com.documents.api.editor.EditorSaveApiMapper;
+import com.documents.api.editor.dto.EditorSaveRequest;
+import com.documents.api.editor.dto.EditorSaveResponse;
+import com.documents.service.AdminBlockOperationService;
+import com.documents.service.editor.EditorSaveCommand;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,73 +31,73 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/admin")
 public class AdminBlockController {
 
-    private final AdminBlockTransactionService adminBlockTransactionService;
-    private final DocumentTransactionApiMapper documentTransactionApiMapper;
+    private final AdminBlockOperationService adminBlockOperationService;
+    private final EditorSaveApiMapper editorSaveApiMapper;
 
     @Operation(summary = "텍스트 블록 생성")
     @PostMapping("/documents/{documentId}/blocks")
-    public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> createBlock(
+    public ResponseEntity<GlobalResponse<EditorSaveResponse>> createBlock(
             @PathVariable("documentId") UUID documentId,
-            @Valid @RequestBody DocumentTransactionRequest request,
+            @Valid @RequestBody EditorSaveRequest request,
             @CurrentUserId String userId
     ) {
-        DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
+        EditorSaveCommand command = editorSaveApiMapper.toCommand(request);
 
         return ResponseEntity.ok(GlobalResponse.ok(
                 SuccessCode.SUCCESS,
-                documentTransactionApiMapper.toResponse(
-                        adminBlockTransactionService.applyCreate(documentId, command.batchId(), command.operations().get(0), userId)
+                editorSaveApiMapper.toResponse(
+                        adminBlockOperationService.applyCreate(documentId, command.batchId(), command.operations().get(0), userId)
                 )
         ));
     }
 
     @Operation(summary = "블록 수정")
     @PatchMapping("/blocks/{blockId}")
-    public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> updateBlock(
+    public ResponseEntity<GlobalResponse<EditorSaveResponse>> updateBlock(
             @PathVariable("blockId") UUID blockId,
-            @Valid @RequestBody DocumentTransactionRequest request,
+            @Valid @RequestBody EditorSaveRequest request,
             @CurrentUserId String userId
     ) {
-        DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
+        EditorSaveCommand command = editorSaveApiMapper.toCommand(request);
 
         return ResponseEntity.ok(GlobalResponse.ok(
                 SuccessCode.SUCCESS,
-                documentTransactionApiMapper.toResponse(
-                        adminBlockTransactionService.applyReplaceContent(blockId, command.batchId(), command.operations().get(0), userId)
+                editorSaveApiMapper.toResponse(
+                        adminBlockOperationService.applyReplaceContent(blockId, command.batchId(), command.operations().get(0), userId)
                 )
         ));
     }
 
     @Operation(summary = "블록 삭제")
     @DeleteMapping("/blocks/{blockId}")
-    public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> deleteBlock(
+    public ResponseEntity<GlobalResponse<EditorSaveResponse>> deleteBlock(
             @PathVariable("blockId") UUID blockId,
-            @Valid @RequestBody DocumentTransactionRequest request,
+            @Valid @RequestBody EditorSaveRequest request,
             @CurrentUserId String userId
     ) {
-        DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
+        EditorSaveCommand command = editorSaveApiMapper.toCommand(request);
 
         return ResponseEntity.ok(GlobalResponse.ok(
                 SuccessCode.SUCCESS,
-                documentTransactionApiMapper.toResponse(
-                        adminBlockTransactionService.applyDelete(blockId, command.batchId(), command.operations().get(0), userId)
+                editorSaveApiMapper.toResponse(
+                        adminBlockOperationService.applyDelete(blockId, command.batchId(), command.operations().get(0), userId)
                 )
         ));
     }
 
     @Operation(summary = "블록 이동")
     @PostMapping("/blocks/{blockId}/move")
-    public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> moveBlock(
+    public ResponseEntity<GlobalResponse<EditorSaveResponse>> moveBlock(
             @PathVariable("blockId") UUID blockId,
-            @Valid @RequestBody DocumentTransactionRequest request,
+            @Valid @RequestBody EditorSaveRequest request,
             @CurrentUserId String userId
     ) {
-        DocumentTransactionCommand command = documentTransactionApiMapper.toCommand(request);
+        EditorSaveCommand command = editorSaveApiMapper.toCommand(request);
 
         return ResponseEntity.ok(GlobalResponse.ok(
                 SuccessCode.SUCCESS,
-                documentTransactionApiMapper.toResponse(
-                        adminBlockTransactionService.applyMove(blockId, command.batchId(), command.operations().get(0), userId)
+                editorSaveApiMapper.toResponse(
+                        adminBlockOperationService.applyMove(blockId, command.batchId(), command.operations().get(0), userId)
                 )
         ));
     }
