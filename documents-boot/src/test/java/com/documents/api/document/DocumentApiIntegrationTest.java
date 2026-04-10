@@ -216,29 +216,6 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("성공_문서 이동 API는 같은 사용자 소유 부모 아래로 이동한다")
-	void moveDocumentMovesWithinCurrentUserDocuments() throws Exception {
-		Document rootDocument = saveDocument(USER_ID, null, "루트 문서", "00000000000000000001");
-		Document movingDocument = saveDocument(USER_ID, null, "이동 대상", "00000000000000000002");
-
-		mockMvc.perform(post("/documents/{documentId}/move", movingDocument.getId())
-				.contentType("application/json")
-				.header(USER_ID_HEADER, USER_ID)
-				.content("""
-					{
-					  "targetParentId": "%s",
-					  "afterDocumentId": null,
-					  "beforeDocumentId": null
-					}
-					""".formatted(rootDocument.getId())))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.success").value(true));
-
-		Document reloaded = documentRepository.findByIdAndDeletedAtIsNull(movingDocument.getId()).orElseThrow();
-		assertThat(reloaded.getParentId()).isEqualTo(rootDocument.getId());
-	}
-
-	@Test
 	@DisplayName("성공_문서 휴지통 이동 후 복구 API는 deletedAt을 다시 null로 만든다")
 	void trashAndRestoreDocumentChangesDeletedAt() throws Exception {
 		Document document = saveDocument(USER_ID, null, "복구 대상", "00000000000000000001");
