@@ -2,7 +2,6 @@ package com.documents.api.block;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,7 +12,6 @@ import com.documents.domain.BlockType;
 import com.documents.domain.Document;
 import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,8 +26,8 @@ import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@DisplayName("Block API 통합 검증")
-class BlockApiIntegrationTest {
+@DisplayName("AdminBlock API 통합 검증")
+class AdminBlockApiIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -46,39 +44,15 @@ class BlockApiIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
-                .defaultRequest(get("/").header("X-User-Id", "user-123"))
+                .defaultRequest(post("/").header("X-User-Id", "user-123"))
                 .build();
         blockRepository.deleteAll();
         documentRepository.deleteAll();
     }
 
     @Test
-    @DisplayName("성공_문서 블록 목록 조회 API는 활성 블록 전체를 정렬 순서대로 반환한다")
-    void getBlocksReturnsAllActiveBlocks() throws Exception {
-        Document document = document("문서");
-        Block rootBlock = block(document, null, "루트 블록", "000000000001000000000000");
-        block(document, rootBlock, "자식 블록", "000000000001I00000000000");
-        blockRepository.save(Block.builder()
-                .id(UUID.randomUUID())
-                .document(document)
-                .type(BlockType.TEXT)
-                .content(content("삭제된 블록"))
-                .sortKey("000000000002000000000000")
-                .createdBy("user-123")
-                .updatedBy("user-123")
-                .deletedAt(LocalDateTime.of(2026, 3, 16, 0, 0))
-                .build());
-
-        mockMvc.perform(get("/documents/{documentId}/blocks", document.getId()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].content.segments[0].text").value("루트 블록"))
-                .andExpect(jsonPath("$.data[1].content.segments[0].text").value("자식 블록"));
-    }
-
-    @Test
-    @DisplayName("성공_생성 admin API는 transaction create 응답을 그대로 반환한다")
-    void createBlockUsesTransactionContract() throws Exception {
+    @DisplayName("성공_생성 admin API는 editor save create 응답을 그대로 반환한다")
+    void createBlockUsesEditorSaveContract() throws Exception {
         Document document = document("문서");
 
         mockMvc.perform(post("/admin/documents/{documentId}/blocks", document.getId())
@@ -109,8 +83,8 @@ class BlockApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("성공_수정 admin API는 transaction replace_content 경로로 같은 블록을 수정한다")
-    void updateBlockUsesTransactionContract() throws Exception {
+    @DisplayName("성공_수정 admin API는 editor save replace_content 경로로 같은 블록을 수정한다")
+    void updateBlockUsesEditorSaveContract() throws Exception {
         Document document = document("문서");
         Block block = block(document, null, "기존 블록", "000000000001000000000000");
 
@@ -153,8 +127,8 @@ class BlockApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("성공_이동 admin API는 transaction move 경로로 같은 블록을 이동한다")
-    void moveBlockUsesTransactionContract() throws Exception {
+    @DisplayName("성공_이동 admin API는 editor save move 경로로 같은 블록을 이동한다")
+    void moveBlockUsesEditorSaveContract() throws Exception {
         Document document = document("문서");
         Block targetParent = block(document, null, "부모 블록", "000000000001000000000000");
         Block moved = block(document, null, "이동 블록", "000000000002000000000000");
@@ -186,8 +160,8 @@ class BlockApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("성공_삭제 admin API는 transaction delete 경로로 subtree soft delete를 수행한다")
-    void deleteBlockUsesTransactionContract() throws Exception {
+    @DisplayName("성공_삭제 admin API는 editor save delete 경로로 subtree soft delete를 수행한다")
+    void deleteBlockUsesEditorSaveContract() throws Exception {
         Document document = document("문서");
         Block root = block(document, null, "루트 블록", "000000000001000000000000");
         Block child = block(document, root, "자식 블록", "000000000001I00000000000");
@@ -253,6 +227,99 @@ class BlockApiIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.code").value(9015));
+    }
+
+    @Test
+    @DisplayName("실패_없는 block이면 body blockRef가 틀려도 block not found를 우선 반환한다")
+    void updateBlockReturnsBlockNotFoundBeforeBlockReferenceValidation() throws Exception {
+        UUID missingBlockId = UUID.randomUUID();
+
+        mockMvc.perform(patch("/admin/blocks/{blockId}", missingBlockId)
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-missing",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(UUID.randomUUID())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.httpStatus").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.code").value(9006));
+    }
+
+    @Test
+    @DisplayName("성공_여러 operation이 와도 첫 operation만 사용해 수정한다")
+    void updateBlockUsesOnlyFirstOperation() throws Exception {
+        Document document = document("문서");
+        Block block = block(document, null, "기존 블록", "000000000001000000000000");
+
+        mockMvc.perform(patch("/admin/blocks/{blockId}", block.getId())
+                        .contentType("application/json")
+                        .header("X-User-Id", "user-123")
+                        .content("""
+                                {
+                                  "clientId": "admin-api",
+                                  "batchId": "batch-multi",
+                                  "operations": [
+                                    {
+                                      "opId": "op-1",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 0,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "첫 번째 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    {
+                                      "opId": "op-2",
+                                      "type": "BLOCK_REPLACE_CONTENT",
+                                      "blockRef": "%s",
+                                      "version": 1,
+                                      "content": {
+                                        "format": "rich_text",
+                                        "schemaVersion": 1,
+                                        "segments": [
+                                          {
+                                            "text": "두 번째 수정",
+                                            "marks": []
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                                """.formatted(block.getId(), block.getId())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"));
+
+        Block updated = blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow();
+        assertThat(updated.getContent()).isEqualTo(content("첫 번째 수정"));
     }
 
     private Document document(String title) {
