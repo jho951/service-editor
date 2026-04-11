@@ -1,15 +1,10 @@
 package com.documents.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
@@ -23,12 +18,12 @@ import com.documents.domain.Block;
 import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
-import com.documents.repository.DocumentRepository;
 import com.documents.service.editor.EditorSaveAppliedOperationResult;
 import com.documents.service.editor.EditorSaveOperationCommand;
 import com.documents.service.editor.EditorSaveOperationStatus;
 import com.documents.service.editor.EditorSaveOperationType;
 import com.documents.service.editor.EditorSaveResult;
+import com.documents.service.transaction.DocumentVersionUpdater;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AdminBlockOperationService 구현 검증")
@@ -40,10 +35,13 @@ class AdminBlockOperationServiceImplTest {
     private BlockService blockService;
 
     @Mock
-    private DocumentRepository documentRepository;
+    private DocumentService documentService;
 
     @Mock
     private EditorSaveOperationExecutor operationExecutor;
+
+    @Mock
+    private DocumentVersionUpdater documentVersionUpdater;
 
     @InjectMocks
     private AdminBlockOperationServiceImpl adminBlockOperationService;
@@ -56,9 +54,7 @@ class AdminBlockOperationServiceImplTest {
         EditorSaveOperationCommand operation = operation("tmp:block:1", EditorSaveOperationType.BLOCK_CREATE, null);
         UUID blockId = UUID.randomUUID();
 
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId))
-                .thenReturn(Optional.of(document))
-                .thenReturn(Optional.of(document(documentId, 4)));
+        when(documentService.getById(documentId)).thenReturn(document);
         when(operationExecutor.apply(eq(documentId), eq(document), eq(operation), eq(ACTOR_ID), any()))
                 .thenReturn(new EditorSaveAppliedOperationResult(
                         "op-1",
@@ -69,8 +65,8 @@ class AdminBlockOperationServiceImplTest {
                         "000000000001000000000000",
                         null
                 ));
-        when(documentRepository.incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class)))
-                .thenReturn(1);
+        when(documentVersionUpdater.increment(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class)))
+                .thenReturn(document(documentId, 4));
 
         EditorSaveResult result = adminBlockOperationService.applyCreate(documentId, "batch-1", operation, ACTOR_ID);
 
@@ -80,7 +76,7 @@ class AdminBlockOperationServiceImplTest {
         assertThat(result.appliedOperations()).hasSize(1);
         assertThat(result.appliedOperations().get(0).blockId()).isEqualTo(blockId);
 
-        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+        verify(documentVersionUpdater).increment(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
     }
 
     @Test
@@ -93,7 +89,7 @@ class AdminBlockOperationServiceImplTest {
         EditorSaveOperationCommand operation = operation(blockId.toString(), EditorSaveOperationType.BLOCK_REPLACE_CONTENT, 4L);
 
         when(blockService.getById(blockId)).thenReturn(block);
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+        when(documentService.getById(documentId)).thenReturn(document);
         when(operationExecutor.apply(eq(documentId), eq(document), eq(operation), eq(ACTOR_ID), any()))
                 .thenReturn(new EditorSaveAppliedOperationResult(
                         "op-1",
@@ -108,7 +104,7 @@ class AdminBlockOperationServiceImplTest {
         EditorSaveResult result = adminBlockOperationService.applyReplaceContent(blockId, "batch-2", operation, ACTOR_ID);
 
         assertThat(result.documentVersion()).isEqualTo(7L);
-        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+        verify(documentVersionUpdater, never()).increment(any(UUID.class), any(), any(LocalDateTime.class));
     }
 
     @Test
@@ -168,7 +164,8 @@ class AdminBlockOperationServiceImplTest {
         UUID documentId = UUID.randomUUID();
         EditorSaveOperationCommand operation = operation("tmp:block:1", EditorSaveOperationType.BLOCK_CREATE, null);
 
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.empty());
+        when(documentService.getById(documentId))
+                .thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
         assertThatThrownBy(() -> adminBlockOperationService.applyCreate(documentId, "batch-6", operation, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)
@@ -188,7 +185,7 @@ class AdminBlockOperationServiceImplTest {
         EditorSaveOperationCommand operation = operation(blockId.toString(), EditorSaveOperationType.BLOCK_MOVE, 4L);
 
         when(blockService.getById(blockId)).thenReturn(block);
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+        when(documentService.getById(documentId)).thenReturn(document);
         when(operationExecutor.apply(eq(documentId), eq(document), eq(operation), eq(ACTOR_ID), any()))
                 .thenReturn(new EditorSaveAppliedOperationResult(
                         "op-1",
@@ -203,7 +200,7 @@ class AdminBlockOperationServiceImplTest {
         EditorSaveResult result = adminBlockOperationService.applyMove(blockId, "batch-7", operation, ACTOR_ID);
 
         assertThat(result.documentVersion()).isEqualTo(9L);
-        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+        verify(documentVersionUpdater, never()).increment(any(UUID.class), any(), any(LocalDateTime.class));
     }
 
     @Test
@@ -216,7 +213,7 @@ class AdminBlockOperationServiceImplTest {
         EditorSaveOperationCommand operation = operation(blockId.toString(), EditorSaveOperationType.BLOCK_DELETE, 2L);
 
         when(blockService.getById(blockId)).thenReturn(block);
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
+        when(documentService.getById(documentId)).thenReturn(document);
         when(operationExecutor.apply(eq(documentId), eq(document), eq(operation), eq(ACTOR_ID), any()))
                 .thenReturn(new EditorSaveAppliedOperationResult(
                         "op-1",
@@ -227,8 +224,8 @@ class AdminBlockOperationServiceImplTest {
                         null,
                         LocalDateTime.of(2026, 4, 10, 0, 0)
                 ));
-        when(documentRepository.incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class)))
-                .thenReturn(0);
+        when(documentVersionUpdater.increment(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class)))
+                .thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
 
         assertThatThrownBy(() -> adminBlockOperationService.applyDelete(blockId, "batch-8", operation, ACTOR_ID))
                 .isInstanceOf(BusinessException.class)

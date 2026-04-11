@@ -34,6 +34,8 @@ import com.documents.service.editor.EditorSaveOperationType;
 import com.documents.service.editor.EditorSaveResult;
 import com.documents.support.OrderedSortKeyGenerator;
 import com.documents.support.TextNormalizer;
+import com.documents.service.transaction.DocumentVersionUpdater;
+import com.documents.service.transaction.PersistenceContextManager;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("EditorOperation 오케스트레이터 save 구현 검증")
@@ -57,6 +59,12 @@ class EditorOperationOrchestratorImplTest {
     @Mock
     private DocumentService documentService;
 
+    @Mock
+    private DocumentVersionUpdater documentVersionUpdater;
+
+    @Mock
+    private PersistenceContextManager persistenceContextManager;
+
     private EditorOperationOrchestratorImpl editorOperationOrchestrator;
 
     @BeforeEach
@@ -64,6 +72,7 @@ class EditorOperationOrchestratorImplTest {
         BlockService editorBlockService = new BlockServiceImpl(
                 blockRepository,
                 documentRepository,
+                documentVersionUpdater,
                 new TextNormalizer(),
                 new OrderedSortKeyGenerator()
         ) {
@@ -107,14 +116,15 @@ class EditorOperationOrchestratorImplTest {
         editorOperationOrchestrator = new EditorOperationOrchestratorImpl(
                 documentService,
                 editorBlockService,
-                new EditorSaveOperationExecutor(editorBlockService, blockRepository),
+                new EditorSaveOperationExecutor(editorBlockService, persistenceContextManager),
                 new EditorMoveResultMapper(),
-                documentRepository
+                documentVersionUpdater,
+                persistenceContextManager
         );
-        lenient().when(documentRepository.findByIdAndDeletedAtIsNull(any(UUID.class)))
-                .thenAnswer(invocation -> Optional.of(document(invocation.getArgument(0), 0)));
-        lenient().when(documentRepository.incrementVersion(any(UUID.class), anyString(), any(LocalDateTime.class)))
-                .thenReturn(1);
+        lenient().when(documentService.getById(any(UUID.class)))
+                .thenAnswer(invocation -> document(invocation.getArgument(0), 0));
+        lenient().when(documentVersionUpdater.increment(any(UUID.class), anyString(), any(LocalDateTime.class)))
+                .thenAnswer(invocation -> document(invocation.getArgument(0), 1));
     }
 
     @Test
@@ -136,11 +146,8 @@ class EditorOperationOrchestratorImplTest {
                 eq(null),
                 eq(ACTOR_ID)
         )).thenReturn(createdBlock);
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId))
-                .thenReturn(Optional.of(document(documentId, 0)))
-                .thenReturn(Optional.of(document(documentId, 1)));
+        when(documentService.getById(documentId)).thenReturn(document(documentId, 0));
         when(blockService.update(blockId, REPLACED_CONTENT, 0, ACTOR_ID)).thenReturn(updatedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -183,8 +190,8 @@ class EditorOperationOrchestratorImplTest {
         assertThat(result.appliedOperations().get(1).version()).isEqualTo(1);
 
         verify(blockService).update(blockId, REPLACED_CONTENT, 0, ACTOR_ID);
-        verify(documentRepository, times(2)).findByIdAndDeletedAtIsNull(documentId);
-        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+        verify(documentService).getById(documentId);
+        verify(persistenceContextManager, atLeastOnce()).flush();
     }
 
     @Test
@@ -204,10 +211,7 @@ class EditorOperationOrchestratorImplTest {
                 eq(null),
                 eq(ACTOR_ID)
         )).thenReturn(createdBlock);
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId))
-                .thenReturn(Optional.of(document(documentId, 0)))
-                .thenReturn(Optional.of(document(documentId, 1)));
-        doNothing().when(blockRepository).flush();
+        when(documentService.getById(documentId)).thenReturn(document(documentId, 0));
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -300,7 +304,6 @@ class EditorOperationOrchestratorImplTest {
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.move(blockId, null, afterBlockId, null, 4, ACTOR_ID)).thenReturn(movedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -340,7 +343,6 @@ class EditorOperationOrchestratorImplTest {
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.move(blockId, null, null, null, 4, ACTOR_ID)).thenReturn(existingBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -368,7 +370,7 @@ class EditorOperationOrchestratorImplTest {
         assertThat(result.appliedOperations().get(0).version()).isEqualTo(4);
         assertThat(result.documentVersion()).isEqualTo(0);
 
-        verify(documentRepository, never()).incrementVersion(any(UUID.class), anyString(), any(LocalDateTime.class));
+        verify(persistenceContextManager).flush();
     }
 
     @Test
@@ -393,7 +395,6 @@ class EditorOperationOrchestratorImplTest {
         )).thenReturn(createdParentBlock);
         when(blockRepository.findByIdAndDeletedAtIsNull(existingBlockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.move(existingBlockId, tempParentId, null, null, 1, ACTOR_ID)).thenReturn(movedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -458,7 +459,6 @@ class EditorOperationOrchestratorImplTest {
         )).thenReturn(createdBlock);
         when(blockService.move(blockId, null, afterBlockId, null, 0, ACTOR_ID)).thenReturn(movedBlock);
         when(blockService.update(blockId, movedContent, 1, ACTOR_ID)).thenReturn(updatedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -521,7 +521,6 @@ class EditorOperationOrchestratorImplTest {
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.move(blockId, null, null, null, 4, ACTOR_ID)).thenReturn(existingBlock);
         when(blockService.update(blockId, REPLACED_CONTENT, 4, ACTOR_ID)).thenReturn(updatedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -586,7 +585,6 @@ class EditorOperationOrchestratorImplTest {
         )).thenReturn(createdBlock);
         when(blockService.move(blockId, firstParentId, null, null, 0, ACTOR_ID)).thenReturn(firstMovedBlock);
         when(blockService.move(blockId, secondParentId, null, null, 1, ACTOR_ID)).thenReturn(secondMovedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -1068,7 +1066,6 @@ class EditorOperationOrchestratorImplTest {
                 .thenReturn(Optional.of(updatedBlock));
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
         when(blockService.move(blockId, parentId, null, null, 4, ACTOR_ID)).thenReturn(movedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -1131,7 +1128,6 @@ class EditorOperationOrchestratorImplTest {
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
         when(blockService.move(blockId, parentId, null, null, 4, ACTOR_ID)).thenReturn(movedBlock);
         when(blockService.update(blockId, replacedAgainContent, 5, ACTOR_ID)).thenReturn(replacedAgainBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -1203,7 +1199,6 @@ class EditorOperationOrchestratorImplTest {
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
         when(blockService.move(blockId, parentId, null, null, 4, ACTOR_ID)).thenReturn(movedBlock);
         when(blockService.delete(blockId, 5, ACTOR_ID)).thenReturn(deletedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -1272,7 +1267,6 @@ class EditorOperationOrchestratorImplTest {
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId))
                 .thenReturn(Optional.of(existingBlock));
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
-        doNothing().when(blockRepository).flush();
 
         assertThatThrownBy(() -> editorOperationOrchestrator.save(
                 documentId,
@@ -1324,7 +1318,6 @@ class EditorOperationOrchestratorImplTest {
                 eq(null),
                 eq(ACTOR_ID)
         )).thenReturn(createdBlock);
-        doNothing().when(blockRepository).flush();
 
         assertThatThrownBy(() -> editorOperationOrchestrator.save(
                 documentId,
@@ -1440,7 +1433,6 @@ class EditorOperationOrchestratorImplTest {
         )).thenReturn(createdBlock);
         when(blockRepository.findByIdAndDeletedAtIsNull(createdBlockId)).thenReturn(Optional.of(createdBlock));
         when(blockService.delete(createdBlockId, 0, ACTOR_ID)).thenReturn(deletedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -1502,7 +1494,6 @@ class EditorOperationOrchestratorImplTest {
         when(blockService.update(createdBlockId, REPLACED_CONTENT, 0, ACTOR_ID)).thenReturn(updatedBlock);
         when(blockRepository.findByIdAndDeletedAtIsNull(createdBlockId)).thenReturn(Optional.of(updatedBlock));
         when(blockService.delete(createdBlockId, 1, ACTOR_ID)).thenReturn(deletedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -1578,7 +1569,6 @@ class EditorOperationOrchestratorImplTest {
         when(blockService.move(createdBlockId, parentId, null, null, 0, ACTOR_ID)).thenReturn(movedBlock);
         when(blockRepository.findByIdAndDeletedAtIsNull(createdBlockId)).thenReturn(Optional.of(movedBlock));
         when(blockService.delete(createdBlockId, 1, ACTOR_ID)).thenReturn(deletedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -1646,7 +1636,6 @@ class EditorOperationOrchestratorImplTest {
                 eq(null),
                 eq(ACTOR_ID)
         )).thenReturn(createdBlock);
-        doNothing().when(blockRepository).flush();
 
         assertThatThrownBy(() -> editorOperationOrchestrator.save(
                 documentId,
@@ -1735,7 +1724,6 @@ class EditorOperationOrchestratorImplTest {
         when(blockService.delete(createdBlockId, 0, ACTOR_ID)).thenReturn(deletedBlock);
         when(blockService.update(createdBlockId, REPLACED_CONTENT, 0, ACTOR_ID))
                 .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
-        doNothing().when(blockRepository).flush();
 
         assertThatThrownBy(() -> editorOperationOrchestrator.save(
                 documentId,
@@ -1807,7 +1795,6 @@ class EditorOperationOrchestratorImplTest {
         when(blockService.delete(createdBlockId, 0, ACTOR_ID)).thenReturn(deletedBlock);
         when(blockService.move(createdBlockId, parentId, null, null, 0, ACTOR_ID))
                 .thenThrow(new BusinessException(BusinessErrorCode.BLOCK_NOT_FOUND));
-        doNothing().when(blockRepository).flush();
 
         assertThatThrownBy(() -> editorOperationOrchestrator.save(
                 documentId,
@@ -1869,7 +1856,6 @@ class EditorOperationOrchestratorImplTest {
                 .thenReturn(Optional.of(existingBlock));
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(existingBlock);
         when(blockService.delete(blockId, 3, ACTOR_ID)).thenReturn(deletedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -1921,7 +1907,6 @@ class EditorOperationOrchestratorImplTest {
                 .thenReturn(Optional.of(existingBlock));
         when(blockService.move(blockId, null, null, null, 4, ACTOR_ID)).thenReturn(existingBlock);
         when(blockService.delete(blockId, 4, ACTOR_ID)).thenReturn(deletedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -2005,7 +1990,6 @@ class EditorOperationOrchestratorImplTest {
         )).thenReturn(createdBlock);
         when(blockService.update(blockId, REPLACED_CONTENT, 0, ACTOR_ID))
                 .thenThrow(new BusinessException(BusinessErrorCode.CONFLICT));
-        doNothing().when(blockRepository).flush();
 
         assertThatThrownBy(() -> editorOperationOrchestrator.save(
                 documentId,
@@ -2053,7 +2037,6 @@ class EditorOperationOrchestratorImplTest {
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(updatedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -2092,7 +2075,6 @@ class EditorOperationOrchestratorImplTest {
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(existingBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -2135,7 +2117,6 @@ class EditorOperationOrchestratorImplTest {
                 .thenReturn(Optional.of(existingBlock));
         when(blockService.update(blockId, REPLACED_CONTENT, 3, ACTOR_ID)).thenReturn(existingBlock);
         when(blockService.move(blockId, parentId, null, null, 3, ACTOR_ID)).thenReturn(movedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -2200,7 +2181,6 @@ class EditorOperationOrchestratorImplTest {
         )).thenReturn(createdBlock);
         when(blockService.update(blockId, REPLACED_CONTENT, 0, ACTOR_ID)).thenReturn(firstUpdatedBlock);
         when(blockService.update(blockId, secondContent, 1, ACTOR_ID)).thenReturn(secondUpdatedBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -2278,7 +2258,6 @@ class EditorOperationOrchestratorImplTest {
                 eq(null),
                 eq(ACTOR_ID)
         )).thenReturn(createdChildBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -2345,7 +2324,6 @@ class EditorOperationOrchestratorImplTest {
                 eq(beforeBlockId),
                 eq(ACTOR_ID)
         )).thenReturn(createdMiddleBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -2543,7 +2521,6 @@ class EditorOperationOrchestratorImplTest {
                 eq(tempBeforeBlockId),
                 eq(ACTOR_ID)
         )).thenReturn(createdMiddleBlock);
-        doNothing().when(blockRepository).flush();
 
         EditorSaveResult result = editorOperationOrchestrator.save(
                 documentId,
@@ -2590,8 +2567,6 @@ class EditorOperationOrchestratorImplTest {
         movedDocument.setParent(Document.builder().id(targetParentId).build());
 
         when(documentService.move(documentId, targetParentId, null, null, ACTOR_ID)).thenReturn(movedDocument);
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(movedDocument));
-
         EditorMoveResult result = editorOperationOrchestrator.move(
                 new EditorMoveCommand(
                         EditorMoveResourceType.DOCUMENT,
@@ -2611,7 +2586,6 @@ class EditorOperationOrchestratorImplTest {
         assertThat(result.documentVersion()).isEqualTo(1L);
 
         verify(documentService).move(documentId, targetParentId, null, null, ACTOR_ID);
-        verify(documentRepository).flush();
     }
 
     @Test
@@ -2629,8 +2603,7 @@ class EditorOperationOrchestratorImplTest {
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.move(blockId, targetParentId, null, null, 2, ACTOR_ID)).thenReturn(movedBlock);
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-        doNothing().when(blockRepository).flush();
+        when(documentService.getById(documentId)).thenReturn(document);
 
         EditorMoveResult result = editorOperationOrchestrator.move(
                 new EditorMoveCommand(
@@ -2665,8 +2638,7 @@ class EditorOperationOrchestratorImplTest {
 
         when(blockRepository.findByIdAndDeletedAtIsNull(blockId)).thenReturn(Optional.of(existingBlock));
         when(blockService.move(blockId, null, null, null, 2, ACTOR_ID)).thenReturn(existingBlock);
-        when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(document));
-        doNothing().when(blockRepository).flush();
+        when(documentService.getById(documentId)).thenReturn(document);
 
         EditorMoveResult result = editorOperationOrchestrator.move(
                 new EditorMoveCommand(
