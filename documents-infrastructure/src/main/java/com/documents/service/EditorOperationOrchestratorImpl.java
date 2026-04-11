@@ -9,9 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.documents.domain.Block;
 import com.documents.domain.Document;
-import com.documents.exception.BusinessErrorCode;
-import com.documents.exception.BusinessException;
-import com.documents.repository.DocumentRepository;
 import com.documents.service.editor.EditorMoveAppliedResult;
 import com.documents.service.editor.EditorMoveCommand;
 import com.documents.service.editor.EditorMoveResult;
@@ -20,6 +17,8 @@ import com.documents.service.editor.EditorSaveCommand;
 import com.documents.service.editor.EditorSaveContext;
 import com.documents.service.editor.EditorSaveOperationStatus;
 import com.documents.service.editor.EditorSaveResult;
+import com.documents.service.transaction.DocumentVersionUpdater;
+import com.documents.service.transaction.PersistenceContextManager;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,12 +30,13 @@ public class EditorOperationOrchestratorImpl implements EditorOperationOrchestra
     private final BlockService blockService;
     private final EditorSaveOperationExecutor editorSaveOperationExecutor;
     private final EditorMoveResultMapper editorMoveResultMapper;
-    private final DocumentRepository documentRepository;
+    private final DocumentVersionUpdater documentVersionUpdater;
+    private final PersistenceContextManager persistenceContextManager;
 
     @Override
     @Transactional
     public EditorSaveResult save(UUID documentId, EditorSaveCommand command, String actorId) {
-        Document document = findActiveDocument(documentId);
+        Document document = documentService.getById(documentId);
         EditorSaveContext context = new EditorSaveContext();
         List<EditorSaveAppliedOperationResult> appliedOperations = command.operations().stream()
                 .map(operation -> DocumentVersionIncrementContext.runWithoutIncrement(
@@ -46,7 +46,9 @@ public class EditorOperationOrchestratorImpl implements EditorOperationOrchestra
 
         Long documentVersion = document.getVersion().longValue();
         if (hasEditorChange(appliedOperations)) {
-            documentVersion = incrementDocumentVersion(documentId, actorId).longValue();
+            documentVersion = documentVersionUpdater.increment(documentId, actorId, LocalDateTime.now())
+                    .getVersion()
+                    .longValue();
         }
 
         return new EditorSaveResult(documentId, documentVersion, command.batchId(), appliedOperations);
@@ -62,16 +64,14 @@ public class EditorOperationOrchestratorImpl implements EditorOperationOrchestra
     }
 
     private EditorMoveResult moveDocument(EditorMoveCommand command, String actorId) {
-        documentService.move(
+        Document movedDocument = documentService.move(
                 command.resourceId(),
                 command.targetParentId(),
                 command.afterId(),
                 command.beforeId(),
                 actorId
         );
-        documentRepository.flush();
-
-        Document movedDocument = findActiveDocument(command.resourceId());
+        persistenceContextManager.flush();
         return editorMoveResultMapper.toDocumentResult(movedDocument);
     }
 
@@ -88,26 +88,11 @@ public class EditorOperationOrchestratorImpl implements EditorOperationOrchestra
                 actorId
         );
 
-        Document document = findActiveDocument(documentId);
-        return editorMoveResultMapper.toBlockResult(appliedOperation, document);
-    }
-
-    private Document findActiveDocument(UUID documentId) {
-        return documentRepository.findByIdAndDeletedAtIsNull(documentId)
-                .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
+        return editorMoveResultMapper.toBlockResult(appliedOperation, documentService.getById(documentId));
     }
 
     private boolean hasEditorChange(List<EditorSaveAppliedOperationResult> appliedOperations) {
         return appliedOperations.stream()
                 .anyMatch(result -> result.status() == EditorSaveOperationStatus.APPLIED);
-    }
-
-    private Integer incrementDocumentVersion(UUID documentId, String actorId) {
-        int updatedRowCount = documentRepository.incrementVersion(documentId, actorId, LocalDateTime.now());
-        if (updatedRowCount != 1) {
-            throw new BusinessException(BusinessErrorCode.CONFLICT);
-        }
-
-        return findActiveDocument(documentId).getVersion();
     }
 }

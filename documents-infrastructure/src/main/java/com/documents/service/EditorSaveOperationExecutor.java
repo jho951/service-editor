@@ -12,12 +12,12 @@ import com.documents.domain.BlockType;
 import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
-import com.documents.repository.BlockRepository;
 import com.documents.service.editor.EditorMoveAppliedResult;
 import com.documents.service.editor.EditorSaveAppliedOperationResult;
 import com.documents.service.editor.EditorSaveContext;
 import com.documents.service.editor.EditorSaveOperationCommand;
 import com.documents.service.editor.EditorSaveOperationStatus;
+import com.documents.service.transaction.PersistenceContextManager;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,7 +29,7 @@ public class EditorSaveOperationExecutor {
             "{\"format\":\"rich_text\",\"schemaVersion\":1,\"segments\":[{\"text\":\"\",\"marks\":[]}]}";
 
     private final BlockService blockService;
-    private final BlockRepository blockRepository;
+    private final PersistenceContextManager persistenceContextManager;
 
     public EditorSaveAppliedOperationResult apply(
             UUID documentId,
@@ -62,7 +62,7 @@ public class EditorSaveOperationExecutor {
                 toEntityVersion(version),
                 actorId
         );
-        blockRepository.flush();
+        persistenceContextManager.flush();
 
         return new EditorMoveAppliedResult(
                 movedBlock.getId(),
@@ -91,7 +91,7 @@ public class EditorSaveOperationExecutor {
                 resolvedPositionReferences.beforeBlockId(),
                 actorId
         );
-        blockRepository.flush();
+        persistenceContextManager.flush();
 
         context.put(operation.blockReference(), createdBlock.getId(), createdBlock.getVersion().longValue(), null, true);
 
@@ -126,7 +126,7 @@ public class EditorSaveOperationExecutor {
                 toEntityVersion(resolvedBlockReference.version()),
                 actorId
         );
-        blockRepository.flush();
+        persistenceContextManager.flush();
 
         context.put(
                 operation.blockReference(),
@@ -164,7 +164,7 @@ public class EditorSaveOperationExecutor {
                 toEntityVersion(resolvedBlockReference.version()),
                 actorId
         );
-        blockRepository.flush();
+        persistenceContextManager.flush();
 
         context.put(
                 operation.blockReference(),
@@ -193,7 +193,7 @@ public class EditorSaveOperationExecutor {
     ) {
         Block block = resolveExistingBlock(documentId, operation, context);
         Block deletedBlock = blockService.delete(block.getId(), block.getVersion(), actorId);
-        blockRepository.flush();
+        persistenceContextManager.flush();
 
         return new EditorSaveAppliedOperationResult(
                 operation.opId(),

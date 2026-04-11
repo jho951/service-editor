@@ -1,8 +1,7 @@
 package com.documents.service;
 
-import static com.documents.service.editor.EditorSaveOperationStatus.APPLIED;
+import static com.documents.service.editor.EditorSaveOperationStatus.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,12 +12,12 @@ import com.documents.domain.Block;
 import com.documents.domain.Document;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
-import com.documents.repository.DocumentRepository;
 import com.documents.service.editor.EditorSaveAppliedOperationResult;
 import com.documents.service.editor.EditorSaveContext;
 import com.documents.service.editor.EditorSaveOperationCommand;
 import com.documents.service.editor.EditorSaveOperationType;
 import com.documents.service.editor.EditorSaveResult;
+import com.documents.service.transaction.DocumentVersionUpdater;
 
 import lombok.RequiredArgsConstructor;
 
@@ -27,8 +26,9 @@ import lombok.RequiredArgsConstructor;
 public class AdminBlockOperationServiceImpl implements AdminBlockOperationService {
 
     private final BlockService blockService;
-    private final DocumentRepository documentRepository;
+    private final DocumentService documentService;
     private final EditorSaveOperationExecutor operationExecutor;
+    private final DocumentVersionUpdater documentVersionUpdater;
 
     @Override
     @Transactional
@@ -38,7 +38,7 @@ public class AdminBlockOperationServiceImpl implements AdminBlockOperationServic
             EditorSaveOperationCommand operation,
             String actorId
     ) {
-        Document document = findActiveDocument(documentId);
+        Document document = documentService.getById(documentId);
         validateOperationType(operation, EditorSaveOperationType.BLOCK_CREATE);
         return applySingleOperation(documentId, document, batchId, operation, actorId);
     }
@@ -54,7 +54,7 @@ public class AdminBlockOperationServiceImpl implements AdminBlockOperationServic
         Block block = blockService.getById(blockId);
         validateOperationType(operation, EditorSaveOperationType.BLOCK_REPLACE_CONTENT);
         validateBlockReferenceMatches(blockId, operation);
-        Document document = findActiveDocument(block.getDocumentId());
+        Document document = documentService.getById(block.getDocumentId());
         return applySingleOperation(document.getId(), document, batchId, operation, actorId);
     }
 
@@ -69,7 +69,7 @@ public class AdminBlockOperationServiceImpl implements AdminBlockOperationServic
         Block block = blockService.getById(blockId);
         validateOperationType(operation, EditorSaveOperationType.BLOCK_MOVE);
         validateBlockReferenceMatches(blockId, operation);
-        Document document = findActiveDocument(block.getDocumentId());
+        Document document = documentService.getById(block.getDocumentId());
         return applySingleOperation(document.getId(), document, batchId, operation, actorId);
     }
 
@@ -84,7 +84,7 @@ public class AdminBlockOperationServiceImpl implements AdminBlockOperationServic
         Block block = blockService.getById(blockId);
         validateOperationType(operation, EditorSaveOperationType.BLOCK_DELETE);
         validateBlockReferenceMatches(blockId, operation);
-        Document document = findActiveDocument(block.getDocumentId());
+        Document document = documentService.getById(block.getDocumentId());
         return applySingleOperation(document.getId(), document, batchId, operation, actorId);
     }
 
@@ -101,7 +101,9 @@ public class AdminBlockOperationServiceImpl implements AdminBlockOperationServic
 
         Long documentVersion = document.getVersion().longValue();
         if (appliedOperation.status() == APPLIED) {
-            documentVersion = incrementDocumentVersion(documentId, actorId).longValue();
+            documentVersion = documentVersionUpdater.increment(documentId, actorId, java.time.LocalDateTime.now())
+                    .getVersion()
+                    .longValue();
         }
 
         return new EditorSaveResult(documentId, documentVersion, batchId, List.of(appliedOperation));
@@ -120,19 +122,5 @@ public class AdminBlockOperationServiceImpl implements AdminBlockOperationServic
         if (!blockId.toString().equals(operation.blockReference())) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
         }
-    }
-
-    private Document findActiveDocument(UUID documentId) {
-        return documentRepository.findByIdAndDeletedAtIsNull(documentId)
-                .orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
-    }
-
-    private Integer incrementDocumentVersion(UUID documentId, String actorId) {
-        int updatedRowCount = documentRepository.incrementVersion(documentId, actorId, LocalDateTime.now());
-        if (updatedRowCount != 1) {
-            throw new BusinessException(BusinessErrorCode.CONFLICT);
-        }
-
-        return findActiveDocument(documentId).getVersion();
     }
 }
