@@ -40,7 +40,7 @@
 - move는 문서 이동과 블록 이동을 하나의 명시적 move endpoint로 통합한다.
 - move request는 `resourceType`, `resourceId`, `targetParentId`, `afterId`, `beforeId`, `version` 기준으로 설계한다.
 - move는 `EditorOperationOrchestrator.move(...)`로 받고, 문서 이동은 기존 `DocumentService.move(...)`, 블록 이동은 editor save의 `BLOCK_MOVE` 실행 경로를 재사용한다.
-- 이 분기는 모든 operation을 받는 범용 dispatcher가 아니라, move 하나만 공통화한 단일 operation contract 안에서만 허용한다.
+- 이 구조는 모든 operation을 `POST /editor-operations` 하나로 받는 범용 dispatcher가 아니라, `EditorOperationController` 아래에 명시적 operation endpoint를 두는 방식으로 유지한다.
 - move API는 drag 중간 상태를 저장하지 않고, drop 확정 시점의 최종 위치만 1회 반영하는 explicit structure action으로 사용한다.
 - create/read/update/delete/trash/restore 같은 리소스 CRUD는 기존 `DocumentController`, block 전용 controller 경계에 남긴다.
 

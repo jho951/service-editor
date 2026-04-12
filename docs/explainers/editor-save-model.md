@@ -71,22 +71,28 @@
 
 - `GET /documents/{documentId}/blocks`
 - `POST /editor-operations/documents/{documentId}/save`
+- `POST /editor-operations/move`
 
-쓰기 요청 top-level은 `clientId`, `batchId`, `operations`를 사용한다.
-동시성 검사는 save batch 전체의 문서 snapshot이 아니라 각 block operation의 `version`으로 처리한다.
-batch 안에 실제 editor 변경이 하나라도 반영되면 응답에는 증가한 최신 `documentVersion`이 내려간다.
+save 요청 top-level은 `clientId`, `batchId`, `operations`를 사용한다.
+save 동시성 검사는 batch 전체의 문서 snapshot이 아니라 각 block operation의 `version`으로 처리한다.
+save batch 안에 실제 editor 변경이 하나라도 반영되면 응답에는 증가한 최신 `documentVersion`이 내려간다.
+
+move는 문서와 블록 이동을 공통 contract로 처리하는 별도 explicit structure API다.
+drag 중간 상태를 저장하지 않고, drop 확정 시점의 최종 위치만 반영한다.
 
 ### 보조 API
 
-- `POST /documents/{documentId}/blocks`
-- `PATCH /blocks/{blockId}`
-- `DELETE /blocks/{blockId}`
+- `POST /admin/documents/{documentId}/blocks`
+- `PATCH /admin/blocks/{blockId}`
+- `POST /admin/blocks/{blockId}/move`
+- `DELETE /admin/blocks/{blockId}`
 
 보조 API는 남길 수 있다. 다만 에디터의 일반 편집 저장 경로에서는 표준이 아니다.
 
 정리하면:
 
-- 에디터는 읽기 1개, 쓰기 1개를 표준으로 사용한다.
+- 에디터는 읽기 1개, 쓰기 2개를 표준으로 사용한다.
+- save는 batch 저장, move는 explicit 구조 변경이라는 서로 다른 write 유스케이스를 맡는다.
 - 나머지 단건 블록 API는 운영/관리/디버깅/호환 용도다.
 
 ---

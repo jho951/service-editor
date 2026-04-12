@@ -622,7 +622,7 @@ Block {
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되고 있으면 다시 pending에 포함될 수 있다.
 - 같은 블록 안의 비중첩 수정도 v1에서는 block 단위 충돌로 처리할 수 있다.
 - `POST /admin/documents/{documentId}/blocks`, `PATCH /admin/blocks/{blockId}`, `POST /admin/blocks/{blockId}/move`, `DELETE /admin/blocks/{blockId}`는 에디터 표준 저장 경로가 아니라 운영/관리/비에디터 보조 경로로 둘 수 있다.
-- 위 4개 admin block API는 path와 HTTP method는 유지하되, request/response 계약과 실제 실행 로직은 현재 deprecated transaction 기반 단건 admin block 모델을 사용해야 한다.
+- 위 4개 admin block API는 path와 HTTP method는 유지하되, request/response 계약과 실제 실행 로직은 `EditorSave*` 기반 단건 admin block 모델을 사용해야 한다.
 - 각 admin block API는 자기 역할에 맞는 단일 operation 하나만 허용해야 한다.
 
 ## 10.2 향후 확장
@@ -778,9 +778,9 @@ Block {
 TEXT 블록 생성.
 - 이 API는 운영/관리/비에디터 경로에서 사용할 수 있다.
 - 에디터 표준 생성/저장 경로는 document save endpoint를 사용한다.
-- 요청 body는 현재 deprecated `DocumentTransactionRequest`와 동일한 구조를 사용해야 한다.
+- 요청 body는 `EditorSaveRequest`와 동일한 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_CREATE`여야 한다.
-- 응답 body는 현재 deprecated `DocumentTransactionResponse`와 동일해야 한다.
+- 응답 body는 `EditorSaveResponse`와 동일해야 한다.
 
 요청 예시:
 ```json
@@ -804,11 +804,11 @@ TEXT 블록 생성.
 블록 내용 또는 블록 자체 메타데이터 수정.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
 - 에디터 표준 본문 저장 경로는 document save endpoint를 사용한다.
-- 요청 body는 현재 deprecated `DocumentTransactionRequest`와 동일한 구조를 사용해야 한다.
+- 요청 body는 `EditorSaveRequest`와 동일한 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_REPLACE_CONTENT`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
-- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 현재 admin block 단건 처리 경로를 호출해야 한다.
-- 응답 body는 현재 deprecated `DocumentTransactionResponse`와 동일해야 한다.
+- 서버는 `AdminBlockOperationService`가 `blockId`로 소속 `documentId`를 해석한 뒤 단건 `EditorSaveOperationCommand`를 처리하는 경로를 호출해야 한다.
+- 응답 body는 `EditorSaveResponse`와 동일해야 한다.
 
 내용 수정 예시:
 ```json
@@ -852,11 +852,11 @@ TEXT 블록 생성.
 단일 블록 이동.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
 - 에디터 표준 이동 경로는 `POST /editor-operations/move`를 사용한다.
-- 요청 body는 현재 deprecated `DocumentTransactionRequest`와 동일한 구조를 사용해야 한다.
+- 요청 body는 `EditorSaveRequest`와 동일한 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_MOVE`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
-- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 현재 admin block 단건 처리 경로를 호출해야 한다.
-- 응답 body는 현재 deprecated `DocumentTransactionResponse`와 동일해야 한다.
+- 서버는 `AdminBlockOperationService`가 `blockId`로 소속 `documentId`를 해석한 뒤 단건 `EditorSaveOperationCommand`를 처리하는 경로를 호출해야 한다.
+- 응답 body는 `EditorSaveResponse`와 동일해야 한다.
 
 위치 변경 예시:
 ```json
@@ -882,11 +882,11 @@ TEXT 블록 생성.
 - 지정 루트 블록과 하위 블록 subtree를 함께 soft delete 한다.
 - 이 API는 명시적 단일 삭제 액션 또는 운영/관리/비에디터 경로에서 사용할 수 있다.
 - 에디터 표준 삭제 경로는 document save endpoint를 사용한다.
-- 요청 body는 현재 deprecated `DocumentTransactionRequest`와 동일한 구조를 사용해야 한다.
+- 요청 body는 `EditorSaveRequest`와 동일한 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_DELETE`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
-- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 현재 admin block 단건 처리 경로를 호출해야 한다.
-- 응답 body는 현재 deprecated `DocumentTransactionResponse`와 동일해야 한다.
+- 서버는 `AdminBlockOperationService`가 `blockId`로 소속 `documentId`를 해석한 뒤 단건 `EditorSaveOperationCommand`를 처리하는 경로를 호출해야 한다.
+- 응답 body는 `EditorSaveResponse`와 동일해야 한다.
 
 ## 12.5 Editor Operation API
 

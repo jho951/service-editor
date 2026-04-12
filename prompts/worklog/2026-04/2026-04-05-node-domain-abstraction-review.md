@@ -38,9 +38,9 @@
 ## Step 7. editor 공통 orchestrator 기준 재정리
 
 - 변경 내용: `EditorOperationController` 아래의 공통 application 계층을 `EditorOperationOrchestrator` 하나로 두는 방향으로 기준을 다시 고정했다.
-- 변경 내용: 공통 orchestrator의 실제 도입 범위는 save로 한정하고, move는 기존 구현 경계를 유지하는 방향으로 선을 다시 그었다.
+- 변경 내용: move도 `EditorOperationOrchestrator.move(...)`를 타되, orchestrator 안에서 document direct 처리와 block executor 재사용으로 분기하는 방향으로 선을 다시 그었다.
 - 변경 내용: save public 경계는 `EditorSaveRequest`, `EditorSaveResponse`, `EditorSaveApiMapper` 기준으로 재정리했고, 기존 `DocumentTransaction*` public 경계는 deprecated 브리지로 남기기로 했다.
-- 판단: 공통 controller를 두더라도 모든 operation을 즉시 같은 orchestrator에 넣을 필요는 없다. 현재 단계에서는 save의 public 경계와 내부 구조를 먼저 editor family 기준으로 고정하는 편이 더 일관되다.
+- 판단: 공통 controller를 두더라도 save와 move를 같은 방식으로 실행할 필요는 없다. 현재 구조에서는 둘 다 orchestrator를 진입점으로 두되, save는 batch orchestration, move는 resourceType 분기 처리로 책임을 나누는 편이 더 일관되다.
 
 ## Step 8. save 내부 구조를 editor 중심으로 전환
 
@@ -49,7 +49,37 @@
 - 변경 내용: `EditorSaveCommand` 안의 operation type도 `DocumentTransactionOperationType`이 아니라 `EditorSaveOperationType`을 사용하도록 바꿨다.
 - 판단: editor 통합 구조를 채택한 이상 public 경계만 `EditorSave*`로 바꾸고 내부 중심을 계속 `DocumentTransaction*`로 두는 방식은 구조 일관성을 해친다. save 알고리즘은 유지하되, editor 경계에서 보이는 타입과 실행 구조 모두 `EditorSave*`로 통일하는 편이 맞다.
 
-## Step 9. move orchestrator 범위 보류
+## Step 9. admin block 단건 API 내부 타입을 `EditorSave*` 기준으로 전환
 
-- 변경 내용: 이번 작업 범위를 save 중심 리팩토링으로 한정하기 위해, move는 `EditorOperationOrchestrator` 범위에서 제외하고 controller가 기존 문서/블록 이동 서비스로 직접 연결하도록 정리했다.
-- 판단: save와 move를 최종적으로 같은 editor orchestration family로 맞출 수는 있지만, 이번 변경에서는 save 구조를 먼저 고정하는 것이 우선이다. move까지 동시에 편입하면 범위가 커져 구조 판단과 회귀 검증이 섞인다.
+- 변경 내용: `AdminBlockController`의 create/update/delete/move 4개 단건 API는 `EditorSaveRequest`, `EditorSaveResponse`, `EditorSaveApiMapper`를 사용하도록 바꿨다.
+- 변경 내용: `AdminBlockOperationService`, `AdminBlockOperationServiceImpl`는 유지하되, 내부에서 사용하던 `DocumentTransactionOperationCommand`, `DocumentTransactionResult`, `DocumentTransactionOperationExecutor`를 `EditorSaveOperationCommand`, `EditorSaveResult`, `EditorSaveOperationExecutor` 기준으로 치환했다.
+- 변경 내용: admin block 단건 경로의 검증/조회/문서 version 증가 순서는 기존 `AdminBlockOperationServiceImpl` 역할을 유지하도록 두었고, 관련 테스트 명명과 `docs/REQUIREMENTS.md`도 `DocumentTransaction*` 기준에서 `EditorSave*` 기준으로 맞췄다.
+- 판단: admin block API의 역할은 save 4개 operation을 운영/관리 경로에서 단건으로 치기 쉽게 만든 보조 경계다. 따라서 controller와 request/response 명명은 `EditorSave*`로 맞추되, 기존 단건 wrapper의 동작 순서와 책임은 `AdminBlockOperationServiceImpl` 안에 유지하는 편이 기존 동작 치환에 더 맞다.
+
+## Step 10. deprecated transaction legacy 경로 제거
+
+- 변경 내용: `DocumentController`에서 deprecated `POST /documents/{documentId}/transactions`, `POST /documents/{documentId}/move` 경로를 제거했다.
+- 변경 내용: 더 이상 참조되지 않는 `DocumentTransaction*` DTO, mapper, service, executor, transaction package와 `MoveDocumentRequest`를 삭제했다.
+- 변경 내용: legacy save/move 테스트는 제거하고, 현재 계약 검증은 `EditorOperationControllerWebMvcTest`, `EditorOperationApiIntegrationTest`, `EditorOperationConcurrencyIntegrationTest`, `EditorOperationOrchestratorImplTest` 기준으로 유지하도록 정리했다.
+- 판단: deprecated save/move 경로의 기능과 핵심 오류 시나리오는 editor 경계 테스트로 이미 옮겨졌고, admin block 단건 경로도 `EditorSave*` 기준으로 정리된 상태라 legacy transaction 축을 더 유지할 이유가 없다.
+
+## Step 11. save 경계와 document version 책임 최종 정리
+
+- 변경 내용: `EditorOperationOrchestratorImpl`, `AdminBlockOperationServiceImpl`, `EditorSaveOperationExecutor`에서 `DocumentRepository`, `BlockRepository` 직접 참조를 제거했다.
+- 변경 내용: `BlockServiceImpl`, `DocumentServiceImpl`의 기본 write 메서드에서는 명시적 `flush()`를 제거하고, 최신 block version 또는 save/move 응답의 최신 block 상태가 필요한 지점에서만 `PersistenceContextManager`를 통해 flush 하도록 정리했다.
+- 변경 내용: 문서 version 증가 책임은 한때 `DocumentService.incrementVersion(...)`로 올렸지만, 최종적으로는 `DocumentVersionUpdater`, `DocumentVersionUpdaterImpl`로 다시 분리했다.
+- 변경 내용: `BlockServiceImpl`, `EditorOperationOrchestratorImpl`, `AdminBlockOperationServiceImpl`는 더 이상 `DocumentService`를 통해 문서 version 증가를 우회하지 않고, 목적이 드러나는 전용 updater를 사용하도록 정리했다.
+- 판단: 오케스트레이터와 executor는 유스케이스 조정과 save 알고리즘 해석에 집중하고, 영속화 시점은 필요한 지점에서만 orchestration 경계가 flush 하도록 두는 편이 경계가 더 선명하다.
+- 판단: block version/sortKey는 더티체킹과 선택적 flush로 충분하지만, document version까지 `@Version` dirty-checking 증가나 일반 `DocumentService` 책임으로 두면 동시성 정책 의도가 흐려진다. 이 저장소의 요구사항과 통합 테스트 기준에서는 bulk 증가 정책을 전용 updater로 분리해 유지하는 쪽이 맞다.
+- 검증: `BlockServiceImplTest`, `DocumentServiceImplTest`, `EditorOperationOrchestratorImplTest`, `AdminBlockOperationServiceImplTest`, `EditorOperationControllerWebMvcTest`, `AdminBlockControllerWebMvcTest`, `DocumentControllerWebMvcTest`, `EditorOperationApiIntegrationTest`, `EditorOperationConcurrencyIntegrationTest`, `AdminBlockApiIntegrationTest`, `DocumentBlocksApiIntegrationTest`, `DocumentApiIntegrationTest`
+- 검증: `:documents-infrastructure:test --tests com.documents.service.AdminBlockOperationServiceImplTest --tests com.documents.service.EditorOperationOrchestratorImplTest --tests com.documents.service.BlockServiceImplTest`
+- 검증: `:documents-infrastructure:test --tests com.documents.service.DocumentServiceImplTest`
+- 검증: `:documents-api:test --tests com.documents.api.editor.EditorOperationControllerWebMvcTest --tests com.documents.api.block.AdminBlockControllerWebMvcTest --tests com.documents.api.document.DocumentControllerWebMvcTest`
+- 검증: `:documents-boot:test --tests com.documents.api.editor.EditorOperationApiIntegrationTest --tests com.documents.api.editor.EditorOperationConcurrencyIntegrationTest --tests com.documents.api.block.AdminBlockApiIntegrationTest --tests com.documents.api.block.DocumentBlocksApiIntegrationTest --tests com.documents.api.document.DocumentApiIntegrationTest`
+
+## Step 12. editor 문서 기준 최종 정리
+
+- 변경 내용: `docs/REQUIREMENTS.md`의 admin block 보조 API 계약을 현재 구현 기준인 `EditorSave*` 단건 모델로 최종 반영했다.
+- 변경 내용: `docs/guides/editor/` 문서군에서는 save와 move의 서비스 경계를 다시 맞췄다. save와 move 모두 `EditorOperationOrchestrator`를 진입점으로 사용하고, move는 orchestrator 안에서 document direct 처리와 block executor 재사용으로 분기하는 현재 구조로 정리했다.
+- 변경 내용: `docs/explainers/editor-save-model.md`, `docs/guides/editor/frontend-editor-guideline.md`에 남아 있던 예전 단건 block 보조 API 경로를 `/admin/**` 기준으로 정리했다.
+- 판단: `REQUIREMENTS`, guide, explainer는 현재 기준을 한 번에 읽히게 통합하는 문서라 최신 구조로 덮어써야 하고, worklog만 어떤 판단 변경이 있었는지 Step으로 누적하는 편이 문서 성격에 맞다.

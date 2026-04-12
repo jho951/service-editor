@@ -154,9 +154,10 @@ move 호출 기준은 다음으로 고정한다.
 
 다음 API는 보조 경로로만 보고, 에디터 주 저장 경로에서는 기본적으로 사용하지 않는다.
 
-- `POST /documents/{documentId}/blocks`
-- `PATCH /blocks/{blockId}`
-- `DELETE /blocks/{blockId}`
+- `POST /admin/documents/{documentId}/blocks`
+- `PATCH /admin/blocks/{blockId}`
+- `POST /admin/blocks/{blockId}/move`
+- `DELETE /admin/blocks/{blockId}`
 
 즉 프론트 구현자는 "이벤트마다 다른 API를 호출한다"는 관점으로 접근하면 안 된다.
 

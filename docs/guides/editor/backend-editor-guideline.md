@@ -30,13 +30,15 @@ move 처리 기준은 다음으로 고정한다.
 - drop 확정 시점의 최종 위치만 1회 반영하는 explicit action으로 처리한다.
 - 같은 위치로 drop된 no-op 이동은 성공으로 처리할 수 있지만, 실제 갱신과 버전 증가는 없어야 한다.
 - controller는 save와 move를 모두 `EditorOperationOrchestrator`로 연결한다.
-- `EditorOperationOrchestrator.move(...)`는 `EditorMoveCommand`, `EditorMoveResourceType` 기준으로 받고, 문서 이동은 기존 `DocumentService.move(...)`, 블록 이동은 `EditorSaveOperationExecutor`의 `BLOCK_MOVE` 실행 경로를 재사용한다.
 - 문서/블록 move 알고리즘은 새 endpoint에서 따로 재구현하지 않고 기존 구현을 그대로 재사용한다.
 - block move 응답에는 갱신된 `version`, `documentVersion`, `sortKey`를 포함한다.
 - document move 응답도 현재 위치 반영 결과와 최신 `documentVersion`을 같은 response 구조로 돌려준다.
 - save는 `POST /editor-operations/documents/{documentId}/save`에서 시작하고, public 경계는 `EditorSaveRequest/Response`, `EditorSaveApiMapper` 기준으로 받는다.
 - `EditorOperationOrchestrator.save(...)`는 `EditorSaveCommand`, `EditorSaveResult`, `EditorSaveOperationType`, `EditorSaveOperationExecutor`, `EditorSaveContext` 기준으로 직접 저장 흐름을 조율한다.
-- 기존 save 알고리즘은 유지하되, editor 경계 안에서는 deprecated `DocumentTransactionService`를 새 중심 경로로 사용하지 않는다.
+- `EditorOperationOrchestrator.move(...)`는 `EditorMoveCommand`를 받아 `resourceType`으로 분기한다. document move는 orchestrator가 `DocumentService.move(...)`를 직접 호출하고, block move는 `EditorSaveOperationExecutor.applyMove(...)`를 재사용한다.
+- `BlockService`, `DocumentService` 기본 동작은 더티체킹 중심으로 두되, editor/admin orchestration 경계에서는 `PersistenceContextManager.flush()`로 최신 block version과 sortKey를 확정한다.
+- 문서 version 증가는 동시성 요구를 유지하기 위해 `DocumentVersionUpdater.increment(...)` bulk 경로를 사용하고, block move 단일 API에서는 `BlockService.move(...)`가 올린 최신 document version을 재조회로 읽는다.
+- 기존 save 알고리즘은 유지하되, 현재 editor save 경계의 write 진입점은 `EditorOperationController`와 `EditorOperationOrchestrator`로 고정한다.
 
 ---
 
@@ -158,8 +160,8 @@ v1 전제는 다음과 같다.
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant API as Transaction Controller
-    participant S as Transaction Service
+    participant API as EditorOperationController
+    participant S as EditorOperationOrchestrator
     participant B as Block Service/Domain
     participant DB as Database
 
@@ -181,8 +183,8 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant API as Transaction Controller
-    participant S as Transaction Service
+    participant API as EditorOperationController
+    participant S as EditorOperationOrchestrator
     participant B as Block Service/Domain
     participant DB as Database
 
@@ -204,8 +206,8 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant C as Client
-    participant API as Transaction Controller
-    participant S as Transaction Service
+    participant API as EditorOperationController
+    participant S as EditorOperationOrchestrator
     participant B as Block Service/Domain
     participant DB as Database
 
