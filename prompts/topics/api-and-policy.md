@@ -21,6 +21,7 @@
 - [2026-03-27-internal-api-remove-v1-prefix.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-27-internal-api-remove-v1-prefix.md)
 - [2026-03-27-outbound-auth-mode-separation.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-27-outbound-auth-mode-separation.md)
 - [2026-04-05-node-domain-abstraction-review.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-04/2026-04-05-node-domain-abstraction-review.md)
+- [2026-04-17-docs-implementation-sync.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-04/2026-04-17-docs-implementation-sync.md)
 
 ## 관련 문서
 

@@ -267,8 +267,8 @@ class AdminBlockApiIntegrationTest {
     }
 
     @Test
-    @DisplayName("성공_여러 operation이 와도 첫 operation만 사용해 수정한다")
-    void updateBlockUsesOnlyFirstOperation() throws Exception {
+    @DisplayName("실패_여러 operation이 오면 단건 보조 API 계약 위반으로 거부한다")
+    void updateBlockRejectsMultipleOperations() throws Exception {
         Document document = document("문서");
         Block block = block(document, null, "기존 블록", "000000000001000000000000");
 
@@ -315,11 +315,12 @@ class AdminBlockApiIntegrationTest {
                                   ]
                                 }
                                 """.formatted(block.getId(), block.getId())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.appliedOperations[0].opId").value("op-1"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.httpStatus").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value(9015));
 
         Block updated = blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow();
-        assertThat(updated.getContent()).isEqualTo(content("첫 번째 수정"));
+        assertThat(updated.getContent()).isEqualTo(content("기존 블록"));
     }
 
     private Document document(String title) {

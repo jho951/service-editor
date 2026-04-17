@@ -65,10 +65,10 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 - v1 동시성 기준은 document 전체가 아니라 block 단위 `version`이다.
 - 같은 block에 대한 stale update는 `409 Conflict`로 처리한다.
 - v1 transaction 실패 정책은 partial apply가 아니라 전체 rollback을 사용한다.
-- conflict 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함한다.
+- 현재 v1 구현 기준 conflict 응답은 공통 실패 응답의 `CONFLICT(409)`로 반환하고, 최신 block `version`과 `content` 직접 포함은 v2 conflict 응답 고도화 후보로 둔다.
 - conflict 이후 프론트 복구 기준은 실패한 batch payload 복원이 아니라, 현재 로컬 문서 상태 기준 pending 재조립이다.
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되면 다시 pending에 포함될 수 있다.
-- `POST /documents/{documentId}/blocks`, `PATCH /blocks/{blockId}`, `DELETE /blocks/{blockId}`는 에디터 표준 경로가 아니라 보조/운영/관리 경로로 둔다.
+- `POST /admin/documents/{documentId}/blocks`, `PATCH /admin/blocks/{blockId}`, `POST /admin/blocks/{blockId}/move`, `DELETE /admin/blocks/{blockId}`는 에디터 표준 경로가 아니라 보조/운영/관리 경로로 둔다.
 - 이 설계 자체는 autosave 저장 모델이며, 실시간 브로드캐스트/협업 모델을 포함하지 않는다.
 - 이후 새 블록 생성 후 바로 입력하는 경로를 더 직접적으로 표현하기 위해, `BLOCK_CREATE`가 선택적 초기 `content`를 함께 받을 수 있도록 `ADR 020`에서 계약을 확장했다.
 - 이후 API 진입 경계는 `ADR 021`에서 `EditorOperationController` 기준으로 재배치했고, 표준 save entry path는 `POST /editor-operations/documents/{documentId}/save`로 옮겼다.

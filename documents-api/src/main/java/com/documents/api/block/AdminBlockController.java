@@ -17,8 +17,11 @@ import com.documents.api.dto.GlobalResponse;
 import com.documents.api.editor.EditorSaveApiMapper;
 import com.documents.api.editor.dto.EditorSaveRequest;
 import com.documents.api.editor.dto.EditorSaveResponse;
+import com.documents.exception.BusinessErrorCode;
+import com.documents.exception.BusinessException;
 import com.documents.service.AdminBlockOperationService;
 import com.documents.service.editor.EditorSaveCommand;
+import com.documents.service.editor.EditorSaveOperationCommand;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,11 +45,12 @@ public class AdminBlockController {
             @CurrentUserId String userId
     ) {
         EditorSaveCommand command = editorSaveApiMapper.toCommand(request);
+        EditorSaveOperationCommand operation = singleOperation(command);
 
         return ResponseEntity.ok(GlobalResponse.ok(
                 SuccessCode.SUCCESS,
                 editorSaveApiMapper.toResponse(
-                        adminBlockOperationService.applyCreate(documentId, command.batchId(), command.operations().get(0), userId)
+                        adminBlockOperationService.applyCreate(documentId, command.batchId(), operation, userId)
                 )
         ));
     }
@@ -59,11 +63,12 @@ public class AdminBlockController {
             @CurrentUserId String userId
     ) {
         EditorSaveCommand command = editorSaveApiMapper.toCommand(request);
+        EditorSaveOperationCommand operation = singleOperation(command);
 
         return ResponseEntity.ok(GlobalResponse.ok(
                 SuccessCode.SUCCESS,
                 editorSaveApiMapper.toResponse(
-                        adminBlockOperationService.applyReplaceContent(blockId, command.batchId(), command.operations().get(0), userId)
+                        adminBlockOperationService.applyReplaceContent(blockId, command.batchId(), operation, userId)
                 )
         ));
     }
@@ -76,11 +81,12 @@ public class AdminBlockController {
             @CurrentUserId String userId
     ) {
         EditorSaveCommand command = editorSaveApiMapper.toCommand(request);
+        EditorSaveOperationCommand operation = singleOperation(command);
 
         return ResponseEntity.ok(GlobalResponse.ok(
                 SuccessCode.SUCCESS,
                 editorSaveApiMapper.toResponse(
-                        adminBlockOperationService.applyDelete(blockId, command.batchId(), command.operations().get(0), userId)
+                        adminBlockOperationService.applyDelete(blockId, command.batchId(), operation, userId)
                 )
         ));
     }
@@ -93,12 +99,21 @@ public class AdminBlockController {
             @CurrentUserId String userId
     ) {
         EditorSaveCommand command = editorSaveApiMapper.toCommand(request);
+        EditorSaveOperationCommand operation = singleOperation(command);
 
         return ResponseEntity.ok(GlobalResponse.ok(
                 SuccessCode.SUCCESS,
                 editorSaveApiMapper.toResponse(
-                        adminBlockOperationService.applyMove(blockId, command.batchId(), command.operations().get(0), userId)
+                        adminBlockOperationService.applyMove(blockId, command.batchId(), operation, userId)
                 )
         ));
+    }
+
+    private EditorSaveOperationCommand singleOperation(EditorSaveCommand command) {
+        if (command.operations().size() != 1) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
+        return command.operations().get(0);
     }
 }

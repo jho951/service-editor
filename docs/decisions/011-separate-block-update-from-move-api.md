@@ -20,9 +20,10 @@
 
 ## 결정
 
-- `PATCH /blocks/{blockId}`는 블록 내용 또는 블록 자체 메타데이터 수정만 담당한다.
-- 블록 이동은 `POST /blocks/{blockId}/move`에서 별도로 처리한다.
-- 이동 API는 `parentId`, `afterBlockId`, `beforeBlockId`, `version`으로 대상 위치를 해석한다.
+- 블록 내용 수정과 블록 이동은 같은 API 책임으로 섞지 않는다.
+- 현재 보조 경로 기준 내용 수정은 `PATCH /admin/blocks/{blockId}`, 단일 이동은 `POST /admin/blocks/{blockId}/move`에서 처리한다.
+- 에디터 표준 이동은 후속 결정에 따라 `POST /editor-operations/move`로 처리한다.
+- 단건 admin move는 `parentRef`, `afterRef`, `beforeRef`, `version`으로 대상 위치를 해석하고, editor move는 `targetParentId`, `afterId`, `beforeId`, `version`으로 대상 위치를 해석한다.
 - 이동 처리에서는 기존 `sortKey` 정책을 사용해 새 위치의 `sortKey`를 계산한다.
 - v1에서는 단일 블록 이동 API를 우선 채택하고, 별도 다중 블록 reorder API는 기본 경로로 두지 않는다.
 

@@ -366,7 +366,8 @@ v1 동시성 기준은 `block.version`이다.
 v1에서는 다음 방향을 사용한다.
 
 - save batch는 전체 rollback
-- conflict 응답에는 최신 block content 포함
+- conflict 응답은 공통 실패 응답의 `CONFLICT(409)`로 반환
+- 최신 block content가 필요하면 프론트가 충돌 후 재조회
 
 ### 왜 전체 rollback이 나은가
 
@@ -382,7 +383,7 @@ v1에서는 다음 방향을 사용한다.
 
 v1에서는 이 단순함이 더 중요하다.
 
-### 왜 최신 block content를 같이 주는가
+### 왜 최신 block content를 재조회하는가
 
 충돌이 났을 때 클라이언트는 바로 판단 재료가 필요하다.
 
@@ -392,13 +393,16 @@ v1에서는 이 단순함이 더 중요하다.
 - 서버 최신 content
 - 어느 block이 충돌했는지
 
-최신 content가 응답에 같이 오면 바로 다음 동작으로 이어가기 쉽다.
+현재 v1 구현은 conflict 응답에 최신 block payload를 직접 담지 않는다.
+대신 공통 실패 응답을 유지하고, 프론트가 필요한 block 상태를 재조회한다.
+
+최신 content를 확보하면 바로 다음 동작으로 이어가기 쉽다.
 
 - 충돌 UI 표시
 - 최신 값과 로컬 값 비교
 - 사용자 확인 후 재적용
 
-따라서 v1에서는 conflict 응답에 적어도 충돌 block의 최신 `version`, 최신 `content`는 포함하는 것이 좋다.
+충돌 응답에 최신 `version`, 최신 `content`를 직접 포함하는 방식은 v2 conflict 응답 고도화 후보로 둔다.
 
 ### 시나리오: 오래 타이핑한 뒤 저장 시 동시성 충돌이 난 경우
 
@@ -424,7 +428,7 @@ v1에서는 이 단순함이 더 중요하다.
 3. 현재 사용자가 flush하면 `409 Conflict`가 난다.
 4. 서버는 이번 batch를 반영하지 않는다.
 5. 하지만 클라이언트는 내 로컬 content와 pending 상태를 유지한다.
-6. 대신 충돌 난 block을 `conflicted` 상태로 표시하고, 서버 최신 `version`, `content`를 함께 보관한다.
+6. 대신 충돌 난 block을 `conflicted` 상태로 표시하고, 필요하면 서버 최신 `version`, `content`를 재조회해 보관한다.
 7. 사용자는 비교 후 재적용하거나 수정한 뒤 다시 저장할 수 있다.
 
 즉 버리는 것은 "이번 서버 반영 시도"이지, "사용자 로컬 작업본"이 아니다.

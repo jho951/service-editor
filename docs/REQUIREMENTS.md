@@ -110,7 +110,8 @@
 - 문서 단건 조회
 - 문서 목록 조회
 - 문서 수정
-- 문서 soft delete
+- 문서 hard delete
+- 문서 휴지통 이동
 - 문서 restore
 - 문서 부모 변경(계층 이동)
 
@@ -615,8 +616,8 @@ Block {
 - 블록 수정 충돌 판정은 block 단위 낙관적 락을 사용한다.
 - stale version이면 `409 Conflict`를 반환한다.
 - save 실패 정책은 partial apply가 아니라 전체 rollback을 사용한다.
-- 충돌 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함해야 한다.
-- 프론트는 최신 block content를 기준으로 로컬 변경을 재적용하거나 사용자에게 충돌 상태를 보여줄 수 있어야 한다.
+- 현재 v1 충돌 응답은 공통 실패 응답(`GlobalResponse`)의 `CONFLICT(409)`로 반환하며, 상세 충돌 block payload는 포함하지 않는다.
+- 프론트는 conflict 후 필요한 최신 block content를 재조회하고, 현재 로컬 문서 상태 기준으로 pending을 다시 조립해야 한다.
 - 전체 rollback은 서버 반영 기준이며, 프론트는 conflict 시 로컬 draft와 복구에 필요한 pending 상태를 바로 폐기하지 않아야 한다.
 - conflict 후 pending 복구는 실패한 batch payload 복원이 아니라, 현재 로컬 문서 상태 기준 재조립을 원칙으로 한다.
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되고 있으면 다시 pending에 포함될 수 있다.
@@ -760,7 +761,8 @@ Block {
 - 같은 상태를 다시 요청하면 no-op으로 처리하고 `Document.version`을 증가시키지 않아야 한다.
 
 ### `DELETE /documents/{documentId}`
-문서 soft delete.
+문서 hard delete.
+- 대상 문서, 하위 문서, 각 문서 소속 블록을 함께 물리 삭제한다.
 
 ### `POST /documents/{documentId}/restore`
 문서 복구.
@@ -907,7 +909,7 @@ TEXT 블록 생성.
 - 서버는 batch 안에 실제 editor 변경이 하나라도 적용되면 `Document.version`을 증가시키고, 응답에 최신 `documentVersion`을 포함해야 한다.
 - `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`가 모두 no-op이면 block version과 `documentVersion`을 올리지 않아야 한다.
 - 하나의 operation이라도 실패하면 전체 rollback을 적용해야 한다.
-- 충돌 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함해야 한다.
+- 현재 v1 충돌 응답은 공통 실패 응답(`GlobalResponse`)의 `CONFLICT(409)`로 반환하며, 상세 충돌 block payload는 포함하지 않는다.
 
 ### `POST /editor-operations/move`
 문서와 블록 이동을 공통 contract로 처리하는 단일 move API.
@@ -1084,6 +1086,7 @@ TEXT 블록 생성.
 5. 검색 기능이 필요할 경우 별도 인덱싱 전략 수립
 6. 첨부 파일/이미지 업로드 도입 시 asset 모델 정의
 7. 링크, 멘션, inline code 등 추가 mark 타입의 schema 확장 정책 정의
+8. editor save conflict 응답에 최신 block `version`과 `content`를 직접 포함할지 여부
 
 ---
 

@@ -208,14 +208,11 @@ class AdminBlockControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("성공_여러 operation이 와도 첫 operation으로 위임한다")
-    void updateBlockDelegatesFirstOperationWhenMultipleOperationsExist() throws Exception {
+    @DisplayName("실패_여러 operation이 오면 단건 보조 API 계약 위반으로 거부한다")
+    void updateBlockRejectsMultipleOperations() throws Exception {
         UUID blockId = UUID.randomUUID();
-        UUID documentId = UUID.randomUUID();
-        when(adminBlockOperationService.applyReplaceContent(eq(blockId), any(), any(), eq("user-123")))
-                .thenReturn(saveResult(documentId, null, blockId, 1L, "000000000001000000000000", null));
 
-        mockMvc.perform(patch("/admin/blocks/{blockId}", blockId)
+        var result = mockMvc.perform(patch("/admin/blocks/{blockId}", blockId)
                         .contentType("application/json")
                         .header("X-User-Id", "user-123")
                         .content("""
@@ -259,7 +256,8 @@ class AdminBlockControllerWebMvcTest {
                                 }
                                 """.formatted(blockId, blockId)));
 
-        verify(adminBlockOperationService).applyReplaceContent(eq(blockId), any(), any(), eq("user-123"));
+        ApiResponseAssertions.assertErrorEnvelope(result, "BAD_REQUEST", 9015, "잘못된 요청입니다.");
+        verify(adminBlockOperationService, never()).applyReplaceContent(any(), any(), any(), any());
     }
 
     @Test
