@@ -2,10 +2,16 @@
 
 문서와 블록 데이터를 관리하는 Spring Boot 기반 백엔드 서비스입니다. 현재 저장소는 Gradle 멀티모듈 구조로 정리되어 있으며, 문서(Document)와 블록(Block) CRUD를 확장해 나가는 기준 프로젝트입니다.
 
+## Contract Source
+
+- 공통 계약 레포: `https://github.com/jho951/contract`
+- 이 서비스의 코드 SoT: `Block-server` `dev`
+- 인터페이스 변경 시 본 저장소 구현보다 계약 레포 변경을 먼저 반영합니다.
+
 ## 프로젝트 개요
 
-- 문서 메타데이터와 문서 내부 블록 구조를 저장, 조회, 수정, 삭제하는 서비스를 목표로 합니다.
-- 현재는 멀티모듈 백엔드 구조와 실행 환경이 정리된 상태이며, 문서/블록 CRUD는 단계적으로 구현할 예정입니다.
+- 문서 메타데이터와 문서 내부 블록 구조를 저장, 조회, 수정, 삭제하는 서비스를 제공합니다.
+- 현재는 문서 CRUD, 휴지통/복구, 블록 조회, 관리자 블록 보조 API, 에디터 save/move API가 구현된 상태입니다.
 - 데이터 저장은 MySQL, 애플리케이션 실행은 Spring Boot, 영속 계층은 Spring Data JPA를 사용합니다.
 
 ## 현재 사용되는 아키텍처
@@ -50,71 +56,52 @@
 ./gradlew test
 ```
 
-### Docker 실행
+### Local 실행 스크립트
 
-도커 관련 명령은 `docker/docker.sh`를 사용합니다.
-
-전체 빌드 후 실행:
+로컬 실행은 `scripts/run-local.sh`를 사용합니다.
 
 ```bash
-bash docker/docker.sh all
+# 기본(dev)
+bash scripts/run-local.sh
+
+# prod 프로필로 실행
+bash scripts/run-local.sh prod
 ```
 
-이미지 빌드:
+### Docker 실행 스크립트
+
+도커 실행은 `scripts/run-docker.sh`를 사용합니다.
+
+기본 실행(인자 없음): `dev up`
 
 ```bash
-bash docker/docker.sh build
+# dev 환경 전체 빌드/기동/로그
+bash scripts/run-docker.sh dev all
+
+# prod 환경 기동
+bash scripts/run-docker.sh prod up
+
+# 인자 없이 실행하면 dev up
+bash scripts/run-docker.sh
 ```
 
-컨테이너 시작:
+지원 동작:
 
-```bash
-bash docker/docker.sh up
-```
-
-컨테이너 중지:
-
-```bash
-bash docker/docker.sh down
-```
-
-로그 확인:
-
-```bash
-bash docker/docker.sh logs
-```
-
-재시작:
-
-```bash
-bash docker/docker.sh restart
-```
-
-볼륨 포함 전체 정리:
-
-```bash
-bash docker/docker.sh nuke
-```
-
-## 도커 시작/중지 쉘 사용법
-
-`docker/docker.sh`는 `docker/docker-compose.yml`을 기준으로 앱과 MySQL 컨테이너를 제어합니다.
-
-- `all`: 이미지 재빌드 후 컨테이너 기동, `documents-app` 로그를 바로 출력
+- `all`: 이미지 재빌드 후 컨테이너 기동, 앱 로그 출력
 - `build`: 이미지만 빌드
 - `up`: 백그라운드로 컨테이너 시작
-- `down`: 컨테이너 중지 및 네트워크 정리
-- `logs`: 전체 서비스 로그 팔로우
-- `restart`: 컨테이너 재시작
-- `nuke`: 컨테이너와 볼륨 삭제, 불필요 이미지 정리
+- `down`: 컨테이너 중지
+- `logs`: 로그 팔로우
+- `restart`: 재시작
+- `nuke`: 컨테이너/볼륨 삭제 + 불필요 이미지 정리
+- `ps`: 컨테이너 상태 확인
 
-사용 예시:
+환경별 compose 파일:
 
-```bash
-bash docker/docker.sh up
-bash docker/docker.sh logs
-bash docker/docker.sh down
-```
+- dev: `docker/docker-compose.dev.yml`
+- prod: `docker/docker-compose.prod.yml`
+
+참고: 기존 `docker/docker.sh`는 하위 호환용 래퍼로 유지되며 내부적으로 `scripts/run-docker.sh`를 호출합니다.
 
 ## 기술 스택
 
@@ -134,7 +121,10 @@ bash docker/docker.sh down
 - MySQL 기반 JPA 영속화 준비
 - OpenAPI(Swagger) 문서화 설정
 - Docker 기반 로컬 실행 환경
-- 문서(Document)와 블록(Block) CRUD 확장 예정 구조
+- 문서(Document) CRUD와 휴지통/복구
+- 문서 단위 블록(Block) 조회
+- 관리자 블록 생성/수정/이동/삭제 보조 API
+- 에디터 save batch와 문서/블록 move API
 
 ## 기여 방법
 

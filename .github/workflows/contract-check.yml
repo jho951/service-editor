@@ -1,0 +1,24 @@
+name: contract-check
+
+on:
+  pull_request:
+
+jobs:
+  contract-impact:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }} --depth=1
+
+      - name: Run contract impact check
+        env:
+          SERVICE_NAME: block
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/jho951/contract/main/scripts/contract-impact-check.sh -o /tmp/contract-impact-check.sh
+          chmod +x /tmp/contract-impact-check.sh
+          /tmp/contract-impact-check.sh "$SERVICE_NAME" "origin/${{ github.base_ref }}"

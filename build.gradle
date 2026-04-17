@@ -27,6 +27,11 @@ ext {
         'SERVER_PORT',
         'TZ'
     ]
+    testLibraries = [
+        springBootTest : 'org.springframework.boot:spring-boot-starter-test',
+        springWeb      : 'org.springframework.boot:spring-boot-starter-web',
+        springDataJpa  : 'org.springframework.boot:spring-boot-starter-data-jpa'
+    ]
 }
 
 group = ext.resolvedProjectGroup
