@@ -27,6 +27,7 @@ import com.documents.repository.BlockRepository;
 import com.documents.repository.DocumentRepository;
 import com.documents.support.OrderedSortKeyGenerator;
 import com.documents.support.TextNormalizer;
+import com.documents.service.transaction.DocumentVersionUpdater;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Block 서비스 구현 검증")
@@ -45,6 +46,9 @@ class BlockServiceImplTest {
     @Mock
     private TextNormalizer textNormalizer;
 
+    @Mock
+    private DocumentVersionUpdater documentVersionUpdater;
+
     private BlockServiceImpl blockService;
 
     @BeforeEach
@@ -52,11 +56,10 @@ class BlockServiceImplTest {
         blockService = new BlockServiceImpl(
                 blockRepository,
                 documentRepository,
+                documentVersionUpdater,
                 textNormalizer,
                 new OrderedSortKeyGenerator()
         );
-        lenient().when(documentRepository.incrementVersion(any(UUID.class), any(), any(LocalDateTime.class)))
-                .thenReturn(1);
     }
 
     @Test
@@ -752,7 +755,7 @@ class BlockServiceImplTest {
 
         blockService.create(documentId, null, BlockType.TEXT, SIMPLE_CONTENT, null, null, ACTOR_ID);
 
-        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+        verify(documentVersionUpdater).increment(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
     }
 
     @Test
@@ -769,7 +772,7 @@ class BlockServiceImplTest {
 
         blockService.update(blockId, UPDATED_CONTENT, 0, ACTOR_ID);
 
-        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+        verify(documentVersionUpdater).increment(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
     }
 
     @Test
@@ -785,7 +788,7 @@ class BlockServiceImplTest {
 
         blockService.update(blockId, toContent("기존 블록"), 0, ACTOR_ID);
 
-        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+        verify(documentVersionUpdater, never()).increment(any(UUID.class), any(), any(LocalDateTime.class));
     }
 
     @Test
@@ -805,7 +808,7 @@ class BlockServiceImplTest {
 
         blockService.move(blockId, null, null, null, 1, ACTOR_ID);
 
-        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+        verify(documentVersionUpdater).increment(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
     }
 
     @Test
@@ -826,7 +829,7 @@ class BlockServiceImplTest {
 
         blockService.move(blockId, parentId, null, null, 1, ACTOR_ID);
 
-        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+        verify(documentVersionUpdater, never()).increment(any(UUID.class), any(), any(LocalDateTime.class));
     }
 
     @Test
@@ -851,7 +854,7 @@ class BlockServiceImplTest {
 
         blockService.delete(rootId, 0, ACTOR_ID);
 
-        verify(documentRepository).incrementVersion(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
+        verify(documentVersionUpdater).increment(eq(documentId), eq(ACTOR_ID), any(LocalDateTime.class));
     }
 
     @Test
@@ -870,7 +873,7 @@ class BlockServiceImplTest {
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.CONFLICT);
 
-        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+        verify(documentVersionUpdater, never()).increment(any(UUID.class), any(), any(LocalDateTime.class));
     }
 
     @Test
@@ -898,7 +901,7 @@ class BlockServiceImplTest {
                 .extracting("errorCode")
                 .isEqualTo(BusinessErrorCode.CONFLICT);
 
-        verify(documentRepository, never()).incrementVersion(any(UUID.class), any(), any(LocalDateTime.class));
+        verify(documentVersionUpdater, never()).increment(any(UUID.class), any(), any(LocalDateTime.class));
     }
 
     private Document document(UUID documentId) {

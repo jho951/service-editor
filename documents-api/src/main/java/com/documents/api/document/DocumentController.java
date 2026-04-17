@@ -19,9 +19,6 @@ import com.documents.api.block.dto.BlockResponse;
 import com.documents.api.code.SuccessCode;
 import com.documents.api.document.dto.CreateDocumentRequest;
 import com.documents.api.document.dto.DocumentResponse;
-import com.documents.api.document.dto.MoveDocumentRequest;
-import com.documents.api.document.dto.DocumentTransactionRequest;
-import com.documents.api.document.dto.DocumentTransactionResponse;
 import com.documents.api.document.dto.TrashDocumentResponse;
 import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.document.dto.UpdateDocumentVisibilityRequest;
@@ -29,7 +26,6 @@ import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Document;
 import com.documents.service.BlockService;
 import com.documents.service.DocumentService;
-import com.documents.service.DocumentTransactionService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,8 +42,6 @@ public class DocumentController {
 	private final BlockApiMapper blockApiMapper;
 	private final DocumentService documentService;
 	private final DocumentApiMapper documentApiMapper;
-	private final DocumentTransactionService documentTransactionService;
-	private final DocumentTransactionApiMapper documentTransactionApiMapper;
 
 	@Operation(summary = "내 문서 목록 조회")
 	@GetMapping
@@ -143,19 +137,6 @@ public class DocumentController {
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(updatedDocument)));
 	}
 
-	@Operation(summary = "문서 에디터 transaction 반영")
-	@PostMapping("/{documentId}/transactions")
-	public ResponseEntity<GlobalResponse<DocumentTransactionResponse>> applyTransactions(
-		@PathVariable("documentId") UUID documentId,
-		@Valid @RequestBody DocumentTransactionRequest request,
-		@CurrentUserId String userId
-	) {
-		DocumentTransactionResponse response = documentTransactionApiMapper.toResponse(
-			documentTransactionService.apply(documentId, documentTransactionApiMapper.toCommand(request), userId)
-		);
-		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, response));
-	}
-
 	@Operation(summary = "문서 삭제")
 	@DeleteMapping("/{documentId}")
 	public ResponseEntity<GlobalResponse<Void>> deleteDocument(
@@ -183,23 +164,6 @@ public class DocumentController {
 		@CurrentUserId String userId
 	) {
 		documentService.restore(documentId, userId);
-		return ResponseEntity.ok(GlobalResponse.ok());
-	}
-
-	@Operation(summary = "문서 이동")
-	@PostMapping("/{documentId}/move")
-	public ResponseEntity<GlobalResponse<Void>> moveDocument(
-		@PathVariable("documentId") UUID documentId,
-		@RequestBody MoveDocumentRequest request,
-		@CurrentUserId String userId
-	) {
-		documentService.move(
-			documentId,
-			request.getTargetParentId(),
-			request.getAfterDocumentId(),
-			request.getBeforeDocumentId(),
-			userId
-		);
 		return ResponseEntity.ok(GlobalResponse.ok());
 	}
 }

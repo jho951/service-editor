@@ -102,6 +102,6 @@
 
 ## 관련 문서
 
-- `docs/decisions/018-remove-workspace-from-v1-document-flow.md`
-- `docs/REQUIREMENTS.md`
-- `prompts/2026-03-27-v1-remove-workspace-from-document-flow.md`
+- [018-remove-workspace-from-v1-document-flow.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/018-remove-workspace-from-v1-document-flow.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
+- [2026-03-27-v1-remove-workspace-from-document-flow.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-27-v1-remove-workspace-from-document-flow.md)

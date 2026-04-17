@@ -392,19 +392,21 @@ Block {
 
 ## 8.4 문서 이동 / 순서 변경
 ### 요구사항
-- 문서의 부모 변경과 형제 순서 변경은 `POST /documents/{documentId}/move` 별도 API로 제공해야 한다.
-- 문서 move API는 제목, 아이콘, 커버 수정 책임을 갖지 않고 부모 변경과 순서 변경만 담당해야 한다.
+- 문서의 부모 변경과 형제 순서 변경은 `POST /editor-operations/move` 단일 move API로 제공해야 한다.
+- move API는 제목, 아이콘, 커버 수정 책임을 갖지 않고 부모 변경과 순서 변경만 담당해야 한다.
+- move API는 drag 중간 상태를 저장하지 않고, drop 확정 시점의 최종 위치만 1회 반영해야 한다.
 - 이동 대상 문서는 활성 문서여야 하며, 삭제된 문서는 `DOCUMENT_NOT_FOUND`로 처리해야 한다.
 - 대상 문서가 존재하지 않으면 `DOCUMENT_NOT_FOUND`를 반환해야 한다.
+- move request는 `resourceType=DOCUMENT`, `resourceId=documentId`로 문서 이동을 표현해야 한다.
 - `targetParentId`가 `null`이면 루트 형제 집합으로 이동할 수 있어야 한다.
 - `targetParentId`가 있으면 활성 문서인지 검증해야 한다.
 - 대상 부모 문서는 같은 사용자 소유 문서여야 한다.
 - 자기 자신을 부모로 지정하면 실패 처리해야 한다.
 - 자신의 하위 문서를 부모로 지정하는 순환 이동은 실패 처리해야 한다.
-- 이동 시 위치 해석용 요청 값은 `targetParentId`, `afterDocumentId`, `beforeDocumentId` 기준으로 설계해야 한다.
-- `afterDocumentId`, `beforeDocumentId`가 지정되면 둘 다 같은 부모 집합에 속한 활성 형제 문서인지 검증해야 한다.
-- `afterDocumentId`, `beforeDocumentId`를 동시에 받을 경우 부모 일치 여부와 순서 모순 여부를 검증해야 한다.
-- `afterDocumentId`, `beforeDocumentId`를 동시에 받을 경우 두 문서는 인접한 형제여야 하며, 두 문서 사이 위치로만 해석해야 한다.
+- 이동 시 위치 해석용 요청 값은 `targetParentId`, `afterId`, `beforeId` 기준으로 설계해야 한다.
+- `afterId`, `beforeId`가 지정되면 둘 다 같은 부모 집합에 속한 활성 형제 문서인지 검증해야 한다.
+- `afterId`, `beforeId`를 동시에 받을 경우 부모 일치 여부와 순서 모순 여부를 검증해야 한다.
+- `afterId`, `beforeId`를 동시에 받을 경우 두 문서는 인접한 형제여야 하며, 두 문서 사이 위치로만 해석해야 한다.
 - 위치 계산 결과에 따라 같은 형제 집합 내에서 유일한 `sortKey`를 새로 계산해야 한다.
 - 이동 전후 부모가 같더라도 순서만 바뀌는 reorder를 지원해야 한다.
 - 이동 시 `parentId`, `sortKey`, `updatedBy`, `updatedAt`은 한 트랜잭션에서 함께 갱신해야 한다.
@@ -415,16 +417,18 @@ Block {
 ### 요청 예시
 ```json
 {
+  "resourceType": "DOCUMENT",
+  "resourceId": "이동할 문서 ID",
   "targetParentId": "새 부모 문서 ID 또는 null",
-  "afterDocumentId": "같은 형제 집합의 앞 문서 ID 또는 null",
-  "beforeDocumentId": "같은 형제 집합의 뒤 문서 ID 또는 null"
+  "afterId": "같은 형제 집합의 앞 문서 ID 또는 null",
+  "beforeId": "같은 형제 집합의 뒤 문서 ID 또는 null"
 }
 ```
 
 ### 위치 해석 규칙
 - `targetParentId = null`이면 루트 형제 집합으로 이동한다.
-- `afterDocumentId`만 있으면 해당 문서 뒤 위치로 해석한다.
-- `beforeDocumentId`만 있으면 해당 문서 앞 위치로 해석한다.
+- `afterId`만 있으면 해당 문서 뒤 위치로 해석한다.
+- `beforeId`만 있으면 해당 문서 앞 위치로 해석한다.
 - 둘 다 없으면 대상 부모의 마지막 위치로 해석한다.
 - 둘 다 있으면 두 문서 사이 위치로 해석한다.
 
@@ -486,8 +490,11 @@ Block {
 - 부모를 변경하여 계층 이동이 가능해야 한다.
 - 이동 후 트리 무결성이 깨지면 안 된다.
 - 이동 및 재정렬은 트랜잭션으로 처리해야 한다.
+- 단일 블록 이동은 `POST /editor-operations/move` 단일 move API로도 처리할 수 있어야 한다.
 - 단일 블록 이동은 drag and drop의 drop 시점에 1회 요청으로 처리할 수 있어야 한다.
-- transaction 이동 요청은 `parentRef`, `afterRef`, `beforeRef`, `version`을 기준으로 위치를 해석한다.
+- drag 중간의 hover 위치 변화마다 요청을 보내지 않아야 한다.
+- move request는 `resourceType=BLOCK`, `resourceId=blockId`로 블록 이동을 표현해야 한다.
+- save batch 안의 `BLOCK_MOVE` 요청은 `parentRef`, `afterRef`, `beforeRef`, `version`을 기준으로 위치를 해석한다.
 - `parentRef`, `afterRef`, `beforeRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담을 수 있어야 한다.
 - 블록 이동 시 `sortKey`, `updatedBy`, `updatedAt`, `version`을 함께 갱신해야 한다.
 
@@ -502,16 +509,16 @@ Block {
 - 한 요청 안에서 문서에 실제 반영된 변경이 하나 이상 있으면 `Document.version`은 정확히 `1`만 증가해야 한다.
 - no-op 요청이면 `Document.version`과 `Block.version`을 증가시키지 않아야 한다.
 - stale version 요청은 `409 Conflict`를 반환해야 한다.
-- 충돌 검출이 필요한 저장 또는 구조 변경 요청은 클라이언트가 기준으로 삼은 `version`을 함께 전달해야 한다.
-- 서버는 요청의 `version`과 현재 저장된 `version`을 비교해 stale update를 검출할 수 있어야 한다.
+- 충돌 검출이 필요한 저장 또는 구조 변경 요청은 클라이언트가 기준으로 삼은 대상 리소스의 `version`을 함께 전달해야 한다.
+- 서버는 요청의 `version`과 현재 저장된 대상 리소스의 `version`을 비교해 stale update를 검출할 수 있어야 한다.
 
 ### 버전 역할 분리
 - `Document.version`은 프론트가 문서 전체 freshness를 판단하는 기준값이다.
 - `Block.version`은 특정 block 하나의 수정 또는 이동 충돌을 검출하는 기준값이다.
 - 프론트는 문서 진입 시 문서 조회 응답의 `Document.version`을 기준값으로 저장해야 한다.
 - 문서 메타 수정 성공 시에는 응답의 최신 `Document.version`으로 기준값을 갱신해야 한다.
-- transaction 저장 성공 시에는 응답의 `documentVersion`으로 기준값을 갱신해야 한다.
-- 단건 block API 응답이 최신 `Document.version`을 포함하지 않는 경우 프론트는 문서 조회 응답 또는 transaction 응답의 문서 version을 기준값으로 사용해야 한다.
+- editor save 또는 구조 변경 성공 시에는 응답의 `documentVersion`으로 기준값을 갱신해야 한다.
+- 단건 block API 응답이 최신 `Document.version`을 포함하지 않는 경우 프론트는 문서 조회 응답 또는 editor save 응답의 문서 version을 기준값으로 사용해야 한다.
 
 ### 버전 충돌 예시 시나리오
 1. 현재 DB의 block version이 `5`이고 content는 `"오늘 회의"`를 표현하는 JSON이다.
@@ -547,8 +554,8 @@ Block {
 - `title` 최대 길이: `255`
 - `icon`, `cover`는 허용된 JSON 스키마만 허용
 - `targetParentId`가 있으면 활성 문서여야 하고 현재 문서와 같은 사용자 소유 문서여야 한다.
-- `afterDocumentId`, `beforeDocumentId`가 있으면 둘 다 활성 형제 문서여야 한다.
-- `afterDocumentId`, `beforeDocumentId`를 동시에 받으면 두 문서의 부모가 같아야 하며 서로 인접해야 한다.
+- `afterId`, `beforeId`가 있으면 둘 다 활성 형제 문서여야 한다.
+- `afterId`, `beforeId`를 동시에 받으면 두 문서의 부모가 같아야 하며 서로 인접해야 한다.
 - 자기 자신을 부모로 지정하거나 자신의 하위 문서를 부모로 지정하는 요청은 허용하지 않는다.
 - v1에서 `icon`, `cover`는 JSON object만 허용한다.
 - v1에서 `icon`, `cover`의 최소 허용 스키마는 `{"type":"string","value":"string"}` 형태다.
@@ -582,21 +589,24 @@ Block {
 
 ## 10.1 v1 정책
 - 실시간 협업 merge는 보장하지 않는다.
-- 에디터 저장 표준 write 경로는 `POST /documents/{documentId}/transactions`를 사용한다.
+- 에디터 저장 표준 write 경로는 `POST /editor-operations/documents/{documentId}/save`를 사용한다.
+- 에디터 성격의 explicit 구조 변경 API는 `EditorOperationController` 경계에서 제공한다.
+- `save` 외에 에디터의 명시적 구조 변경 API는 v1에서 `POST /editor-operations/move` 하나만 둔다.
 - autosave와 `Ctrl+S`는 서로 다른 API가 아니라 같은 저장 queue의 flush 트리거다.
 - debounce만으로 무한정 저장이 밀리면 안 되며, 장시간 연속 입력 중에도 `max autosave interval` 기준으로 강제 flush가 가능해야 한다.
 - 에디터 저장 queue는 클라이언트 로컬에서 관리한다.
 - 에디터 queue의 coalescing, 상쇄, 최종 batch 조립은 클라이언트가 담당한다.
-- 서버는 클라이언트가 보낸 최종 transaction batch를 검증하고 반영한다.
+- 서버는 클라이언트가 보낸 최종 save batch를 검증하고 반영한다.
 - 에디터 v1 operation은 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE` 4개만 사용한다.
-- `BLOCK_CREATE`는 위치만 확정하고, 본문은 같은 batch의 `BLOCK_REPLACE_CONTENT`가 담당한다.
-- 서버는 `BLOCK_CREATE` 처리 시 DB의 `block.content` not null 규칙을 만족시키기 위해 새 `TEXT` 블록에 기본 empty structured content를 먼저 부여할 수 있다.
-- 이 기본 empty content는 외부 API 계약상 `BLOCK_CREATE`가 본문을 받는다는 뜻이 아니라, 서버 내부 기본값이다.
+- `BLOCK_CREATE`는 위치를 항상 확정하고, 필요하면 새 블록의 초기 `content`를 함께 받을 수 있다.
+- `BLOCK_CREATE.content`가 없으면 서버는 DB의 `block.content` not null 규칙을 만족시키기 위해 새 `TEXT` 블록에 기본 empty structured content를 저장한다.
+- `BLOCK_CREATE.content`가 있으면 서버는 그 값을 새 블록의 초기 `content`로 저장한다.
+- 새 temp block에 대한 `BLOCK_CREATE`와 `BLOCK_REPLACE_CONTENT`가 같은 batch에 함께 있으면, 프론트는 flush 전에 이를 `BLOCK_CREATE(content=latestContent)` 하나로 coalescing할 수 있어야 한다.
 - `BLOCK_REPLACE_CONTENT`는 range patch가 아니라 block `content` 전체 교체로 처리한다.
-- 모든 transaction operation은 블록 참조값으로 `blockRef`를 사용한다.
+- 모든 save operation은 블록 참조값으로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.
 - `blockRef`는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 서버가 내려준 실제 `blockId`를 담는다.
-- transaction 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
+- save 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
 - `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담을 수 있어야 한다.
 - v1은 temp parent, temp sibling anchor까지 지원해야 한다.
 - 서버는 request 순서대로 `tempId -> real blockId` 매핑 컨텍스트를 갱신하면서 `blockRef`, `parentRef`, `afterRef`, `beforeRef`를 모두 해석해야 한다.
@@ -604,7 +614,7 @@ Block {
 - 서버는 새 block 생성 시 실제 `blockId`를 새로 발급하고, 성공 응답에서 `tempId -> blockId` 매핑을 반환한다.
 - 블록 수정 충돌 판정은 block 단위 낙관적 락을 사용한다.
 - stale version이면 `409 Conflict`를 반환한다.
-- transaction 실패 정책은 partial apply가 아니라 전체 rollback을 사용한다.
+- save 실패 정책은 partial apply가 아니라 전체 rollback을 사용한다.
 - 충돌 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함해야 한다.
 - 프론트는 최신 block content를 기준으로 로컬 변경을 재적용하거나 사용자에게 충돌 상태를 보여줄 수 있어야 한다.
 - 전체 rollback은 서버 반영 기준이며, 프론트는 conflict 시 로컬 draft와 복구에 필요한 pending 상태를 바로 폐기하지 않아야 한다.
@@ -612,7 +622,7 @@ Block {
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되고 있으면 다시 pending에 포함될 수 있다.
 - 같은 블록 안의 비중첩 수정도 v1에서는 block 단위 충돌로 처리할 수 있다.
 - `POST /admin/documents/{documentId}/blocks`, `PATCH /admin/blocks/{blockId}`, `POST /admin/blocks/{blockId}/move`, `DELETE /admin/blocks/{blockId}`는 에디터 표준 저장 경로가 아니라 운영/관리/비에디터 보조 경로로 둘 수 있다.
-- 위 4개 admin block API는 path와 HTTP method는 유지하되, request/response 계약과 실제 실행 로직은 `POST /documents/{documentId}/transactions`와 동일한 transaction 모델을 사용해야 한다.
+- 위 4개 admin block API는 path와 HTTP method는 유지하되, request/response 계약과 실제 실행 로직은 `EditorSave*` 기반 단건 admin block 모델을 사용해야 한다.
 - 각 admin block API는 자기 역할에 맞는 단일 operation 하나만 허용해야 한다.
 
 ## 10.2 향후 확장
@@ -626,7 +636,7 @@ Block {
 - operation log / snapshot 모델
 
 ### 권장 로드맵
-1. v1: structured content + `transactions` 중심 저장 + block 단위 optimistic lock
+1. v1: structured content + document save endpoint 중심 저장 + block 단위 optimistic lock
 2. v2 이후: block content operation 단위 충돌 정보와 재적용 전략 확장
 3. 필요 시: WebSocket/presence/cursor sync 기반 협업 모델 검토
 4. 필요 시: OT / CRDT 모델 검토
@@ -749,18 +759,6 @@ Block {
 - 상태가 실제로 바뀌면 `Document.version`을 `1` 증가시켜야 한다.
 - 같은 상태를 다시 요청하면 no-op으로 처리하고 `Document.version`을 증가시키지 않아야 한다.
 
-### `POST /documents/{documentId}/move`
-문서 부모 변경 및 형제 순서 변경.
-
-요청 예시:
-```json
-{
-  "targetParentId": "새 부모 문서 ID 또는 null",
-  "afterDocumentId": "같은 형제 집합의 앞 문서 ID 또는 null",
-  "beforeDocumentId": "같은 형제 집합의 뒤 문서 ID 또는 null"
-}
-```
-
 ### `DELETE /documents/{documentId}`
 문서 soft delete.
 
@@ -779,10 +777,10 @@ Block {
 ### `POST /admin/documents/{documentId}/blocks`
 TEXT 블록 생성.
 - 이 API는 운영/관리/비에디터 경로에서 사용할 수 있다.
-- 에디터 표준 생성/저장 경로는 `transactions`를 사용한다.
-- 요청 body는 `POST /documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- 에디터 표준 생성/저장 경로는 document save endpoint를 사용한다.
+- 요청 body는 `EditorSaveRequest`와 동일한 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_CREATE`여야 한다.
-- 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
+- 응답 body는 `EditorSaveResponse`와 동일해야 한다.
 
 요청 예시:
 ```json
@@ -805,12 +803,12 @@ TEXT 블록 생성.
 ### `PATCH /admin/blocks/{blockId}`
 블록 내용 또는 블록 자체 메타데이터 수정.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
-- 에디터 표준 본문 저장 경로는 `transactions`를 사용한다.
-- 요청 body는 `POST /documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- 에디터 표준 본문 저장 경로는 document save endpoint를 사용한다.
+- 요청 body는 `EditorSaveRequest`와 동일한 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_REPLACE_CONTENT`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
-- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
-- 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
+- 서버는 `AdminBlockOperationService`가 `blockId`로 소속 `documentId`를 해석한 뒤 단건 `EditorSaveOperationCommand`를 처리하는 경로를 호출해야 한다.
+- 응답 body는 `EditorSaveResponse`와 동일해야 한다.
 
 내용 수정 예시:
 ```json
@@ -853,12 +851,12 @@ TEXT 블록 생성.
 ### `POST /admin/blocks/{blockId}/move`
 단일 블록 이동.
 - 이 API는 운영/관리/비에디터 보조 경로로 둘 수 있다.
-- 에디터 표준 이동 경로는 `transactions`를 사용한다.
-- 요청 body는 `POST /documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- 에디터 표준 이동 경로는 `POST /editor-operations/move`를 사용한다.
+- 요청 body는 `EditorSaveRequest`와 동일한 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_MOVE`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
-- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
-- 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
+- 서버는 `AdminBlockOperationService`가 `blockId`로 소속 `documentId`를 해석한 뒤 단건 `EditorSaveOperationCommand`를 처리하는 경로를 호출해야 한다.
+- 응답 body는 `EditorSaveResponse`와 동일해야 한다.
 
 위치 변경 예시:
 ```json
@@ -883,31 +881,67 @@ TEXT 블록 생성.
 블록 soft delete.
 - 지정 루트 블록과 하위 블록 subtree를 함께 soft delete 한다.
 - 이 API는 명시적 단일 삭제 액션 또는 운영/관리/비에디터 경로에서 사용할 수 있다.
-- 에디터 표준 삭제 경로는 `transactions`를 사용한다.
-- 요청 body는 `POST /documents/{documentId}/transactions`와 같은 transaction request 구조를 사용해야 한다.
+- 에디터 표준 삭제 경로는 document save endpoint를 사용한다.
+- 요청 body는 `EditorSaveRequest`와 동일한 구조를 사용해야 한다.
 - `operations`는 길이 1이어야 하며, 유일한 operation의 `type`은 `BLOCK_DELETE`여야 한다.
 - path의 `blockId`와 operation의 `blockRef`는 동일해야 한다.
-- 서버는 `blockId`로 소속 `documentId`를 해석한 뒤 transaction과 같은 서비스 경로를 호출해야 한다.
-- 응답 body는 `DocumentTransactionResponse`와 동일해야 한다.
+- 서버는 `AdminBlockOperationService`가 `blockId`로 소속 `documentId`를 해석한 뒤 단건 `EditorSaveOperationCommand`를 처리하는 경로를 호출해야 한다.
+- 응답 body는 `EditorSaveResponse`와 동일해야 한다.
 
-### `POST /documents/{documentId}/transactions`
+## 12.5 Editor Operation API
+
+### `POST /editor-operations/documents/{documentId}/save`
 에디터 생성/저장 batch 반영.
 - 에디터의 표준 write 경로다.
 - 한 요청에 `BLOCK_CREATE`, `BLOCK_REPLACE_CONTENT`, `BLOCK_MOVE`, `BLOCK_DELETE`를 함께 담을 수 있어야 한다.
 - request top-level에는 `clientId`, `batchId`, `operations`를 포함해야 한다.
 - 기존 block 수정/이동/삭제 operation은 `version`을 포함해야 한다.
-- 모든 transaction operation은 블록 참조 필드로 `blockRef`를 사용해야 한다.
+- 모든 save operation은 블록 참조 필드로 `blockRef`를 사용해야 한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣어야 한다.
 - 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용해야 한다.
 - `parentRef`, `afterRef`, `beforeRef`에는 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 넣을 수 있어야 한다.
 - 기존 block 수정/이동/삭제 operation의 `blockRef`에는 서버가 내려준 실제 `blockId`를 넣어야 한다.
 - 새 block은 request에서 `blockRef=tempId`로 참조하고, 성공 응답에서 서버가 생성한 실제 `blockId`와 `tempId -> blockId` 매핑을 반환해야 한다.
 - 서버는 request 순서대로 `blockRef`, `parentRef`, `afterRef`, `beforeRef`의 temp 참조를 해석할 수 있어야 한다.
-- 동시성 검사는 `Document.version`과 block별 `version`을 함께 사용해야 한다.
+- save 요청의 충돌 검출은 block별 `version`으로 수행하고, 성공 응답의 `documentVersion`으로 문서 전체 freshness 기준값을 갱신해야 한다.
 - 서버는 batch 안에 실제 editor 변경이 하나라도 적용되면 `Document.version`을 증가시키고, 응답에 최신 `documentVersion`을 포함해야 한다.
 - `BLOCK_MOVE`, `BLOCK_REPLACE_CONTENT`가 모두 no-op이면 block version과 `documentVersion`을 올리지 않아야 한다.
 - 하나의 operation이라도 실패하면 전체 rollback을 적용해야 한다.
 - 충돌 응답에는 충돌 block의 최신 `version`, 최신 `content`를 포함해야 한다.
+
+### `POST /editor-operations/move`
+문서와 블록 이동을 공통 contract로 처리하는 단일 move API.
+- 이 API는 문서 메타데이터 수정, block content 수정과 분리된 explicit structure operation API다.
+- 이 API는 drag 중간 상태를 반영하지 않고, drop 확정 시점의 최종 위치만 1회 저장해야 한다.
+- 요청 body는 `resourceType`, `resourceId`, `targetParentId`, `afterId`, `beforeId`를 포함해야 한다.
+- `resourceType=BLOCK`이면 `version`을 함께 포함해야 한다.
+- `resourceType=DOCUMENT`면 `targetParentId`, `afterId`, `beforeId`를 문서 기준으로 해석해야 한다.
+- `resourceType=BLOCK`이면 `targetParentId`, `afterId`, `beforeId`를 블록 기준으로 해석해야 한다.
+- move의 위치 검증과 실제 반영은 `resourceType`에 맞는 도메인 서비스가 담당해야 한다.
+- 같은 위치로 drop된 no-op 이동은 성공으로 처리할 수 있지만 실제 갱신과 버전 증가는 발생하지 않아야 한다.
+
+문서 이동 예시:
+```json
+{
+  "resourceType": "DOCUMENT",
+  "resourceId": "문서 ID",
+  "targetParentId": "새 부모 문서 ID 또는 null",
+  "afterId": "같은 형제 집합의 앞 문서 ID 또는 null",
+  "beforeId": "같은 형제 집합의 뒤 문서 ID 또는 null"
+}
+```
+
+블록 이동 예시:
+```json
+{
+  "resourceType": "BLOCK",
+  "resourceId": "블록 ID",
+  "targetParentId": "새 부모 블록 ID 또는 null",
+  "afterId": "같은 형제 집합의 앞 블록 ID 또는 null",
+  "beforeId": "같은 형제 집합의 뒤 블록 ID 또는 null",
+  "version": 3
+}
+```
 
 ---
 
@@ -971,13 +1005,13 @@ TEXT 블록 생성.
 ## 15.1 트랜잭션이 필요한 작업
 - 문서 삭제 + 하위 블록 soft delete
 - 문서 복구
-- 에디터 transaction batch 반영
+- 에디터 save batch 반영
 - 문서 부모 변경
 
 ## 15.2 저장 흐름 권장안
-### 에디터 transaction
+### 에디터 save batch
 1. 클라이언트는 로컬 queue에서 pending operation을 모은다.
-2. debounce 또는 명시적 flush 시 `transactions` 요청을 만든다.
+2. debounce 또는 명시적 flush 시 document save 요청을 만든다.
 3. 서버는 operation 순서대로 정합성, version, 위치, 삭제 정책을 검증한다.
 4. 하나라도 실패하면 전체 rollback 한다.
 5. 성공 시 operation별 반영 결과와 새 version, `tempId -> blockId` 매핑을 반환한다.

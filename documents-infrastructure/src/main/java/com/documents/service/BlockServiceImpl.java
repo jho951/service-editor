@@ -19,6 +19,7 @@ import com.documents.repository.DocumentRepository;
 import com.documents.support.OrderedSortKeyGenerator;
 import com.documents.support.OrderedSortKeyGenerator.SortKeyRebalanceRequiredException;
 import com.documents.support.TextNormalizer;
+import com.documents.service.transaction.DocumentVersionUpdater;
 
 import lombok.RequiredArgsConstructor;
 
@@ -33,6 +34,7 @@ public class BlockServiceImpl implements BlockService {
 
     private final BlockRepository blockRepository;
     private final DocumentRepository documentRepository;
+    private final DocumentVersionUpdater documentVersionUpdater;
     private final TextNormalizer textNormalizer;
     private final OrderedSortKeyGenerator orderedSortKeyGenerator;
 
@@ -203,7 +205,7 @@ public class BlockServiceImpl implements BlockService {
         rootBlock.setUpdatedBy(normalizedActorId);
         rootBlock.setVersion(version + 1);
         if (DocumentVersionIncrementContext.shouldIncrement()) {
-            incrementActiveDocumentVersion(rootBlock.getDocumentId(), normalizedActorId);
+            incrementActiveDocumentVersion(rootBlock.getDocumentId(), normalizedActorId, deletedAt);
         }
         return rootBlock;
     }
@@ -344,14 +346,10 @@ public class BlockServiceImpl implements BlockService {
     }
 
     private void incrementActiveDocumentVersion(UUID documentId, String actorId, LocalDateTime updatedAt) {
-        int updatedRowCount = documentRepository.incrementVersion(documentId, actorId, updatedAt);
-        if (updatedRowCount != 1) {
-            throw new BusinessException(BusinessErrorCode.CONFLICT);
-        }
+        documentVersionUpdater.increment(documentId, actorId, updatedAt);
     }
 
     private void incrementActiveDocumentVersion(UUID documentId, String actorId) {
         incrementActiveDocumentVersion(documentId, actorId, LocalDateTime.now());
     }
-
 }

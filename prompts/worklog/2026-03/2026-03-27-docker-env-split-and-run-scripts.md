@@ -1,0 +1,21 @@
+# 2026-03-27 Docker Env Split And Run Scripts
+
+## Step 1. 실행 환경과 스크립트 분리
+
+- 목적: Docker 실행 환경을 dev/prod로 분리하고 실행 스크립트를 local/docker 2종으로 정리한다.
+- 변경 내용: `docker/docker-compose.dev.yml`, `docker/docker-compose.prod.yml`를 추가해 환경별 compose를 분리했다.
+- 변경 내용: 루트 `run-docker.sh`를 추가해 `dev|prod` + 액션(`all|build|up|down|logs|restart|nuke|ps`) 실행 구조를 만들었다.
+- 변경 내용: 루트 `run-local.sh`를 추가해 `dev|prod` 프로필로 로컬 부팅할 수 있게 정리했다.
+- 변경 내용: 기존 `docker/docker.sh`는 호환 래퍼로 전환하고 README 실행 가이드를 갱신했다.
+- 검증: `bash -n`으로 스크립트 문법을 점검했다.
+
+## Step 2. 스크립트 구조와 네트워크 보강
+
+- 변경 내용: 스크립트를 `scripts/` 디렉토리로 이동하고, `run-docker.sh`는 인자 없이 실행 시 `dev up` 기본 동작으로 보정했다.
+- 변경 내용: `.env` 파일은 선택 로딩으로 변경했다.
+- 변경 내용: compose 파일에서 호스트 포트 노출을 제거하고, `documents-private` + `service-backbone-shared` 이중 네트워크로 전환했다.
+- 변경 내용: 앱은 `documents-service` 별칭으로 서비스 백본 네트워크에 붙도록 정리했다.
+
+## Step 3. 계약 동기화 기록 추가
+
+- 변경 내용: `CONTRACT_SYNC.md`를 추가하고 contract repo main SHA(`79dcbadd3428749cd2f4d0615f8443bdfe8aae5a`)로 env 계약 동기화를 기록했다.

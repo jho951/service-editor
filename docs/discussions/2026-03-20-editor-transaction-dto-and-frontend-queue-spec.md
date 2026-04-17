@@ -32,10 +32,17 @@
 - request는 `clientId`, `batchId`, `operations`를 기본으로 둔다.
 - 기존 block을 바꾸는 operation은 `version`을 필수로 둔다.
 - 새 block은 request에서 `blockRef=tempId`로 참조하고, 성공 응답에서 `tempId -> blockId` 매핑을 돌려준다.
+- `BLOCK_CREATE`는 위치 필드와 함께 선택적 `content`를 받을 수 있다.
 - transaction은 전체 rollback이다.
 - conflict 응답은 충돌 block의 최신 `version`, 최신 `content`를 포함한다.
 - frontend queue는 단순 FIFO가 아니라 coalescing queue로 관리한다.
 - flush는 debounce만이 아니라 `max autosave interval`과 명시적 flush 트리거를 함께 사용한다.
+
+## 관련 문서
+
+- [014-adopt-transaction-centered-editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
+- [020-allow-optional-content-on-block-create-in-transactions.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/020-allow-optional-content-on-block-create-in-transactions.md)
+- [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
 
 ## Request DTO 초안
 
@@ -74,6 +81,16 @@
   "opId": "op-1",
   "type": "BLOCK_CREATE",
   "blockRef": "tmp:block:1",
+  "content": {
+    "format": "rich_text",
+    "schemaVersion": 1,
+    "segments": [
+      {
+        "text": "새 블록",
+        "marks": []
+      }
+    ]
+  },
   "parentRef": null,
   "afterRef": null,
   "beforeRef": null
@@ -86,8 +103,9 @@
 - 서버는 `tempId`를 그대로 저장하지 않고, 성공 시 실제 `blockId`를 생성해 응답에서 매핑을 돌려준다.
 - 위치 참조 필드는 `parentRef`, `afterRef`, `beforeRef`를 사용한다.
 - `parentRef`, `afterRef`, `beforeRef`도 같은 batch 안의 새 block이면 `tempId`, 기존 block이면 실제 `blockId`를 담는다.
-- `BLOCK_CREATE`는 위치만 다룬다.
-- 본문은 포함하지 않는다.
+- `content`는 선택 필드다.
+- `content`가 없으면 서버는 empty structured content fallback으로 새 블록을 생성한다.
+- `content`가 있으면 서버는 그 값을 새 블록의 초기 content로 저장한다.
 
 ### 2. `BLOCK_REPLACE_CONTENT`
 
@@ -138,6 +156,9 @@
 - 대상 식별자는 `blockRef`를 사용한다.
 - 같은 batch 안에서 생성한 block이면 `blockRef`에 `tempId`를 넣을 수 있다.
 - 같은 batch 안에서 생성한 block이 아니라면 `blockRef`에는 실제 `blockId`가 들어가야 한다.
+- 프론트는 새 temp block의 `BLOCK_CREATE + BLOCK_REPLACE_CONTENT`를 flush 전에 `BLOCK_CREATE(content=latestContent)` 하나로 접는 것을 우선 권장한다.
+- 다만 이 coalescing은 권장 최적화이지, 서버 계약의 필수 전제는 아니다.
+- 서버는 temp block을 참조하는 `BLOCK_REPLACE_CONTENT`도 계속 허용해, 프론트가 collapse하지 못한 batch도 정상 처리할 수 있어야 한다.
 
 ### 3. `BLOCK_MOVE`
 
@@ -366,7 +387,7 @@ PendingOperation
 
 ## 프론트 전처리 체크리스트
 
-자세한 이벤트 흐름 예시는 `docs/guides/frontend-editor-transaction-implementation-guide.md`의 "프론트 전처리 시나리오"를 기준으로 본다.
+자세한 이벤트 흐름 예시는 `docs/guides/editor/frontend-editor-guideline.md`의 "프론트 전처리 시나리오"를 기준으로 본다.
 
 ### 공통
 

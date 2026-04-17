@@ -1,0 +1,30 @@
+# Explainers 운영 메모
+
+이 디렉토리는 코드만 읽어서는 빠르게 파악하기 어려운 기술 구조, 내부 동작 흐름, 핵심 정책 배경을 설명하는 문서를 둔다.
+
+## 무엇을 여기에 두는가
+
+- 알고리즘 설명
+- 정렬 정책, 저장 모델, 캐시 전략
+- 동시성 제어 구조
+- 계층 간 책임과 내부 동작 흐름
+- 특정 도메인 구조를 이해하기 위한 핵심 설명
+
+## 무엇을 여기에 두지 않는가
+
+- 채택 전 전략 비교
+  - [docs/discussions/](https://github.com/jho951/Block-server/blob/dev/docs/discussions/README.md)
+- 채택된 공식 결정
+  - [docs/decisions/](https://github.com/jho951/Block-server/blob/dev/docs/decisions/README.md)
+- 개인 학습용 설명 문서와 개인 트러블슈팅 기록
+  - [docs/learn/](https://github.com/jho951/Block-server/blob/dev/docs/learn/README.md)
+- 구현 순서, 역할 분담, 체크리스트 중심 문서
+  - [docs/guides/](https://github.com/jho951/Block-server/blob/dev/docs/guides/README.md)
+
+## 문서 작성 기준
+
+- 날짜형 이름보다 주제 중심의 고정 파일명을 우선한다.
+- 설명은 교과서 요약보다 이 저장소 기준 이해를 우선한다.
+- 가능하면 코드 경로, 요청 흐름, 실제 시나리오를 포함한다.
+- 관련 구조가 바뀌면 같은 작업에서 explainer도 갱신한다.
+- explainer는 특히 "왜 필요한가 -> 어떻게 동작하는가 -> 어디에 적용되는가" 순서가 잘 보이게 적는다.

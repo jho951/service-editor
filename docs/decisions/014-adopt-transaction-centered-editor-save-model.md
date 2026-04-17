@@ -46,9 +46,7 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 - `BLOCK_REPLACE_CONTENT`
 - `BLOCK_MOVE`
 - `BLOCK_DELETE`
-- `BLOCK_CREATE`는 위치만 확정하고, 본문은 같은 batch의 `BLOCK_REPLACE_CONTENT`가 담당한다.
-- 서버 내부에서는 DB의 not null 제약을 만족시키기 위해 새 `TEXT` 블록에 기본 empty structured content를 먼저 넣을 수 있다.
-- 이 기본값은 외부 계약상 `BLOCK_CREATE`가 본문을 다룬다는 의미가 아니라, 영속 계층 기본값이다.
+- 초기 채택 시점에는 `BLOCK_CREATE`를 위치 전용 operation으로 두고, 본문은 같은 batch의 `BLOCK_REPLACE_CONTENT`가 맡는 쪽을 우선 채택했다.
 - `BLOCK_REPLACE_CONTENT`는 range patch가 아니라 block의 structured content 전체 교체로 처리한다.
 - 모든 transaction operation은 블록 참조값으로 `blockRef`를 사용한다.
 - `BLOCK_CREATE`의 `blockRef`에는 새 block용 `tempId`를 넣는다.
@@ -72,6 +70,8 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 - 같은 실패 batch 안의 non-conflict 변경도 서버에는 미반영이므로, 로컬 상태가 유지되면 다시 pending에 포함될 수 있다.
 - `POST /documents/{documentId}/blocks`, `PATCH /blocks/{blockId}`, `DELETE /blocks/{blockId}`는 에디터 표준 경로가 아니라 보조/운영/관리 경로로 둔다.
 - 이 설계 자체는 autosave 저장 모델이며, 실시간 브로드캐스트/협업 모델을 포함하지 않는다.
+- 이후 새 블록 생성 후 바로 입력하는 경로를 더 직접적으로 표현하기 위해, `BLOCK_CREATE`가 선택적 초기 `content`를 함께 받을 수 있도록 `ADR 020`에서 계약을 확장했다.
+- 이후 API 진입 경계는 `ADR 021`에서 `EditorOperationController` 기준으로 재배치했고, 표준 save entry path는 `POST /editor-operations/documents/{documentId}/save`로 옮겼다.
 
 ## 영향
 
@@ -89,3 +89,10 @@ v1 에디터는 structured content 기반 TEXT 블록을 편집한다.
 - 기존 단건 block API와의 역할 경계를 문서와 구현에서 명확히 유지해야 한다.
 - 같은 block 내부의 비중첩 수정도 v1에서는 block 단위 충돌로 처리된다.
 - 실시간 공동 편집을 제공하려면 별도 브로드캐스트/원격 변경 적용 모델을 추가로 설계해야 한다.
+
+## 관련 문서
+
+- [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
+- [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
+- [021-adopt-editor-operation-controller-boundary.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/021-adopt-editor-operation-controller-boundary.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)

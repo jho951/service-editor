@@ -27,3 +27,8 @@
 - 단점:
   - `/**` 경로가 Gateway 신뢰 경계에 더 강하게 의존
   - 로컬/테스트 환경에서 헤더 누락 시 요청 실패가 더 엄격해짐
+
+## 관련 문서
+
+- [2026-03-27-gateway-trusted-header-review.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-27-gateway-trusted-header-review.md)
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)

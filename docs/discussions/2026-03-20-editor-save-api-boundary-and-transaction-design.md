@@ -30,12 +30,12 @@
 
 ## 고려한 자료와 사례
 
-- `docs/discussions/2026-03-18-block-save-api-strategy.md`
-- `docs/discussions/2026-03-18-block-save-api-review.md`
-- `docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md`
-- `docs/discussions/2026-03-19-block-structured-content-strategy.md`
-- `docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md`
-- 현재 `BlockController`, `BlockService`, `docs/REQUIREMENTS.md`
+- [2026-03-18-block-save-api-strategy.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-block-save-api-strategy.md)
+- [2026-03-18-block-save-api-review.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-block-save-api-review.md)
+- [2026-03-18-save-api-and-patch-api-coexistence.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md)
+- [2026-03-19-block-structured-content-strategy.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-19-block-structured-content-strategy.md)
+- [012-adopt-structured-text-content-and-staged-concurrency-roadmap.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
+- 현재 `BlockController`, `BlockService`, [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
 
 ## 선택지
 
@@ -425,9 +425,10 @@
 
 ## 관련 문서
 
-- `docs/discussions/2026-03-18-block-save-api-strategy.md`
-- `docs/discussions/2026-03-18-block-save-api-review.md`
-- `docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md`
-- `docs/discussions/2026-03-19-block-structured-content-strategy.md`
-- `docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md`
-- `prompts/2026-03-20-editor-save-api-boundary.md`
+- [2026-03-18-block-save-api-strategy.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-block-save-api-strategy.md)
+- [2026-03-18-block-save-api-review.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-block-save-api-review.md)
+- [2026-03-18-save-api-and-patch-api-coexistence.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-save-api-and-patch-api-coexistence.md)
+- [2026-03-19-block-structured-content-strategy.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-19-block-structured-content-strategy.md)
+- [012-adopt-structured-text-content-and-staged-concurrency-roadmap.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
+- [014-adopt-transaction-centered-editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
+- [prompts/worklog/2026-03/2026-03-20-editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-editor-transaction-save-model.md)

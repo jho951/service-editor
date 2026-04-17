@@ -47,3 +47,10 @@ application-local.yaml
 *.secrets
 *.log
 .DS_Store
+
+### Custom ###
+/docs/learn/**
+!/docs/learn/
+!/docs/learn/README.md
+!/docs/learn/troubleshooting/
+!/docs/learn/troubleshooting/README.md

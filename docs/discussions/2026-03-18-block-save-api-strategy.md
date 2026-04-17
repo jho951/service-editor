@@ -414,8 +414,8 @@
 
 ## 관련 문서
 
-- [블록 저장 API 검토 메모](/home/ghmin/project/ai_project/Block-server/docs/discussions/2026-03-18-block-save-api-review.md)
-- 작업 로그: `prompts/2026-03-18-block-save-api-strategy.md`
+- [블록 저장 API 검토 메모](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-block-save-api-review.md)
+- 작업 로그: [prompts/worklog/2026-03/2026-03-20-editor-transaction-save-model.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-editor-transaction-save-model.md)
 
 ## 참고 자료
 

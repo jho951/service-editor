@@ -43,8 +43,8 @@
 - 내부 요구사항: `docs/REQUIREMENTS.md`
 - 내부 로드맵: `docs/roadmap/v2/blocks/block-delete.md`
 - 내부 로드맵: `docs/roadmap/v2/blocks/block-restore.md`
-- 내부 작업 로그: `prompts/2026-03-18-document-delete-service.md`
-- 내부 작업 로그: `prompts/2026-03-20-document-restore-api.md`
+- 내부 작업 로그: [prompts/worklog/2026-03/2026-03-18-document-delete.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-18-document-delete.md)
+- 내부 작업 로그: [prompts/worklog/2026-03/2026-03-20-document-restore-api.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-document-restore-api.md)
 - 내부 구현 전제: `documents-infrastructure/src/main/java/com/documents/service/DocumentServiceImpl.java`
 
 내부 자료 관찰 요약:
@@ -229,7 +229,7 @@
 
 ## 관련 문서
 
-- `docs/REQUIREMENTS.md`
-- `docs/roadmap/v2/documents/document-trash.md`
-- `prompts/2026-03-18-document-delete-service.md`
-- `prompts/2026-03-20-document-restore-api.md`
+- [REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
+- [document-trash.md](https://github.com/jho951/Block-server/blob/dev/docs/roadmap/v2/documents/document-trash.md)
+- [2026-03-18-document-delete.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-18-document-delete.md)
+- [2026-03-20-document-restore-api.md](https://github.com/jho951/Block-server/blob/dev/prompts/worklog/2026-03/2026-03-20-document-restore-api.md)
