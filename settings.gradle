@@ -5,7 +5,7 @@ pluginManagement {
     }
 }
 
-rootProject.name = 'demo'
+rootProject.name = 'Block-server'
 
 include 'documents-boot'
 include 'documents-api'
