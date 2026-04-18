@@ -2,6 +2,8 @@ package com.documents.api.auth;
 
 import java.util.UUID;
 
+import io.github.jho951.platform.governance.api.AuditEntry;
+import io.github.jho951.platform.governance.api.AuditLogRecorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -18,6 +20,11 @@ import jakarta.servlet.http.HttpServletResponse;
 public class GatewayAuthInterceptor implements HandlerInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(GatewayAuthInterceptor.class);
+    private final AuditLogRecorder auditLogRecorder;
+
+    public GatewayAuthInterceptor(AuditLogRecorder auditLogRecorder) {
+        this.auditLogRecorder = auditLogRecorder;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -68,6 +75,23 @@ public class GatewayAuthInterceptor implements HandlerInterceptor {
             requestId == null ? "-" : requestId,
             durationMs
         );
+        auditLogRecorder.record(new AuditEntry(
+            "documents",
+            "DOCUMENTS_API_REQUEST",
+            java.util.Map.of(
+                "eventType", "READ",
+                "actorId", userId == null ? "anonymous" : userId,
+                "actorType", userId == null ? "ANONYMOUS" : "USER",
+                "resourceType", "HTTP_PATH",
+                "resourceId", request.getRequestURI(),
+                "result", response.getStatus() < 400 ? "SUCCESS" : "FAILURE",
+                "requestId", requestId == null ? "" : requestId,
+                "method", request.getMethod(),
+                "status", String.valueOf(response.getStatus()),
+                "durationMs", String.valueOf(durationMs)
+            ),
+            java.time.Instant.now()
+        ));
     }
 
     private String normalize(String value) {

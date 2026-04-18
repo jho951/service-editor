@@ -8,11 +8,13 @@ ext {
     resolvedProjectVersion = findProperty('projectVersion') ?: '0.0.1-SNAPSHOT'
     resolvedProjectDescription = findProperty('projectDescription') ?: 'Documents App (Spring Boot + JPA + MySQL + Swagger)'
     resolvedJavaVersion = Integer.parseInt((findProperty('javaVersion') ?: '17').toString())
-    resolvedSpringBootVersion = (findProperty('springBootVersion') ?: '3.4.10').toString()
+    resolvedSpringBootVersion = (findProperty('springBootVersion') ?: '3.5.13').toString()
     resolvedSpringdocVersion = (findProperty('springdocVersion') ?: '2.8.13').toString()
     resolvedJakartaPersistenceVersion = (findProperty('jakartaPersistenceVersion') ?: '3.1.0').toString()
     resolvedLombokVersion = (findProperty('lombokVersion') ?: '1.18.38').toString()
-    resolvedJunitJupiterVersion = (findProperty('junitJupiterVersion') ?: '5.11.4').toString()
+    resolvedJunitJupiterVersion = (findProperty('junitJupiterVersion') ?: '5.12.2').toString()
+    resolvedJunitPlatformVersion = (findProperty('junitPlatformVersion') ?: '1.12.2').toString()
+    resolvedPlatformGovernanceVersion = (findProperty('platformGovernanceVersion') ?: '2.0.0').toString()
     runtimeEnvKeys = [
         'DB_URL',
         'DB_USERNAME',
@@ -44,6 +46,14 @@ allprojects {
 
     repositories {
         mavenCentral()
+        maven {
+            name = 'GitHubPackages_platform_governance'
+            url = uri('https://maven.pkg.github.com/jho951/platform-governance')
+            credentials {
+                username = findProperty('githubPackagesUsername') ?: System.getenv('GITHUB_ACTOR')
+                password = findProperty('githubPackagesToken') ?: System.getenv('GITHUB_TOKEN')
+            }
+        }
     }
 }
 
@@ -54,6 +64,7 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:${rootProject.ext.resolvedSpringBootVersion}"
+            mavenBom "io.github.jho951.platform:platform-governance-bom:${rootProject.ext.resolvedPlatformGovernanceVersion}"
         }
     }
 
@@ -69,6 +80,7 @@ subprojects {
         testCompileOnly "org.projectlombok:lombok:${rootProject.ext.resolvedLombokVersion}"
         testAnnotationProcessor "org.projectlombok:lombok:${rootProject.ext.resolvedLombokVersion}"
         testImplementation "org.junit.jupiter:junit-jupiter:${rootProject.ext.resolvedJunitJupiterVersion}"
+        testRuntimeOnly "org.junit.platform:junit-platform-launcher:${rootProject.ext.resolvedJunitPlatformVersion}"
     }
 
     tasks.named('test') {

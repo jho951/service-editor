@@ -1,6 +1,8 @@
 dependencies {
     api project(':documents-core')
 
+    implementation platform("io.github.jho951.platform:platform-governance-bom:${rootProject.ext.resolvedPlatformGovernanceVersion}")
+    implementation 'io.github.jho951.platform:platform-governance-api'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${rootProject.ext.resolvedSpringdocVersion}"

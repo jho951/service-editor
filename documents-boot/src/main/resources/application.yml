@@ -12,3 +12,26 @@ spring:
       - classpath:application-db.yml
       - classpath:application-auth.yml
       - classpath:application-docs.yml
+
+platform:
+  governance:
+    enabled: ${PLATFORM_GOVERNANCE_ENABLED:true}
+    audit:
+      enabled: ${PLATFORM_GOVERNANCE_AUDIT_ENABLED:true}
+      service-name: ${PLATFORM_GOVERNANCE_AUDIT_SERVICE_NAME:${spring.application.name}}
+      environment: ${PLATFORM_GOVERNANCE_AUDIT_ENVIRONMENT:${SPRING_PROFILES_ACTIVE:local}}
+      failure-policy: ${PLATFORM_GOVERNANCE_AUDIT_FAILURE_POLICY:FAIL_CLOSED}
+      identity:
+        enabled: ${PLATFORM_GOVERNANCE_AUDIT_IDENTITY_ENABLED:true}
+        validation-enabled: ${PLATFORM_GOVERNANCE_AUDIT_IDENTITY_VALIDATION_ENABLED:true}
+        fail-on-validation-error: ${PLATFORM_GOVERNANCE_AUDIT_IDENTITY_FAIL_ON_VALIDATION_ERROR:true}
+    engine:
+      strict: ${PLATFORM_GOVERNANCE_ENGINE_STRICT:false}
+    violation:
+      action: ${PLATFORM_GOVERNANCE_VIOLATION_ACTION:DENY}
+      handler-failure-fatal: ${PLATFORM_GOVERNANCE_VIOLATION_HANDLER_FAILURE_FATAL:false}
+    operational:
+      fail-fast-enabled: ${PLATFORM_GOVERNANCE_OPERATIONAL_FAIL_FAST_ENABLED:true}
+      production-profiles: ${PLATFORM_GOVERNANCE_OPERATIONAL_PRODUCTION_PROFILES:prod}
+      require-policy-config-in-enforcing-mode: ${PLATFORM_GOVERNANCE_OPERATIONAL_REQUIRE_POLICY_CONFIG_IN_ENFORCING_MODE:false}
+      require-fatal-handler-failures-in-production: ${PLATFORM_GOVERNANCE_OPERATIONAL_REQUIRE_FATAL_HANDLER_FAILURES_IN_PRODUCTION:true}

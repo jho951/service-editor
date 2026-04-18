@@ -4,6 +4,9 @@ plugins {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter'
+    implementation platform("io.github.jho951.platform:platform-governance-bom:${rootProject.ext.resolvedPlatformGovernanceVersion}")
+    implementation 'io.github.jho951.platform:platform-governance-starter'
+    implementation 'io.github.jho951:audit-log-api'
     implementation project(':documents-api')
     implementation project(':documents-infrastructure')
 
