@@ -26,6 +26,9 @@ services:
     build:
       context: ../..
       dockerfile: docker/Dockerfile
+      secrets:
+        - gh_token
+        - github_actor
     container_name: documents-app-dev
     depends_on:
       mysql:
@@ -53,6 +56,12 @@ services:
 
 volumes:
   mysql_data_dev:
+
+secrets:
+  gh_token:
+    environment: GH_TOKEN
+  github_actor:
+    environment: GITHUB_ACTOR
 
 networks:
   documents-private:

@@ -23,6 +23,32 @@ case "$ENV_NAME" in
   *) usage; exit 1 ;;
 esac
 
+gradle_property() {
+  local key="$1"
+  local gradle_properties="${HOME}/.gradle/gradle.properties"
+  [[ -f "$gradle_properties" ]] || return 0
+  awk -F= -v key="$key" '$1 == key { print $2; exit }' "$gradle_properties"
+}
+
+if [[ -z "${GH_TOKEN:-}" ]]; then
+  GH_TOKEN="$(gradle_property githubPackagesToken)"
+  [[ -n "$GH_TOKEN" ]] || GH_TOKEN="$(gradle_property githubToken)"
+  [[ -n "$GH_TOKEN" ]] || GH_TOKEN="$(gradle_property ghToken)"
+  [[ -n "$GH_TOKEN" ]] || GH_TOKEN="$(gradle_property gh_token)"
+  export GH_TOKEN
+fi
+
+if [[ -z "${GITHUB_TOKEN:-}" && -n "${GH_TOKEN:-}" ]]; then
+  export GITHUB_TOKEN="$GH_TOKEN"
+fi
+
+if [[ -z "${GITHUB_ACTOR:-}" ]]; then
+  GITHUB_ACTOR="$(gradle_property githubPackagesUsername)"
+  [[ -n "$GITHUB_ACTOR" ]] || GITHUB_ACTOR="$(gradle_property githubUsername)"
+  [[ -n "$GITHUB_ACTOR" ]] || GITHUB_ACTOR="jho951"
+  export GITHUB_ACTOR
+fi
+
 SHARED_NETWORK="${SERVICE_SHARED_NETWORK:-service-backbone-shared}"
 if ! docker network inspect "$SHARED_NETWORK" >/dev/null 2>&1; then
   echo "Creating external network: $SHARED_NETWORK"
