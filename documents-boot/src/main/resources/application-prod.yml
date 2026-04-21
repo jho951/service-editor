@@ -2,9 +2,9 @@ server:
   port: ${SERVER_PORT:8080}
 
 db:
-  url: ${DB_URL}
-  username: ${DB_USERNAME}
-  password: ${DB_PASSWORD}
+  url: ${DB_URL_PROD:${DB_URL}}
+  username: ${DB_USERNAME_PROD:${DB_USERNAME}}
+  password: ${DB_PASSWORD_PROD:${DB_PASSWORD}}
   pool:
     max: ${DB_POOL_MAX:30}
     min: ${DB_POOL_MIN:5}

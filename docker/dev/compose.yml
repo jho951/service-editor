@@ -6,16 +6,16 @@ services:
     container_name: documents-mysql-dev
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-documentsdb}
-      MYSQL_USER: ${MYSQL_USER:-documents}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-documents}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD_DEV:-root}
+      MYSQL_DATABASE: ${DB_NAME_DEV:-documentsdb}
+      MYSQL_USER: ${DB_USERNAME_DEV:-documents}
+      MYSQL_PASSWORD: ${DB_PASSWORD_DEV:-documents}
       TZ: ${TZ:-Asia/Seoul}
     volumes:
       - mysql_data_dev:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      test: ["CMD", "mysqladmin", "ping", "-p${MYSQL_ROOT_PASSWORD_DEV:-root}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -36,9 +36,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       SERVER_PORT: ${SERVER_PORT:-8083}
-      DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/documentsdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul}
-      DB_USERNAME: ${DB_USERNAME:-documents}
-      DB_PASSWORD: ${DB_PASSWORD:-documents}
+      DB_URL_DEV: ${DB_URL_DEV:-jdbc:mysql://mysql:3306/${DB_NAME_DEV:-documentsdb}?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul}
+      DB_USERNAME_DEV: ${DB_USERNAME_DEV:-documents}
+      DB_PASSWORD_DEV: ${DB_PASSWORD_DEV:-documents}
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50}

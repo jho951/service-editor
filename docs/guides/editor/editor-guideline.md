@@ -32,12 +32,12 @@ save는 기존 저장 알고리즘을 editor save 경계 안으로 옮겨 상세
 
 ## 2. 문서 구조와 확장 기준
 
-현재 editor guide는 아래 3문서를 기본 세트로 유지한다.
+현재 editor guide는 아래 editor 문서군과 공통 OpenAPI 계약을 함께 본다.
 
 - [editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
   - 프론트/백엔드가 같이 보는 공통 계약
 - [editor-service-openapi.yaml](https://github.com/jho951/editor-service/blob/dev/docs/guides/contract/editor-service-openapi.yaml)
-  - 현재 서비스 전체 endpoint와 request/response 스키마를 표현한 OpenAPI 계약
+  - 현재 서비스 전체 endpoint와 request/response 스키마를 표현한 단일 OpenAPI 계약
 - [frontend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/frontend-editor-guideline.md)
   - 프론트 구현 시점 가이드
 - [backend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/backend-editor-guideline.md)
@@ -47,7 +47,8 @@ save는 기존 저장 알고리즘을 editor save 경계 안으로 옮겨 상세
 
 - save, move, 추후 restore 같은 작업은 서로 다른 operation이지만, 사용 맥락은 같은 editor 기능군 안에서 이어진다.
 - operation별로 문서를 먼저 쪼개면 공통 계약과 중복 설명이 빠르게 흩어진다.
-- 그래서 editor 기능군 아래에서 공통 계약 1개와 역할별 가이드 2개를 같이 유지하는 편이 더 읽기 쉽다.
+- 반면 OpenAPI는 editor operation만이 아니라 document, attachment, snapshot, admin helper API까지 한 파일에서 같이 봐야 호출 계약을 놓치지 않는다.
+- 그래서 editor 기능군 아래에서는 공통 계약 1개와 역할별 가이드 2개를 유지하고, 서비스 전체 HTTP 계약은 `docs/guides/contract/editor-service-openapi.yaml` 한 파일로 모아 참조한다.
 
 운영 기준은 아래를 따른다.
 

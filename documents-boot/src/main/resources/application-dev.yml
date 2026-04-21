@@ -1,7 +1,7 @@
 db:
-  url: ${DB_URL:jdbc:mysql://localhost:3306/documentsdb?useSSL=false&allowPublicKeyRetrieval=true&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul}
-  username: ${DB_USERNAME:documents}
-  password: ${DB_PASSWORD:documents}
+  url: ${DB_URL_DEV:${DB_URL:jdbc:mysql://localhost:3306/documentsdb?useSSL=false&allowPublicKeyRetrieval=true&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul}}
+  username: ${DB_USERNAME_DEV:${DB_USERNAME:documents}}
+  password: ${DB_PASSWORD_DEV:${DB_PASSWORD:documents}}
 
 spring:
   jpa:

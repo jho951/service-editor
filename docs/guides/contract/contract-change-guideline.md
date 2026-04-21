@@ -59,7 +59,13 @@ git rev-parse HEAD
 
 ### 3. 이 repo의 local copy와 lock을 갱신한다
 
-이 repo는 현재 service local OpenAPI copy를 기준 파일로 두지 않는다. HTTP API shape이 새로 생기면 `service-contract/artifacts/openapi`에 artifact를 만들고, 이후 이 repo에도 local copy를 둘지 결정한다.
+이 repo는 `docs/guides/contract/editor-service-openapi.yaml`에 현재 서비스 전체 HTTP API의 local copy를 둔다. 다만 기준 원본은 여전히 `service-contract`다.
+
+HTTP API shape이 바뀌면 아래를 같은 작업에서 함께 맞춘다.
+
+- `service-contract/artifacts/openapi`
+- `docs/guides/contract/editor-service-openapi.yaml`
+- `contract.lock.yml`
 
 `contract.lock.yml`의 commit을 새 contract commit으로 바꾼다.
 
@@ -85,8 +91,7 @@ Docker Compose, health, ready, CI/CD가 바뀐 경우에는 `.github/workflows/c
 ### 5. 이 repo를 커밋하고 push한다
 
 ```bash
-git add <implementation-files> contract.lock.yml
-# OpenAPI local copy가 있는 repo면 docs/openapi/*.yml도 함께 add
+git add <implementation-files> contract.lock.yml docs/guides/contract/editor-service-openapi.yaml
 git commit -m "Align editor-service implementation with contract"
 git push origin <branch>
 ```

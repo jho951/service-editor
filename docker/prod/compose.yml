@@ -6,16 +6,16 @@ services:
     container_name: documents-mysql-prod
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-documentsdb}
-      MYSQL_USER: ${MYSQL_USER:-documents}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-documents}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD_PROD:-root}
+      MYSQL_DATABASE: ${DB_NAME_PROD:-documentsdb}
+      MYSQL_USER: ${DB_USERNAME_PROD:-documents}
+      MYSQL_PASSWORD: ${DB_PASSWORD_PROD:-documents}
       TZ: ${TZ:-Asia/Seoul}
     volumes:
       - mysql_data_prod:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      test: ["CMD", "mysqladmin", "ping", "-p${MYSQL_ROOT_PASSWORD_PROD:-root}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -35,9 +35,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: ${SERVER_PORT:-8083}
-      DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/documentsdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul}
-      DB_USERNAME: ${DB_USERNAME:-documents}
-      DB_PASSWORD: ${DB_PASSWORD:-documents}
+      DB_URL_PROD: ${DB_URL_PROD:-jdbc:mysql://mysql:3306/${DB_NAME_PROD:-documentsdb}?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul}
+      DB_USERNAME_PROD: ${DB_USERNAME_PROD:-documents}
+      DB_PASSWORD_PROD: ${DB_PASSWORD_PROD:-documents}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       PLATFORM_GOVERNANCE_SERVICE_ROLE_PRESET: ${PLATFORM_GOVERNANCE_SERVICE_ROLE_PRESET:-RESOURCE_SERVICE}
       PLATFORM_SECURITY_SERVICE_ROLE_PRESET: ${PLATFORM_SECURITY_SERVICE_ROLE_PRESET:-API_SERVER}
