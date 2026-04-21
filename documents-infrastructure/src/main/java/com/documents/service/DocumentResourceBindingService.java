@@ -50,7 +50,7 @@ public class DocumentResourceBindingService {
 
     private static final String ATTACHMENT_KIND = "editor-attachment";
     private static final String SNAPSHOT_KIND = "document-snapshot";
-    private static final String SYSTEM_ACTOR = "documents-app";
+    private static final String SYSTEM_ACTOR = "editor-service";
 
     private final DocumentResourceRepository documentResourceRepository;
     private final ResourceService resourceService;

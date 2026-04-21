@@ -1,7 +1,7 @@
 auth:
   jwt:
     secret: ${JWT_SECRET:change-this-in-prod}
-    issuer: documents-app
+    issuer: editor-service
     access-token-exp-seconds: 3600
     refresh-token-exp-seconds: 1209600
   service-token:

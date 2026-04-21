@@ -23,6 +23,22 @@ case "$ENV_NAME" in
   *) usage; exit 1 ;;
 esac
 
+resolve_env_file() {
+  local preferred="$PROJECT_ROOT/.env.$ENV_NAME"
+  if [[ -f "$preferred" ]]; then
+    echo "$preferred"
+    return 0
+  fi
+
+  local fallback="$PROJECT_ROOT/.env.example"
+  if [[ -f "$fallback" ]]; then
+    echo "$fallback"
+    return 0
+  fi
+
+  echo ""
+}
+
 gradle_property() {
   local key="$1"
   local gradle_properties="${HOME}/.gradle/gradle.properties"
@@ -56,6 +72,14 @@ if ! docker network inspect "$SHARED_NETWORK" >/dev/null 2>&1; then
 fi
 
 compose() {
+  local env_file
+  env_file="$(resolve_env_file)"
+  if [[ -n "$env_file" ]]; then
+    SERVICE_SHARED_NETWORK="$SHARED_NETWORK" EDITOR_ENV_FILE="$env_file" \
+      docker compose --env-file "$env_file" -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
+    return
+  fi
+
   SERVICE_SHARED_NETWORK="$SHARED_NETWORK" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 

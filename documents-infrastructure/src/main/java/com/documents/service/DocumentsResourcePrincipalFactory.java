@@ -14,7 +14,7 @@ public class DocumentsResourcePrincipalFactory {
 
     private static final String USER_TYPE = "USER";
     private static final String SYSTEM_TYPE = "SYSTEM";
-    private static final String SYSTEM_ID = "documents-app";
+    private static final String SYSTEM_ID = "editor-service";
 
     private final TextNormalizer textNormalizer;
     private final SecurityActorContextResolver securityActorContextResolver;

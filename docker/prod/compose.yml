@@ -26,6 +26,9 @@ services:
     build:
       context: ../..
       dockerfile: docker/Dockerfile
+      secrets:
+        - gh_token
+        - github_actor
     container_name: documents-app-prod
     ports:
       - "${EDITOR_SERVICE_HOST_BIND:?EDITOR_SERVICE_HOST_BIND is required}:${EDITOR_SERVICE_HOST_PORT:-8083}:8083"
@@ -47,7 +50,7 @@ services:
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50}
     env_file:
-      - path: ../../.env.prod
+      - path: ${EDITOR_ENV_FILE:-../../.env.prod}
         required: false
       - path: ../../.env
         required: false
@@ -64,6 +67,12 @@ services:
 volumes:
   mysql_data_prod:
   resource_data_prod:
+
+secrets:
+  gh_token:
+    environment: GH_TOKEN
+  github_actor:
+    environment: GITHUB_ACTOR
 
 networks:
   documents-private:

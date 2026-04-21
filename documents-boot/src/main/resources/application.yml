@@ -3,9 +3,15 @@ server:
 
 spring:
   application:
-    name: documents-app
+    name: editor-service
   profiles:
     active: dev
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT_MS:1000ms}
   config:
     import:
       - classpath:application-server.yml
@@ -55,15 +61,14 @@ platform:
         - /editor-operations/**
       admin-paths:
         - /admin/**
-      internal-paths:
-        - /internal/**
+      internal-paths: []
     auth:
       enabled: ${PLATFORM_SECURITY_AUTH_ENABLED:true}
       default-mode: HYBRID
-      internal-token-enabled: ${PLATFORM_SECURITY_INTERNAL_TOKEN_ENABLED:true}
+      internal-token-enabled: ${PLATFORM_SECURITY_INTERNAL_TOKEN_ENABLED:false}
       jwt-secret: ${JWT_SECRET:${PLATFORM_SECURITY_JWT_SECRET:change-this-in-prod}}
       jwt-issuer: ${PLATFORM_SECURITY_JWT_ISSUER:auth-service}
-      jwt-audience: ${PLATFORM_SECURITY_JWT_AUDIENCE:documents-app}
+      jwt-audience: ${PLATFORM_SECURITY_JWT_AUDIENCE:editor-service}
       gateway-header:
         enabled: ${PLATFORM_SECURITY_GATEWAY_HEADER_ENABLED:true}
     ip-guard:

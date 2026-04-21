@@ -20,7 +20,7 @@ ext {
     resolvedPlatformSecurityGovernanceBridgeVersion =
         (findProperty('platform_security_governance_bridge_version') ?: '1.0.1').toString()
     resolvedPlatformResourceGovernanceBridgeVersion =
-        (findProperty('platform_resource_governance_bridge_version') ?: '1.0.0').toString()
+        (findProperty('platform_resource_governance_bridge_version') ?: '1.0.1').toString()
     runtimeEnvProperties = [
         DB_URL: 'db_url',
         DB_USERNAME: 'db_username',
