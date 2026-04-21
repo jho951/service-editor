@@ -1,9 +1,9 @@
-name: documents-service-dev
+name: editor-service-dev
 
 services:
   mysql:
     image: mysql:8.0
-    container_name: documents-mysql-dev
+    container_name: editor-mysql-dev
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD_DEV:-root}
@@ -29,7 +29,7 @@ services:
       secrets:
         - gh_token
         - github_actor
-    container_name: documents-app-dev
+    container_name: editor-app-dev
     depends_on:
       mysql:
         condition: service_healthy

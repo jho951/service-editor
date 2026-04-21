@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-COMPOSE_PROJECT_NAME="documents-service"
+COMPOSE_PROJECT_NAME="editor-service"
 ACTION="${1:-up}"
 ENV_NAME="${2:-dev}"
 shift $(( $# > 0 ? 1 : 0 )) || true
