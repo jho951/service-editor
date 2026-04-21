@@ -32,7 +32,7 @@ env:
   BUILD_COMMAND: ./gradlew --no-daemon :documents-boot:bootJar -x test
   COMPOSE_CONFIG_COMMAND: |
     docker compose -f docker/dev/compose.yml config >/tmp/editor-dev.yml
-    JWT_SECRET=ci-secret DOCUMENTS_SERVICE_HOST_BIND=127.0.0.1 docker compose -f docker/prod/compose.yml config >/tmp/editor-prod.yml
+    JWT_SECRET=ci-secret EDITOR_SERVICE_HOST_BIND=127.0.0.1 docker compose -f docker/prod/compose.yml config >/tmp/editor-prod.yml
   IMAGE_URI: ghcr.io/${{ github.repository }}
   CI_IMAGE_BUILD_COMMAND: |
     docker build \

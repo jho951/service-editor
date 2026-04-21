@@ -44,7 +44,7 @@ env:
     fi
   COMPOSE_CONFIG_COMMAND: |
     docker compose -f docker/dev/compose.yml config >/tmp/editor-dev.yml
-    JWT_SECRET=ci-secret DOCUMENTS_SERVICE_HOST_BIND=127.0.0.1 docker compose -f docker/prod/compose.yml config >/tmp/editor-prod.yml
+    JWT_SECRET=ci-secret EDITOR_SERVICE_HOST_BIND=127.0.0.1 docker compose -f docker/prod/compose.yml config >/tmp/editor-prod.yml
   HEALTH_URL: http://127.0.0.1:8083/actuator/health
   READY_URL: http://127.0.0.1:8083/actuator/health/readiness
   GITHUB_ACTOR: ${{ github.actor }}

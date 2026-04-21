@@ -1,4 +1,4 @@
-name: documents-service-prod
+name: editor-service-prod
 
 services:
   mysql:
@@ -22,13 +22,13 @@ services:
     networks:
       - documents-private
 
-  documents-service:
+  editor-service:
     build:
       context: ../..
       dockerfile: docker/Dockerfile
     container_name: documents-app-prod
     ports:
-      - "${DOCUMENTS_SERVICE_HOST_BIND:?DOCUMENTS_SERVICE_HOST_BIND is required}:${DOCUMENTS_SERVICE_HOST_PORT:-8083}:8083"
+      - "${EDITOR_SERVICE_HOST_BIND:?EDITOR_SERVICE_HOST_BIND is required}:${EDITOR_SERVICE_HOST_PORT:-8083}:8083"
     depends_on:
       mysql:
         condition: service_healthy
