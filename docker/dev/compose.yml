@@ -53,6 +53,7 @@ services:
       service-shared:
         aliases:
           - documents-service
+          - editor-service
 
 volumes:
   mysql_data_dev:

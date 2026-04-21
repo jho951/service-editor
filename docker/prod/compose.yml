@@ -57,6 +57,7 @@ services:
       service-shared:
         aliases:
           - documents-service
+          - editor-service
     volumes:
       - resource_data_prod:/var/lib/documents/resources
 
