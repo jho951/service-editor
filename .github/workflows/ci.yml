@@ -1,0 +1,186 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+      - develop
+      - "feature/**"
+      - "fix/**"
+      - "refactor/**"
+      - "chore/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CONTRACT_REPO: https://github.com/jho951/service-contract
+  SERVICE_NAME: editor-service
+  CI_PROFILE: spring-boot
+  CI_RUNTIME: java
+  JAVA_VERSION: "17"
+  TEST_COMMAND: ./gradlew --no-daemon clean test
+  BUILD_COMMAND: ./gradlew --no-daemon :documents-boot:bootJar -x test
+  COMPOSE_CONFIG_COMMAND: |
+    docker compose -f docker/dev/compose.yml config >/tmp/editor-dev.yml
+    JWT_SECRET=ci-secret DOCUMENTS_SERVICE_HOST_BIND=127.0.0.1 docker compose -f docker/prod/compose.yml config >/tmp/editor-prod.yml
+  IMAGE_URI: ghcr.io/${{ github.repository }}
+  CI_IMAGE_BUILD_COMMAND: |
+    docker build \
+      -f docker/Dockerfile \
+      -t "${IMAGE_URI}:ci-${GITHUB_SHA}" \
+      .
+  GITHUB_ACTOR: ${{ github.actor }}
+  GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GH_TOKEN || secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN || github.token }}
+  GH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GH_TOKEN || secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN || github.token }}
+
+jobs:
+  contract-lock:
+    name: Contract Lock
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate contract lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f contract.lock.yml
+          grep -q "repo: ${CONTRACT_REPO}" contract.lock.yml
+          grep -q "name: ${SERVICE_NAME}" contract.lock.yml
+          grep -q "ref:" contract.lock.yml
+          grep -q "commit:" contract.lock.yml
+          grep -q "consumes:" contract.lock.yml
+          grep -q "contract_lock: true" contract.lock.yml
+          grep -q "ci:" contract.lock.yml
+          grep -q "cd:" contract.lock.yml
+
+      - name: Fetch contract source
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONTRACT_REF="$(awk '/^[[:space:]]*ref:/ { print $2; exit }' contract.lock.yml)"
+          git clone --depth 1 --branch "$CONTRACT_REF" "$CONTRACT_REPO" .contract
+
+      - name: Verify consumed contract paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          awk '
+            /^[^[:space:]]/ { in_consumes = 0 }
+            /^[[:space:]]+consumes:/ { in_consumes = 1; next }
+            in_consumes && /^[[:space:]]+-[[:space:]]+/ {
+              sub(/^[[:space:]]+-[[:space:]]+/, "")
+              print
+            }
+          ' contract.lock.yml | while read -r path; do
+            case "$path" in
+              *"*"*) compgen -G ".contract/$path" > /dev/null ;;
+              *) test -e ".contract/$path" ;;
+            esac
+          done
+
+  setup-runtime:
+    name: Setup Runtime
+    runs-on: ubuntu-latest
+    needs: contract-lock
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        if: ${{ env.CI_RUNTIME == 'java' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Setup Docker Buildx
+        if: ${{ env.CI_IMAGE_BUILD_COMMAND != 'skip' }}
+        uses: docker/setup-buildx-action@v3
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: setup-runtime
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        if: ${{ env.CI_RUNTIME == 'java' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Grant Gradle permission
+        if: ${{ env.CI_RUNTIME == 'java' }}
+        run: chmod +x ./gradlew
+
+      - name: Run tests
+        if: ${{ env.TEST_COMMAND != 'skip' }}
+        shell: bash
+        run: ${{ env.TEST_COMMAND }}
+
+      - name: Validate Compose config
+        shell: bash
+        run: ${{ env.COMPOSE_CONFIG_COMMAND }}
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        if: ${{ env.CI_RUNTIME == 'java' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Grant Gradle permission
+        if: ${{ env.CI_RUNTIME == 'java' }}
+        run: chmod +x ./gradlew
+
+      - name: Build artifact
+        if: ${{ env.BUILD_COMMAND != 'skip' }}
+        shell: bash
+        run: ${{ env.BUILD_COMMAND }}
+
+  image:
+    name: Image
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        if: ${{ env.CI_IMAGE_BUILD_COMMAND != 'skip' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ env.CI_IMAGE_BUILD_COMMAND }}
+
+      - name: Skip Docker image
+        if: ${{ env.CI_IMAGE_BUILD_COMMAND == 'skip' }}
+        run: echo "No Docker image is produced for ${{ env.SERVICE_NAME }}."

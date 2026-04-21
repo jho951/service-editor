@@ -30,11 +30,13 @@ move 처리 기준은 다음으로 고정한다.
 - drop 확정 시점의 최종 위치만 1회 반영하는 explicit action으로 처리한다.
 - 같은 위치로 drop된 no-op 이동은 성공으로 처리할 수 있지만, 실제 갱신과 버전 증가는 없어야 한다.
 - controller는 save와 move를 모두 `EditorOperationOrchestrator`로 연결한다.
+- save는 `DocumentAccessGuard.requireWritable(...)`, move는 문서/블록 종류에 따라 `DocumentAccessGuard` 또는 `BlockAccessGuard`를 먼저 통과해야 한다.
 - 문서/블록 move 알고리즘은 새 endpoint에서 따로 재구현하지 않고 기존 구현을 그대로 재사용한다.
 - block move 응답에는 갱신된 `version`, `documentVersion`, `sortKey`를 포함한다.
 - document move 응답도 현재 위치 반영 결과와 최신 `documentVersion`을 같은 response 구조로 돌려준다.
 - save는 `POST /editor-operations/documents/{documentId}/save`에서 시작하고, public 경계는 `EditorSaveRequest/Response`, `EditorSaveApiMapper` 기준으로 받는다.
 - `EditorOperationOrchestrator.save(...)`는 `EditorSaveCommand`, `EditorSaveResult`, `EditorSaveOperationType`, `EditorSaveOperationExecutor`, `EditorSaveContext` 기준으로 직접 저장 흐름을 조율한다.
+- save는 applied operation이 하나라도 있을 때만 마지막에 `DocumentVersionUpdater.increment(...)`로 문서 version을 올린다.
 - `EditorOperationOrchestrator.move(...)`는 `EditorMoveCommand`를 받아 `resourceType`으로 분기한다. document move는 orchestrator가 `DocumentService.move(...)`를 직접 호출하고, block move는 `EditorSaveOperationExecutor.applyMove(...)`를 재사용한다.
 - `BlockService`, `DocumentService` 기본 동작은 더티체킹 중심으로 두되, editor/admin orchestration 경계에서는 `PersistenceContextManager.flush()`로 최신 block version과 sortKey를 확정한다.
 - 문서 version 증가는 동시성 요구를 유지하기 위해 `DocumentVersionUpdater.increment(...)` bulk 경로를 사용하고, block move 단일 API에서는 `BlockService.move(...)`가 올린 최신 document version을 재조회로 읽는다.

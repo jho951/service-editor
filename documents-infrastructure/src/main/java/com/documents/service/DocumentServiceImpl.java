@@ -29,6 +29,7 @@ public class DocumentServiceImpl implements DocumentService {
 	private final DocumentRepository documentRepository;
 	private final TextNormalizer textNormalizer;
 	private final OrderedSortKeyGenerator orderedSortKeyGenerator;
+    private final DocumentResourceBindingService documentResourceBindingService;
 
 	@Override
 	@Transactional
@@ -142,6 +143,15 @@ public class DocumentServiceImpl implements DocumentService {
 	@Transactional
 	public void delete(UUID documentId, String actorId) {
 		Document document = findActiveDocument(documentId);
+        String normalizedActorId = textNormalizer.normalizeNullable(actorId);
+        if (normalizedActorId == null) {
+            throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
+        }
+
+        documentResourceBindingService.scheduleDocumentBindingsForPurge(
+            collectActiveDocumentTreeIds(document),
+            normalizedActorId
+        );
 		documentRepository.delete(document);
 	}
 
@@ -160,6 +170,7 @@ public class DocumentServiceImpl implements DocumentService {
 				return null;
 			});
 		}
+        documentResourceBindingService.trashDocumentBindings(documentIdsToDelete, normalizedActorId);
 	}
 
 	@Override
@@ -181,6 +192,7 @@ public class DocumentServiceImpl implements DocumentService {
 				return null;
 			});
 		}
+        documentResourceBindingService.restoreDocumentBindings(documentIdsToRestore, normalizedActorId);
 	}
 
 	@Override
@@ -190,6 +202,10 @@ public class DocumentServiceImpl implements DocumentService {
 		List<Document> expiredTrashRoots = documentRepository.findExpiredTrashRoots(expiredAt);
 
 		for (Document expiredTrashRoot : expiredTrashRoots) {
+            documentResourceBindingService.scheduleDocumentBindingsForPurge(
+                collectDeletedDocumentTreeIds(expiredTrashRoot),
+                null
+            );
 			documentRepository.delete(expiredTrashRoot);
 		}
 	}

@@ -1,0 +1,54 @@
+contract:
+  repo: https://github.com/jho951/service-contract
+  ref: main
+  commit: 12dc214ed7e0c9c2290add6972cd35be13634743
+
+service:
+  name: editor-service
+  branch: dev
+  role: backend-service
+  consumes:
+    - shared/routing.md
+    - shared/headers.md
+    - shared/security.md
+    - shared/errors.md
+    - shared/ci-cd.md
+    - repositories/editor-service/**
+    - repositories/authz-service/**
+    - repositories/redis-service/**
+
+validation:
+  contract_lock: true
+  openapi: true
+  schema: true
+  routing: true
+  headers: true
+  errors: true
+  security: true
+
+ci:
+  profile: spring-boot
+  runtime: java
+  java_version: "17"
+  setup: gradle
+  test_command: ./gradlew --no-daemon clean test
+  build_command: ./gradlew --no-daemon :documents-boot:bootJar -x test
+  docker: true
+  contract_check: true
+
+cd:
+  profile: ec2-compose
+  target: ec2
+  strategy: docker-compose
+  environments:
+    - dev
+    - prod
+  image_registry: ghcr.io
+  deploy_on: protected_branch
+  health_check: true
+  smoke_test: true
+
+notes:
+  owner: editor-service
+  automation_level: guardrail
+  legacy_sync_doc: false

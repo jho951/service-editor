@@ -110,6 +110,15 @@ class DocumentApiIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("실패_인증 헤더 없이 문서 목록 조회하면 플랫폼 보안 응답을 반환한다")
+	void getDocumentsWithoutUserHeaderReturnsUnauthorizedEnvelope() throws Exception {
+		MockMvc unauthenticatedMockMvc = MockMvcBuilders.webAppContextSetup(context).build();
+		var result = unauthenticatedMockMvc.perform(get("/documents"));
+
+		assertErrorEnvelope(result, "UNAUTHORIZED", 9001, "인증 정보가 없습니다.");
+	}
+
+	@Test
 	@DisplayName("성공_내 휴지통 문서 목록 조회 API는 현재 사용자 삭제 문서만 반환한다")
 	void getTrashDocumentsReturnsOnlyCurrentUserDeletedDocuments() throws Exception {
 		Document newerDeletedDocument = saveDeletedDocument(
@@ -171,6 +180,31 @@ class DocumentApiIntegrationTest {
 			.andExpect(jsonPath("$.data.title").value("프로젝트 개요"))
 			.andExpect(jsonPath("$.data.sortKey").value("00000000000000000007"))
 			.andExpect(jsonPath("$.data.icon.value").value("📄"));
+	}
+
+	@Test
+	@DisplayName("실패_다른 사용자가 비공개 문서를 조회하면 권한 없음 응답을 반환한다")
+	void getDocumentReturnsForbiddenWhenPrivateDocumentBelongsToOtherUser() throws Exception {
+		Document document = saveDocument(OTHER_USER_ID, null, "다른 사용자 문서", "00000000000000000007");
+
+		var result = mockMvc.perform(
+			get("/documents/{documentId}", document.getId()).header(USER_ID_HEADER, USER_ID)
+		);
+
+		assertErrorEnvelope(result, "FORBIDDEN", 9003, "요청을 수행할 권한이 없습니다.");
+	}
+
+	@Test
+	@DisplayName("성공_공개 문서는 다른 사용자도 단건 조회할 수 있다")
+	void getDocumentAllowsPublicReadForOtherUser() throws Exception {
+		Document document = saveDocument(OTHER_USER_ID, null, "공개 문서", "00000000000000000007");
+		document.setVisibility(DocumentVisibility.PUBLIC);
+		documentRepository.save(document);
+
+		mockMvc.perform(get("/documents/{documentId}", document.getId()).header(USER_ID_HEADER, USER_ID))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.data.id").value(document.getId().toString()))
+			.andExpect(jsonPath("$.data.visibility").value("PUBLIC"));
 	}
 
 	@Test

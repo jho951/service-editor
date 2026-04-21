@@ -62,7 +62,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -99,7 +99,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -124,7 +124,7 @@ class EditorOperationApiIntegrationTest {
 
         Block reloadedMovingBlock = blockRepository.findByIdAndDeletedAtIsNull(movingBlock.getId()).orElseThrow();
         assertThat(reloadedMovingBlock.getVersion()).isEqualTo(1);
-        assertThat(reloadedMovingBlock.getUpdatedBy()).isEqualTo("user-456");
+        assertThat(reloadedMovingBlock.getUpdatedBy()).isEqualTo(USER_ID);
         assertThat(reloadedMovingBlock.getSortKey()).isNotEqualTo("000000000002000000000000");
     }
 
@@ -136,7 +136,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -178,7 +178,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -240,7 +240,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -281,7 +281,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -322,7 +322,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -352,7 +352,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -383,7 +383,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -422,7 +422,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -481,7 +481,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -541,7 +541,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -574,7 +574,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -623,7 +623,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -674,7 +674,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -724,7 +724,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -811,7 +811,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -847,7 +847,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -896,7 +896,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -936,7 +936,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -989,7 +989,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1042,7 +1042,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1115,7 +1115,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1177,7 +1177,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1228,7 +1228,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1266,7 +1266,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1293,7 +1293,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1327,7 +1327,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1377,7 +1377,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1417,7 +1417,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1450,7 +1450,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1476,7 +1476,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1525,7 +1525,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1565,7 +1565,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1614,7 +1614,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1656,7 +1656,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -1771,7 +1771,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -2067,7 +2067,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",
@@ -2098,7 +2098,7 @@ class EditorOperationApiIntegrationTest {
 
         Block updatedBlock = blockRepository.findByIdAndDeletedAtIsNull(existingBlock.getId()).orElseThrow();
         assertThat(updatedBlock.getContent()).isEqualTo(content("수정된 블록"));
-        assertThat(updatedBlock.getUpdatedBy()).isEqualTo("user-456");
+        assertThat(updatedBlock.getUpdatedBy()).isEqualTo(USER_ID);
         assertThat(updatedBlock.getVersion()).isEqualTo(1);
     }
 
@@ -2110,7 +2110,7 @@ class EditorOperationApiIntegrationTest {
 
         mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", USER_ID)
                         .content("""
                                 {
                                   "clientId": "web-editor",

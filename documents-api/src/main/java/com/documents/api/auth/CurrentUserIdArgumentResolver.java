@@ -36,6 +36,10 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
             return authenticatedUserId;
         }
 
+        if (webRequest.getUserPrincipal() != null && StringUtils.hasText(webRequest.getUserPrincipal().getName())) {
+            return webRequest.getUserPrincipal().getName().trim();
+        }
+
         String headerUserId = webRequest.getHeader(GatewayAuthContext.USER_ID_HEADER);
         if (!StringUtils.hasText(headerUserId)) {
             throw new GlobalException(ErrorCode.UNAUTHORIZED);

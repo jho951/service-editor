@@ -16,6 +16,7 @@
 - [ADR 021](https://github.com/jho951/Block-server/blob/dev/docs/decisions/021-adopt-editor-operation-controller-boundary.md)
 - [ADR 014](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
 - [editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-save-model.md)
+- [editor-service-openapi.yaml](https://github.com/jho951/editor-service/blob/dev/docs/guides/contract/editor-service-openapi.yaml)
 - [frontend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/frontend-editor-guideline.md)
 - [backend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/backend-editor-guideline.md)
 
@@ -35,6 +36,8 @@ save는 기존 저장 알고리즘을 editor save 경계 안으로 옮겨 상세
 
 - [editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
   - 프론트/백엔드가 같이 보는 공통 계약
+- [editor-service-openapi.yaml](https://github.com/jho951/editor-service/blob/dev/docs/guides/contract/editor-service-openapi.yaml)
+  - 현재 서비스 전체 endpoint와 request/response 스키마를 표현한 OpenAPI 계약
 - [frontend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/frontend-editor-guideline.md)
   - 프론트 구현 시점 가이드
 - [backend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/backend-editor-guideline.md)

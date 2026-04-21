@@ -8,22 +8,24 @@
 
 ## 디렉토리 맵
 
-- [docs/REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)
+- [docs/REQUIREMENTS.md](https://github.com/jho951/editor-service/blob/dev/docs/REQUIREMENTS.md)
   - 현재 유효한 제품 요구사항과 채택된 정책
-- [docs/discussions/](https://github.com/jho951/Block-server/blob/dev/docs/discussions/README.md)
+- [docs/discussions/](https://github.com/jho951/editor-service/blob/dev/docs/discussions/README.md)
   - 채택 전 설계 검토, 전략 비교, 회의 메모
-- [docs/decisions/](https://github.com/jho951/Block-server/blob/dev/docs/decisions/README.md)
+- [docs/decisions/](https://github.com/jho951/editor-service/blob/dev/docs/decisions/README.md)
   - 채택된 기술 결정과 ADR
-- [docs/runbook/](https://github.com/jho951/Block-server/blob/dev/docs/runbook/README.md)
+- [docs/runbook/](https://github.com/jho951/editor-service/blob/dev/docs/runbook/README.md)
   - 재현 가능한 디버깅 절차와 운영 점검 메모
-- [docs/roadmap/](https://github.com/jho951/Block-server/blob/dev/docs/roadmap/README.md)
+- [docs/roadmap/](https://github.com/jho951/editor-service/blob/dev/docs/roadmap/README.md)
   - 현재 기능 기준 후속 Todo와 버전별 확장 검토
-- [docs/explainers/](https://github.com/jho951/Block-server/blob/dev/docs/explainers/README.md)
+- [docs/explainers/](https://github.com/jho951/editor-service/blob/dev/docs/explainers/README.md)
   - 코드만으로 빠르게 파악하기 어려운 핵심 기술 구조 설명
-- [docs/learn/](https://github.com/jho951/Block-server/blob/dev/docs/learn/README.md)
+- [docs/learn/](https://github.com/jho951/editor-service/blob/dev/docs/learn/README.md)
   - 개인 학습용 로컬 문서와 개인 트러블슈팅 기록
-- [docs/guides/](https://github.com/jho951/Block-server/blob/dev/docs/guides/README.md)
+- [docs/guides/](https://github.com/jho951/editor-service/blob/dev/docs/guides/README.md)
   - 프론트/서버 구현 계약, 작업 순서, 체크리스트
+- [docs/guides/contract/contract-change-guideline.md](https://github.com/jho951/editor-service/blob/dev/docs/guides/contract/contract-change-guideline.md)
+  - 구현 변경 후 service-contract, local 문서, contract.lock.yml 갱신 순서
 
 ## 기본 원칙
 
@@ -38,12 +40,12 @@
 - 외부 공식 문서나 외부 사례를 근거로 썼다면, 문맥을 끊지 않는 선에서 본문 문장 안에 그 출처 성격이 드러나게 적는다. 사실과 그 문서의 해석이 섞일 때는 해석이라는 점도 함께 드러낸다.
 - 같은 문서 안에서 `배경`의 참고 문서와 `관련 문서`의 링크 역할이 겹치지 않게 한다. `배경`에는 직접 판단 근거로 쓴 최소 세트만 두고, `관련 문서`에는 읽은 뒤 따라갈 후속 탐색 링크를 둔다.
 - 같은 내부 문서를 `배경`과 `관련 문서` 두 곳에 반복하지 않는다. 꼭 필요하면 한쪽에만 두고 다른 쪽에서는 문장으로만 참조한다.
-- 요구사항으로 확정된 내용은 최종적으로 [docs/REQUIREMENTS.md](https://github.com/jho951/Block-server/blob/dev/docs/REQUIREMENTS.md)에 반영한다.
-- 아직 채택되지 않은 비교나 검토는 [docs/discussions/](https://github.com/jho951/Block-server/blob/dev/docs/discussions/README.md)에 남긴다.
-- 실제로 채택된 결정만 [docs/decisions/](https://github.com/jho951/Block-server/blob/dev/docs/decisions/README.md) ADR로 승격한다.
-- 디버깅/장애 재현 절차는 [docs/runbook/](https://github.com/jho951/Block-server/blob/dev/docs/runbook/README.md)에 남긴다.
-- 개인 학습용 설명과 개인 트러블슈팅 기록은 [docs/learn/](https://github.com/jho951/Block-server/blob/dev/docs/learn/README.md)에 남긴다.
-- 설명 문서와 구현 가이드는 [docs/explainers/](https://github.com/jho951/Block-server/blob/dev/docs/explainers/README.md), [docs/guides/](https://github.com/jho951/Block-server/blob/dev/docs/guides/README.md)의 경계를 지킨다.
+- 요구사항으로 확정된 내용은 최종적으로 [docs/REQUIREMENTS.md](https://github.com/jho951/editor-service/blob/dev/docs/REQUIREMENTS.md)에 반영한다.
+- 아직 채택되지 않은 비교나 검토는 [docs/discussions/](https://github.com/jho951/editor-service/blob/dev/docs/discussions/README.md)에 남긴다.
+- 실제로 채택된 결정만 [docs/decisions/](https://github.com/jho951/editor-service/blob/dev/docs/decisions/README.md) ADR로 승격한다.
+- 디버깅/장애 재현 절차는 [docs/runbook/](https://github.com/jho951/editor-service/blob/dev/docs/runbook/README.md)에 남긴다.
+- 개인 학습용 설명과 개인 트러블슈팅 기록은 [docs/learn/](https://github.com/jho951/editor-service/blob/dev/docs/learn/README.md)에 남긴다.
+- 설명 문서와 구현 가이드는 [docs/explainers/](https://github.com/jho951/editor-service/blob/dev/docs/explainers/README.md), [docs/guides/](https://github.com/jho951/editor-service/blob/dev/docs/guides/README.md)의 경계를 지킨다.
 - `docs/learn/` 내용은 로컬 학습 메모로 취급한다. 해당 내용이 공식 경로로 다시 정리되지 않았다면, `docs/`의 공식 문서 근거나 직접 링크 대상으로 사용하지 않는다.
 
 ## 흐름 원칙

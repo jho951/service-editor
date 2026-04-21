@@ -24,6 +24,7 @@ import com.documents.api.document.dto.UpdateDocumentRequest;
 import com.documents.api.document.dto.UpdateDocumentVisibilityRequest;
 import com.documents.api.dto.GlobalResponse;
 import com.documents.domain.Document;
+import com.documents.service.DocumentAccessGuard;
 import com.documents.service.BlockService;
 import com.documents.service.DocumentService;
 
@@ -42,6 +43,7 @@ public class DocumentController {
 	private final BlockApiMapper blockApiMapper;
 	private final DocumentService documentService;
 	private final DocumentApiMapper documentApiMapper;
+    private final DocumentAccessGuard documentAccessGuard;
 
 	@Operation(summary = "내 문서 목록 조회")
 	@GetMapping
@@ -86,17 +88,20 @@ public class DocumentController {
 	@Operation(summary = "문서 단건 조회")
 	@GetMapping("/{documentId}")
 	public ResponseEntity<GlobalResponse<DocumentResponse>> getDocument(
-		@PathVariable("documentId") UUID documentId
+		@PathVariable("documentId") UUID documentId,
+        @CurrentUserId String userId
 	) {
-		Document document = documentService.getById(documentId);
+		Document document = documentAccessGuard.requireReadable(documentId, userId);
 		return ResponseEntity.ok(GlobalResponse.ok(SuccessCode.SUCCESS, documentApiMapper.toResponse(document)));
 	}
 
 	@Operation(summary = "문서 블록 목록 조회")
 	@GetMapping("/{documentId}/blocks")
 	public ResponseEntity<GlobalResponse<List<BlockResponse>>> getBlocks(
-		@PathVariable("documentId") UUID documentId
+		@PathVariable("documentId") UUID documentId,
+        @CurrentUserId String userId
 	) {
+        documentAccessGuard.requireReadable(documentId, userId);
 		List<BlockResponse> response = blockService.getAllByDocumentId(documentId).stream()
 			.map(blockApiMapper::toResponse)
 			.toList();

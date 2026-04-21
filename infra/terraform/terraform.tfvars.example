@@ -1,0 +1,3 @@
+aws_region  = "ap-northeast-2"
+service_name = "documents-service"
+environment  = "dev"

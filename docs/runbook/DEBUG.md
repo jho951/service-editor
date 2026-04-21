@@ -28,6 +28,10 @@
 24. 문서 복구 확인이 필요하면 휴지통 이동 직후 `POST /documents/{documentId}/restore`를 호출해 `deleted_at`이 null로 돌아오는지와 대상 문서들의 `version`이 각각 `1` 더 증가했는지 확인한다. `deletedAt + 5분`이 지난 데이터는 복구가 실패해야 한다.
 25. 휴지통 목록 확인이 필요하면 `GET /documents/trash`를 호출해 `deletedAt` 내림차순 정렬, `purgeAt = deletedAt + 5분` 계산, 활성 문서 제외 여부를 확인한다.
 26. 자동 영구 삭제 확인이 필요하면 `deleted_at`이 현재 시각 기준 5분 이상 지난 문서를 만든 뒤 스케줄러 실행 또는 `DocumentService.purgeExpiredTrash()` 호출로 대상 문서, 하위 문서, 각 문서 소속 블록이 실제 삭제되는지 확인한다.
+27. resource binding 상태 확인이 필요하면 `document_resources.status`, `deleted_at`, `purge_at`, `last_error`, `repaired_at`를 조회해 `ACTIVE -> TRASHED -> PENDING_PURGE -> PURGED` 전이와 `BROKEN` 발생 여부를 확인한다.
+28. 문서 trash 후 attachment/snapshot 보존을 확인하려면 `PATCH /documents/{documentId}/trash` 뒤 `document_resources.status = TRASHED`인지 확인하고, `POST /documents/{documentId}/restore` 후 다시 `ACTIVE`로 돌아오는지 확인한다.
+29. document hard delete 또는 block delete 뒤에는 대상 binding이 `PENDING_PURGE`로 전환되고, `DocumentsResourcePurgeScheduler` 실행 후 `PURGED`로 바뀌는지 확인한다.
+30. drift 점검이 필요하면 `DocumentsResourceReconcileScheduler` 실행 후 `document_resources.last_error`, `status = BROKEN` 건수를 확인하고, catalog에만 남은 managed resource가 binding으로 재생성됐는지 확인한다.
 
 ## 확인할 로그
 

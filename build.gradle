@@ -4,30 +4,79 @@ plugins {
 }
 
 ext {
-    resolvedProjectGroup = findProperty('projectGroup') ?: 'com.example'
-    resolvedProjectVersion = findProperty('projectVersion') ?: '0.0.1-SNAPSHOT'
-    resolvedProjectDescription = findProperty('projectDescription') ?: 'Documents App (Spring Boot + JPA + MySQL + Swagger)'
-    resolvedJavaVersion = Integer.parseInt((findProperty('javaVersion') ?: '17').toString())
-    resolvedSpringBootVersion = (findProperty('springBootVersion') ?: '3.5.13').toString()
-    resolvedSpringdocVersion = (findProperty('springdocVersion') ?: '2.8.13').toString()
-    resolvedJakartaPersistenceVersion = (findProperty('jakartaPersistenceVersion') ?: '3.1.0').toString()
-    resolvedLombokVersion = (findProperty('lombokVersion') ?: '1.18.38').toString()
-    resolvedJunitJupiterVersion = (findProperty('junitJupiterVersion') ?: '5.12.2').toString()
-    resolvedJunitPlatformVersion = (findProperty('junitPlatformVersion') ?: '1.12.2').toString()
-    resolvedPlatformGovernanceVersion = (findProperty('platformGovernanceVersion') ?: '2.0.0').toString()
-    runtimeEnvKeys = [
-        'DB_URL',
-        'DB_USERNAME',
-        'DB_PASSWORD',
-        'SPRING_PROFILES_ACTIVE',
-        'JWT_SECRET',
-        'JWT_ACCESS_EXP',
-        'JWT_REFRESH_EXP',
-        'SWAGGER_ENABLED',
-        'CORS_ENABLED',
-        'CORS_ALLOWED_ORIGINS',
-        'SERVER_PORT',
-        'TZ'
+    resolvedProjectGroup = findProperty('project_group') ?: 'com.example'
+    resolvedProjectVersion = findProperty('project_version') ?: '0.0.1-SNAPSHOT'
+    resolvedProjectDescription = findProperty('project_description') ?: 'Documents App (Spring Boot + JPA + MySQL + Swagger)'
+    resolvedJavaVersion = Integer.parseInt((findProperty('java_version') ?: '17').toString())
+    resolvedSpringBootVersion = (findProperty('spring_boot_version') ?: '3.5.13').toString()
+    resolvedSpringdocVersion = (findProperty('springdoc_version') ?: '2.8.13').toString()
+    resolvedJakartaPersistenceVersion = (findProperty('jakarta_persistence_version') ?: '3.1.0').toString()
+    resolvedLombokVersion = (findProperty('lombok_version') ?: '1.18.38').toString()
+    resolvedJunitJupiterVersion = (findProperty('junit_jupiter_version') ?: '5.12.2').toString()
+    resolvedJunitPlatformVersion = (findProperty('junit_platform_version') ?: '1.12.2').toString()
+    resolvedPlatformGovernanceVersion = (findProperty('platform_governance_version') ?: '2.0.1').toString()
+    resolvedPlatformSecurityVersion = (findProperty('platform_security_version') ?: '2.0.3').toString()
+    resolvedPlatformResourceVersion = (findProperty('platform_resource_version') ?: '2.0.0').toString()
+    resolvedPlatformSecurityGovernanceBridgeVersion =
+        (findProperty('platform_security_governance_bridge_version') ?: '1.0.1').toString()
+    resolvedPlatformResourceGovernanceBridgeVersion =
+        (findProperty('platform_resource_governance_bridge_version') ?: '1.0.0').toString()
+    runtimeEnvProperties = [
+        DB_URL: 'db_url',
+        DB_USERNAME: 'db_username',
+        DB_PASSWORD: 'db_password',
+        SPRING_PROFILES_ACTIVE: 'spring_profiles_active',
+        JWT_SECRET: 'jwt_secret',
+        JWT_ACCESS_EXP: 'jwt_access_exp',
+        JWT_REFRESH_EXP: 'jwt_refresh_exp',
+        SWAGGER_ENABLED: 'swagger_enabled',
+        CORS_ENABLED: 'cors_enabled',
+        CORS_ALLOWED_ORIGINS: 'cors_allowed_origins',
+        SERVER_PORT: 'server_port',
+        TZ: 'tz',
+        PLATFORM_GOVERNANCE_ENABLED: 'platform_governance_enabled',
+        PLATFORM_GOVERNANCE_SERVICE_ROLE_PRESET: 'platform_governance_service_role_preset',
+        PLATFORM_GOVERNANCE_AUDIT_ENABLED: 'platform_governance_audit_enabled',
+        PLATFORM_GOVERNANCE_AUDIT_SERVICE_NAME: 'platform_governance_audit_service_name',
+        PLATFORM_GOVERNANCE_AUDIT_ENVIRONMENT: 'platform_governance_audit_environment',
+        PLATFORM_GOVERNANCE_AUDIT_FAILURE_POLICY: 'platform_governance_audit_failure_policy',
+        PLATFORM_GOVERNANCE_AUDIT_IDENTITY_ENABLED: 'platform_governance_audit_identity_enabled',
+        PLATFORM_GOVERNANCE_AUDIT_IDENTITY_VALIDATION_ENABLED: 'platform_governance_audit_identity_validation_enabled',
+        PLATFORM_GOVERNANCE_AUDIT_IDENTITY_FAIL_ON_VALIDATION_ERROR: 'platform_governance_audit_identity_fail_on_validation_error',
+        PLATFORM_GOVERNANCE_ENGINE_STRICT: 'platform_governance_engine_strict',
+        PLATFORM_GOVERNANCE_VIOLATION_ACTION: 'platform_governance_violation_action',
+        PLATFORM_GOVERNANCE_VIOLATION_HANDLER_FAILURE_FATAL: 'platform_governance_violation_handler_failure_fatal',
+        PLATFORM_GOVERNANCE_OPERATIONAL_FAIL_FAST_ENABLED: 'platform_governance_operational_fail_fast_enabled',
+        PLATFORM_GOVERNANCE_OPERATIONAL_PRODUCTION_PROFILES: 'platform_governance_operational_production_profiles',
+        PLATFORM_GOVERNANCE_OPERATIONAL_REQUIRE_POLICY_CONFIG_IN_ENFORCING_MODE: 'platform_governance_operational_require_policy_config_in_enforcing_mode',
+        PLATFORM_GOVERNANCE_OPERATIONAL_REQUIRE_FATAL_HANDLER_FAILURES_IN_PRODUCTION: 'platform_governance_operational_require_fatal_handler_failures_in_production',
+        PLATFORM_SECURITY_ENABLED: 'platform_security_enabled',
+        PLATFORM_SECURITY_SERVICE_ROLE_PRESET: 'platform_security_service_role_preset',
+        PLATFORM_SECURITY_AUTH_ENABLED: 'platform_security_auth_enabled',
+        PLATFORM_SECURITY_INTERNAL_TOKEN_ENABLED: 'platform_security_internal_token_enabled',
+        PLATFORM_SECURITY_JWT_SECRET: 'platform_security_jwt_secret',
+        PLATFORM_SECURITY_JWT_ISSUER: 'platform_security_jwt_issuer',
+        PLATFORM_SECURITY_JWT_AUDIENCE: 'platform_security_jwt_audience',
+        PLATFORM_SECURITY_GATEWAY_HEADER_ENABLED: 'platform_security_gateway_header_enabled',
+        PLATFORM_SECURITY_IP_GUARD_ENABLED: 'platform_security_ip_guard_enabled',
+        PLATFORM_SECURITY_IP_GUARD_TRUST_PROXY: 'platform_security_ip_guard_trust_proxy',
+        PLATFORM_SECURITY_ADMIN_ALLOW_CIDR: 'platform_security_admin_allow_cidr',
+        PLATFORM_SECURITY_ADMIN_ALLOW_CIDRS: 'platform_security_admin_allow_cidrs',
+        PLATFORM_SECURITY_INTERNAL_ALLOW_CIDR: 'platform_security_internal_allow_cidr',
+        PLATFORM_SECURITY_INTERNAL_ALLOW_CIDRS: 'platform_security_internal_allow_cidrs',
+        PLATFORM_SECURITY_RATE_LIMIT_ENABLED: 'platform_security_rate_limit_enabled',
+        PLATFORM_RESOURCE_ENABLED: 'platform_resource_enabled',
+        PLATFORM_RESOURCE_MODE: 'platform_resource_mode',
+        PLATFORM_RESOURCE_OPERATIONAL_FAIL_FAST_ENABLED: 'platform_resource_operational_fail_fast_enabled',
+        PLATFORM_RESOURCE_OPERATIONAL_PRODUCTION_PROFILES: 'platform_resource_operational_production_profiles',
+        PLATFORM_RESOURCE_REQUIRE_KIND_POLICIES_IN_PRODUCTION: 'platform_resource_require_kind_policies_in_production',
+        PLATFORM_RESOURCE_DOCUMENT_MAX_SIZE: 'platform_resource_document_max_size',
+        PLATFORM_RESOURCE_BLOCK_MAX_SIZE: 'platform_resource_block_max_size',
+        PLATFORM_RESOURCE_ATTACHMENT_MAX_SIZE: 'platform_resource_attachment_max_size',
+        DOCUMENTS_RESOURCE_STORAGE_ROOT: 'documents_resource_storage_root',
+        DOCUMENTS_RESOURCE_PURGE_GRACE_PERIOD: 'documents_resource_purge_grace_period',
+        DOCUMENTS_RESOURCE_PURGE_FIXED_DELAY_MS: 'documents_resource_purge_fixed_delay_ms',
+        DOCUMENTS_RESOURCE_RECONCILE_FIXED_DELAY_MS: 'documents_resource_reconcile_fixed_delay_ms'
     ]
     testLibraries = [
         springBootTest : 'org.springframework.boot:spring-boot-starter-test',
@@ -46,12 +95,14 @@ allprojects {
 
     repositories {
         mavenCentral()
-        maven {
-            name = 'GitHubPackages_platform_governance'
-            url = uri('https://maven.pkg.github.com/jho951/platform-governance')
-            credentials {
-                username = findProperty('githubPackagesUsername') ?: System.getenv('GITHUB_ACTOR')
-                password = findProperty('githubPackagesToken') ?: System.getenv('GITHUB_TOKEN')
+        ['platform-governance', 'platform-security', 'platform-resource', 'platform-integrations'].each { repoName ->
+            maven {
+                name = "GitHubPackages_${repoName.replace('-', '_')}"
+                url = uri("https://maven.pkg.github.com/jho951/${repoName}")
+                credentials {
+                    username = findProperty('githubPackagesUsername') ?: System.getenv('GITHUB_ACTOR')
+                    password = findProperty('githubPackagesToken') ?: findProperty('githubToken') ?: findProperty('ghToken') ?: System.getenv('GH_TOKEN') ?: System.getenv('GITHUB_TOKEN')
+                }
             }
         }
     }
@@ -65,6 +116,8 @@ subprojects {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:${rootProject.ext.resolvedSpringBootVersion}"
             mavenBom "io.github.jho951.platform:platform-governance-bom:${rootProject.ext.resolvedPlatformGovernanceVersion}"
+            mavenBom "io.github.jho951.platform:platform-security-bom:${rootProject.ext.resolvedPlatformSecurityVersion}"
+            mavenBom "io.github.jho951.platform:platform-resource-bom:${rootProject.ext.resolvedPlatformResourceVersion}"
         }
     }
 
@@ -87,9 +140,9 @@ subprojects {
         useJUnitPlatform()
     }
 
-    def runtimeEnv = rootProject.ext.runtimeEnvKeys
-        .findAll { rootProject.hasProperty(it) }
-        .collectEntries { [(it): rootProject.property(it).toString()] }
+    def runtimeEnv = rootProject.ext.runtimeEnvProperties
+        .findAll { envName, propertyName -> rootProject.hasProperty(propertyName) }
+        .collectEntries { envName, propertyName -> [(envName): rootProject.property(propertyName).toString()] }
 
     tasks.withType(Test).configureEach {
         if (!runtimeEnv.isEmpty()) {

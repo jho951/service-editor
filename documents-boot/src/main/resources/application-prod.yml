@@ -47,7 +47,62 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       show-details: never
+
+platform:
+  governance:
+    service-role-preset: ${PLATFORM_GOVERNANCE_SERVICE_ROLE_PRESET:RESOURCE_SERVICE}
+    audit:
+      service-name: ${PLATFORM_GOVERNANCE_AUDIT_SERVICE_NAME:documents-app}
+      environment: ${PLATFORM_GOVERNANCE_AUDIT_ENVIRONMENT:prod}
+    engine:
+      strict: ${PLATFORM_GOVERNANCE_ENGINE_STRICT:true}
+    violation:
+      handler-failure-fatal: ${PLATFORM_GOVERNANCE_VIOLATION_HANDLER_FAILURE_FATAL:true}
+    operational:
+      require-policy-config-in-enforcing-mode: ${PLATFORM_GOVERNANCE_OPERATIONAL_REQUIRE_POLICY_CONFIG_IN_ENFORCING_MODE:false}
+  security:
+    service-role-preset: ${PLATFORM_SECURITY_SERVICE_ROLE_PRESET:API_SERVER}
+    ip-guard:
+      enabled: ${PLATFORM_SECURITY_IP_GUARD_ENABLED:true}
+      trust-proxy: ${PLATFORM_SECURITY_IP_GUARD_TRUST_PROXY:true}
+      admin:
+        rules: ${PLATFORM_SECURITY_ADMIN_ALLOW_CIDRS:${PLATFORM_SECURITY_ADMIN_ALLOW_CIDR:10.0.0.0/8}}
+      internal:
+        rules: ${PLATFORM_SECURITY_INTERNAL_ALLOW_CIDRS:${PLATFORM_SECURITY_INTERNAL_ALLOW_CIDR:10.0.0.0/8}}
+    rate-limit:
+      enabled: ${PLATFORM_SECURITY_RATE_LIMIT_ENABLED:true}
+  resource:
+    mode: ${PLATFORM_RESOURCE_MODE:production}
+    operational:
+      require-kind-policies-in-production: true
+    jdbc:
+      initialize-schema: ${PLATFORM_RESOURCE_JDBC_INITIALIZE_SCHEMA:false}
+      catalog-table: ${PLATFORM_RESOURCE_JDBC_CATALOG_TABLE:platform_resource_catalog}
+      outbox-table: ${PLATFORM_RESOURCE_JDBC_OUTBOX_TABLE:platform_resource_outbox}
+    kinds:
+      document-snapshot:
+        allowed-content-types: [application/json]
+        max-size: ${PLATFORM_RESOURCE_DOCUMENT_SNAPSHOT_MAX_SIZE:${PLATFORM_RESOURCE_DOCUMENT_MAX_SIZE:5MB}}
+        access-mode: OWNER_OR_ADMIN
+        delete-mode: SOFT
+        notification-mode: OUTBOX
+      editor-attachment:
+        allowed-content-types: [image/png, image/jpeg, image/webp, application/pdf]
+        max-size: ${PLATFORM_RESOURCE_ATTACHMENT_MAX_SIZE:20MB}
+        access-mode: OWNER_OR_ADMIN
+        delete-mode: SOFT
+        notification-mode: OUTBOX
+    storage:
+      root-directory: ${DOCUMENTS_RESOURCE_STORAGE_ROOT:/var/lib/documents/resources}
+
+documents:
+  resource:
+    purge-grace-period: ${DOCUMENTS_RESOURCE_PURGE_GRACE_PERIOD:PT24H}
+    purge:
+      fixed-delay-ms: ${DOCUMENTS_RESOURCE_PURGE_FIXED_DELAY_MS:60000}
+    reconcile:
+      fixed-delay-ms: ${DOCUMENTS_RESOURCE_RECONCILE_FIXED_DELAY_MS:3600000}

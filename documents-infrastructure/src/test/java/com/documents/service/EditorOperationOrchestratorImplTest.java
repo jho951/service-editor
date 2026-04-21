@@ -65,6 +65,15 @@ class EditorOperationOrchestratorImplTest {
     @Mock
     private PersistenceContextManager persistenceContextManager;
 
+    @Mock
+    private DocumentResourceBindingService documentResourceBindingService;
+
+    @Mock
+    private DocumentAccessGuard documentAccessGuard;
+
+    @Mock
+    private BlockAccessGuard blockAccessGuard;
+
     private EditorOperationOrchestratorImpl editorOperationOrchestrator;
 
     @BeforeEach
@@ -74,7 +83,8 @@ class EditorOperationOrchestratorImplTest {
                 documentRepository,
                 documentVersionUpdater,
                 new TextNormalizer(),
-                new OrderedSortKeyGenerator()
+                new OrderedSortKeyGenerator(),
+                documentResourceBindingService
         ) {
             @Override
             public Block create(
@@ -119,10 +129,18 @@ class EditorOperationOrchestratorImplTest {
                 new EditorSaveOperationExecutor(editorBlockService, persistenceContextManager),
                 new EditorMoveResultMapper(),
                 documentVersionUpdater,
-                persistenceContextManager
+                persistenceContextManager,
+                documentAccessGuard,
+                blockAccessGuard
         );
         lenient().when(documentService.getById(any(UUID.class)))
                 .thenAnswer(invocation -> document(invocation.getArgument(0), 0));
+        lenient().when(documentAccessGuard.requireReadable(any(UUID.class), anyString()))
+                .thenAnswer(invocation -> document(invocation.getArgument(0), 0));
+        lenient().when(documentAccessGuard.requireWritable(any(UUID.class), anyString()))
+                .thenAnswer(invocation -> document(invocation.getArgument(0), 0));
+        lenient().when(blockAccessGuard.requireWritable(any(UUID.class), anyString()))
+                .thenAnswer(invocation -> block(invocation.getArgument(0), UUID.randomUUID(), "000000000001000000000000", 0));
         lenient().when(documentVersionUpdater.increment(any(UUID.class), anyString(), any(LocalDateTime.class)))
                 .thenAnswer(invocation -> document(invocation.getArgument(0), 1));
     }

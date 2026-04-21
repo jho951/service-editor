@@ -49,6 +49,9 @@ class BlockServiceImplTest {
     @Mock
     private DocumentVersionUpdater documentVersionUpdater;
 
+    @Mock
+    private DocumentResourceBindingService documentResourceBindingService;
+
     private BlockServiceImpl blockService;
 
     @BeforeEach
@@ -58,7 +61,8 @@ class BlockServiceImplTest {
                 documentRepository,
                 documentVersionUpdater,
                 textNormalizer,
-                new OrderedSortKeyGenerator()
+                new OrderedSortKeyGenerator(),
+                documentResourceBindingService
         );
     }
 

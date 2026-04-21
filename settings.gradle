@@ -1,11 +1,11 @@
 pluginManagement {
     plugins {
-        id 'org.springframework.boot' version settings.providers.gradleProperty('springBootVersion').orElse('3.4.10').get()
-        id 'io.spring.dependency-management' version settings.providers.gradleProperty('springDependencyManagementVersion').orElse('1.1.6').get()
+        id 'org.springframework.boot' version settings.providers.gradleProperty('spring_boot_version').orElse('3.4.10').get()
+        id 'io.spring.dependency-management' version settings.providers.gradleProperty('spring_dependency_management_version').orElse('1.1.6').get()
     }
 }
 
-rootProject.name = 'Block-server'
+rootProject.name = 'editor-service'
 
 include 'documents-boot'
 include 'documents-api'

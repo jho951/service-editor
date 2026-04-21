@@ -1,6 +1,6 @@
 package com.documents.domain;
 
-import com.documents.common.BaseEntity;
+import com.documents.common.BaseAuditableEntity;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,17 +13,16 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Builder.Default;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
@@ -31,11 +30,11 @@ import org.hibernate.annotations.OnDeleteAction;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@SuperBuilder
 @ToString(callSuper = true)
 @Entity
 @Table(name = "documents")
-public class Document extends BaseEntity {
+public class Document extends BaseAuditableEntity {
 
     @Id
     @Column(name = "document_id", nullable = false, updatable = false, columnDefinition = "char(36)")
@@ -72,15 +71,6 @@ public class Document extends BaseEntity {
 
     @Column(name = "sort_key", nullable = false, length = 255)
     private String sortKey;
-
-    @Column(name = "created_by", length = 64)
-    private String createdBy;
-
-    @Column(name = "updated_by", length = 64)
-    private String updatedBy;
-
-    @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
 
     public UUID getParentId() {
         return parent == null ? null : parent.getId();

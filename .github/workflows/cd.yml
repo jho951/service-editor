@@ -1,0 +1,185 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: Deployment environment.
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: cd-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CONTRACT_REPO: https://github.com/jho951/service-contract
+  SERVICE_NAME: editor-service
+  CD_PROFILE: ec2-compose
+  IMAGE_URI: ghcr.io/${{ github.repository }}
+  IMAGE_BUILD_COMMAND: |
+    docker build \
+      -f docker/Dockerfile \
+      -t "${IMAGE_URI}:${GITHUB_SHA}" \
+      .
+    docker push "${IMAGE_URI}:${GITHUB_SHA}"
+    if [ "${GITHUB_REF_NAME}" = "dev" ] || [ "${GITHUB_REF_NAME}" = "main" ]; then
+      docker tag "${IMAGE_URI}:${GITHUB_SHA}" "${IMAGE_URI}:latest"
+      docker push "${IMAGE_URI}:latest"
+    fi
+  COMPOSE_CONFIG_COMMAND: |
+    docker compose -f docker/dev/compose.yml config >/tmp/editor-dev.yml
+    JWT_SECRET=ci-secret DOCUMENTS_SERVICE_HOST_BIND=127.0.0.1 docker compose -f docker/prod/compose.yml config >/tmp/editor-prod.yml
+  HEALTH_URL: http://127.0.0.1:8083/actuator/health
+  READY_URL: http://127.0.0.1:8083/actuator/health/readiness
+  GITHUB_ACTOR: ${{ github.actor }}
+  GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GH_TOKEN || secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN || github.token }}
+  GH_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN || secrets.GH_TOKEN || secrets.PACKAGES_TOKEN || secrets.GITHUB_TOKEN || github.token }}
+  DEPLOY_COMMAND: ${{ secrets.DEPLOY_COMMAND }}
+
+jobs:
+  deploy-gate:
+    name: Deploy Gate
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_environment: ${{ steps.target.outputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate contract lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f contract.lock.yml
+          grep -q "repo: ${CONTRACT_REPO}" contract.lock.yml
+          grep -q "name: ${SERVICE_NAME}" contract.lock.yml
+          grep -q "cd:" contract.lock.yml
+          grep -q "profile: ${CD_PROFILE}" contract.lock.yml
+
+      - name: Resolve target environment
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            target="${{ inputs.deploy_environment }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            target="prod"
+          else
+            target="dev"
+          fi
+          if [ "$target" = "prod" ] && [ "${{ github.ref_name }}" != "main" ] && [ "${{ github.ref_type }}" != "tag" ]; then
+            echo "Production deploy requires main branch or a tag."
+            exit 1
+          fi
+          echo "environment=$target" >> "$GITHUB_OUTPUT"
+
+  image:
+    name: Image
+    runs-on: ubuntu-latest
+    needs: deploy-gate
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        if: ${{ env.IMAGE_BUILD_COMMAND != 'skip' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        if: ${{ env.IMAGE_BUILD_COMMAND != 'skip' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ${{ env.IMAGE_BUILD_COMMAND }}
+
+      - name: Skip image publish
+        if: ${{ env.IMAGE_BUILD_COMMAND == 'skip' }}
+        run: echo "No Docker image is produced for ${{ env.SERVICE_NAME }}."
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs:
+      - deploy-gate
+      - image
+    environment: ${{ needs.deploy-gate.outputs.deploy_environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Compose config
+        shell: bash
+        run: ${{ env.COMPOSE_CONFIG_COMMAND }}
+
+      - name: Deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Service: ${SERVICE_NAME}"
+          echo "Profile: ${CD_PROFILE}"
+          echo "Environment: ${{ needs.deploy-gate.outputs.deploy_environment }}"
+          echo "Image: ${IMAGE_URI}:${{ github.sha }}"
+          if [ -n "${DEPLOY_COMMAND}" ]; then
+            eval "${DEPLOY_COMMAND}"
+          else
+            echo "DEPLOY_COMMAND secret is not configured; image publish and compose validation completed."
+          fi
+
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Health check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_COMMAND}" ]; then
+            echo "DEPLOY_COMMAND is not configured; skipping remote health check."
+            exit 0
+          fi
+          case "${HEALTH_URL}" in
+            http*) curl --fail --retry 12 --retry-delay 5 "${HEALTH_URL}" ;;
+            *) echo "Runtime health command: ${HEALTH_URL}" ;;
+          esac
+
+  smoke-test:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    needs: health-check
+    steps:
+      - name: Smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_COMMAND}" ]; then
+            echo "DEPLOY_COMMAND is not configured; skipping remote smoke test."
+            exit 0
+          fi
+          case "${READY_URL}" in
+            http*) curl --fail --retry 12 --retry-delay 5 "${READY_URL}" ;;
+            *) echo "Runtime smoke command: ${READY_URL}" ;;
+          esac

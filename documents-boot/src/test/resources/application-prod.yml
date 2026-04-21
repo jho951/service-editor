@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: documents-app
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+platform:
+  governance:
+    service-role-preset: RESOURCE_SERVICE
+    audit:
+      service-name: documents-app
+      environment: prod
+    engine:
+      strict: true
+    violation:
+      handler-failure-fatal: true
+    operational:
+      require-policy-config-in-enforcing-mode: false

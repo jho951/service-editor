@@ -1,0 +1,63 @@
+name: documents-service-dev
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: documents-mysql-dev
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-documentsdb}
+      MYSQL_USER: ${MYSQL_USER:-documents}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-documents}
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - mysql_data_dev:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - documents-private
+
+  documents-service:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+    container_name: documents-app-dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SERVER_PORT: ${SERVER_PORT:-8083}
+      DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/documentsdb?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul}
+      DB_USERNAME: ${DB_USERNAME:-documents}
+      DB_PASSWORD: ${DB_PASSWORD:-documents}
+      JWT_SECRET: ${JWT_SECRET:-dev_secret}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50}
+    env_file:
+      - path: ../../.env.dev
+        required: false
+      - path: ../../.env
+        required: false
+    restart: always
+    networks:
+      documents-private: {}
+      service-shared:
+        aliases:
+          - documents-service
+
+volumes:
+  mysql_data_dev:
+
+networks:
+  documents-private:
+    driver: bridge
+    internal: true
+  service-shared:
+    external: true
+    name: ${SERVICE_SHARED_NETWORK:-service-backbone-shared}

@@ -11,3 +11,7 @@ spring:
   sql:
     init:
       mode: never
+
+platform:
+  resource:
+    mode: local

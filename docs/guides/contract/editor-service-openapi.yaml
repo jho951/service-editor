@@ -1,0 +1,1247 @@
+openapi: 3.0.3
+info:
+  title: Editor Service API
+  version: 1.0.0
+  description: |
+    editor-service가 현재 제공하는 HTTP API 문서입니다.
+    문서 CRUD, editor operation, block attachment, document snapshot, admin block 보조 API를 하나의 OpenAPI 문서로 정리합니다.
+servers:
+  - url: http://documents-app:8083
+tags:
+  - name: Document
+  - name: EditorOperation
+  - name: BlockAttachment
+  - name: DocumentSnapshot
+  - name: AdminBlock
+paths:
+  /documents:
+    get:
+      tags: [Document]
+      summary: Get my documents
+      operationId: getDocuments
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Documents fetched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      tags: [Document]
+      summary: Create document
+      operationId: createDocument
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '201':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+  /documents/trash:
+    get:
+      tags: [Document]
+      summary: Get my trash documents
+      operationId: getTrashDocuments
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Trash documents fetched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrashDocumentListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+  /documents/{documentId}:
+    get:
+      tags: [Document]
+      summary: Get document
+      operationId: getDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Document fetched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+    patch:
+      tags: [Document]
+      summary: Update document
+      operationId: updateDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+      responses:
+        '200':
+          description: Document updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+    delete:
+      tags: [Document]
+      summary: Hard delete document
+      operationId: deleteDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Document deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoidResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+  /documents/{documentId}/blocks:
+    get:
+      tags: [Document]
+      summary: Get document blocks
+      operationId: getBlocks
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Blocks fetched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockListResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+  /documents/{documentId}/visibility:
+    patch:
+      tags: [Document]
+      summary: Update document visibility
+      operationId: updateDocumentVisibility
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentVisibilityRequest'
+      responses:
+        '200':
+          description: Visibility updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+  /documents/{documentId}/trash:
+    patch:
+      tags: [Document]
+      summary: Move document to trash
+      operationId: trashDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Document trashed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoidResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+  /documents/{documentId}/restore:
+    post:
+      tags: [Document]
+      summary: Restore trashed document
+      operationId: restoreDocument
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Document restored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoidResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+  /documents/{documentId}/snapshots:
+    post:
+      tags: [DocumentSnapshot]
+      summary: Create document snapshot
+      operationId: createSnapshot
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '201':
+          description: Snapshot created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSnapshotResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+  /documents/{documentId}/snapshots/{snapshotId}:
+    get:
+      tags: [DocumentSnapshot]
+      summary: Get document snapshot metadata
+      operationId: getSnapshot
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/SnapshotId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Snapshot metadata fetched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentSnapshotResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/DocumentSnapshotNotFoundError'
+    delete:
+      tags: [DocumentSnapshot]
+      summary: Delete document snapshot
+      operationId: deleteSnapshot
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/SnapshotId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Snapshot deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoidResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/DocumentSnapshotNotFoundError'
+  /documents/{documentId}/snapshots/{snapshotId}/content:
+    get:
+      tags: [DocumentSnapshot]
+      summary: Download document snapshot
+      operationId: downloadSnapshot
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/SnapshotId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Snapshot content
+          content:
+            application/json:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/DocumentSnapshotNotFoundError'
+  /editor-operations/documents/{documentId}/save:
+    post:
+      tags: [EditorOperation]
+      summary: Save editor operations
+      operationId: saveEditorOperations
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditorSaveRequest'
+      responses:
+        '200':
+          description: Save applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditorSaveResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+  /editor-operations/move:
+    post:
+      tags: [EditorOperation]
+      summary: Move editor resource
+      operationId: moveEditorResource
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditorMoveOperationRequest'
+      responses:
+        '200':
+          description: Move applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditorMoveResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+  /blocks/{blockId}/attachments:
+    post:
+      tags: [BlockAttachment]
+      summary: Upload block attachment
+      operationId: uploadAttachment
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Attachment uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockAttachmentResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/BlockNotFoundError'
+  /blocks/{blockId}/attachments/{attachmentId}:
+    get:
+      tags: [BlockAttachment]
+      summary: Get block attachment metadata
+      operationId: getAttachment
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Attachment metadata fetched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockAttachmentResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/AttachmentNotFoundError'
+    delete:
+      tags: [BlockAttachment]
+      summary: Delete block attachment
+      operationId: deleteAttachment
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Attachment deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoidResponseEnvelope'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/AttachmentNotFoundError'
+  /blocks/{blockId}/attachments/{attachmentId}/content:
+    get:
+      tags: [BlockAttachment]
+      summary: Download block attachment
+      operationId: downloadAttachment
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+        - $ref: '#/components/parameters/AttachmentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Attachment content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/AttachmentNotFoundError'
+  /admin/documents/{documentId}/blocks:
+    post:
+      tags: [AdminBlock]
+      summary: Create block by admin helper API
+      operationId: createBlockByAdmin
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditorSaveRequest'
+      responses:
+        '200':
+          description: Block created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditorSaveResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/DocumentNotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+  /admin/blocks/{blockId}:
+    patch:
+      tags: [AdminBlock]
+      summary: Update block by admin helper API
+      operationId: updateBlockByAdmin
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditorSaveRequest'
+      responses:
+        '200':
+          description: Block updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditorSaveResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/BlockNotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+    delete:
+      tags: [AdminBlock]
+      summary: Delete block by admin helper API
+      operationId: deleteBlockByAdmin
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditorSaveRequest'
+      responses:
+        '200':
+          description: Block deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditorSaveResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/BlockNotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+  /admin/blocks/{blockId}/move:
+    post:
+      tags: [AdminBlock]
+      summary: Move block by admin helper API
+      operationId: moveBlockByAdmin
+      parameters:
+        - $ref: '#/components/parameters/BlockId'
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditorSaveRequest'
+      responses:
+        '200':
+          description: Block moved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditorSaveResponseEnvelope'
+        '400':
+          $ref: '#/components/responses/InvalidRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/BlockNotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+components:
+  parameters:
+    UserId:
+      name: X-User-Id
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Gateway 또는 platform security bridge가 주입한 사용자 ID입니다.
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: 요청 추적 ID입니다.
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BlockId:
+      name: blockId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AttachmentId:
+      name: attachmentId
+      in: path
+      required: true
+      schema:
+        type: string
+    SnapshotId:
+      name: snapshotId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    UnauthorizedError:
+      description: Missing authentication context
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    ForbiddenError:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    InvalidRequestError:
+      description: Invalid request or validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    ConflictError:
+      description: Conflict or rebalance required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    DocumentNotFoundError:
+      description: Document not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    BlockNotFoundError:
+      description: Block not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    AttachmentNotFoundError:
+      description: Attachment not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+    DocumentSnapshotNotFoundError:
+      description: Document snapshot not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponseEnvelope'
+  schemas:
+    JsonObject:
+      type: object
+      additionalProperties: true
+    DocumentVisibility:
+      type: string
+      enum:
+        - PRIVATE
+        - PUBLIC
+    BlockType:
+      type: string
+      enum:
+        - TEXT
+    CreateDocumentRequest:
+      type: object
+      required:
+        - title
+      properties:
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+          maxLength: 255
+          example: 프로젝트 개요
+        icon:
+          $ref: '#/components/schemas/JsonObject'
+        cover:
+          $ref: '#/components/schemas/JsonObject'
+    UpdateDocumentRequest:
+      type: object
+      required:
+        - title
+        - version
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          example: 수정된 프로젝트 개요
+        icon:
+          $ref: '#/components/schemas/JsonObject'
+        cover:
+          $ref: '#/components/schemas/JsonObject'
+        version:
+          type: integer
+          example: 3
+    UpdateDocumentVisibilityRequest:
+      type: object
+      required:
+        - visibility
+        - version
+      properties:
+        visibility:
+          $ref: '#/components/schemas/DocumentVisibility'
+        version:
+          type: integer
+          example: 3
+    BaseResponseFields:
+      type: object
+      properties:
+        version:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    DocumentResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponseFields'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            parentId:
+              type: string
+              format: uuid
+              nullable: true
+            title:
+              type: string
+            icon:
+              $ref: '#/components/schemas/JsonObject'
+            cover:
+              $ref: '#/components/schemas/JsonObject'
+            visibility:
+              $ref: '#/components/schemas/DocumentVisibility'
+            sortKey:
+              type: string
+              nullable: true
+            createdBy:
+              type: string
+              nullable: true
+            updatedBy:
+              type: string
+              nullable: true
+            deletedAt:
+              type: string
+              format: date-time
+              nullable: true
+    TrashDocumentResponse:
+      type: object
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        deletedAt:
+          type: string
+          format: date-time
+        purgeAt:
+          type: string
+          format: date-time
+    BlockResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponseFields'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            documentId:
+              type: string
+              format: uuid
+            parentId:
+              type: string
+              format: uuid
+              nullable: true
+            type:
+              $ref: '#/components/schemas/BlockType'
+            content:
+              $ref: '#/components/schemas/JsonObject'
+            sortKey:
+              type: string
+            createdBy:
+              type: string
+              nullable: true
+            updatedBy:
+              type: string
+              nullable: true
+            deletedAt:
+              type: string
+              format: date-time
+              nullable: true
+    BlockAttachmentResponse:
+      type: object
+      properties:
+        attachmentId:
+          type: string
+        blockId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        originalName:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+          format: int64
+        status:
+          type: string
+          example: ACTIVE
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+    DocumentSnapshotResponse:
+      type: object
+      properties:
+        snapshotId:
+          type: string
+        documentId:
+          type: string
+          format: uuid
+        documentVersion:
+          type: integer
+          format: int64
+        originalName:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+          format: int64
+        status:
+          type: string
+          example: ACTIVE
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+    EditorSaveRequest:
+      type: object
+      required:
+        - clientId
+        - batchId
+        - operations
+      properties:
+        clientId:
+          type: string
+          example: web-editor
+        batchId:
+          type: string
+          example: batch-20260421-001
+        operations:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/EditorSaveOperationRequest'
+    EditorSaveOperationRequest:
+      type: object
+      required:
+        - opId
+        - type
+      properties:
+        opId:
+          type: string
+          example: op-1
+        type:
+          $ref: '#/components/schemas/EditorSaveOperationType'
+        blockRef:
+          type: string
+          nullable: true
+          description: temp block이면 tempId, 기존 block이면 blockId입니다.
+        version:
+          type: integer
+          format: int64
+          nullable: true
+        content:
+          $ref: '#/components/schemas/JsonObject'
+        parentRef:
+          type: string
+          nullable: true
+        afterRef:
+          type: string
+          nullable: true
+        beforeRef:
+          type: string
+          nullable: true
+    EditorSaveOperationType:
+      type: string
+      enum:
+        - BLOCK_CREATE
+        - BLOCK_REPLACE_CONTENT
+        - BLOCK_MOVE
+        - BLOCK_DELETE
+    EditorSaveOperationStatus:
+      type: string
+      enum:
+        - APPLIED
+        - NO_OP
+    EditorSaveAppliedOperationResponse:
+      type: object
+      properties:
+        opId:
+          type: string
+        status:
+          $ref: '#/components/schemas/EditorSaveOperationStatus'
+        tempId:
+          type: string
+          nullable: true
+        blockId:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+          format: int64
+          nullable: true
+        sortKey:
+          type: string
+          nullable: true
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+    EditorSaveResponse:
+      type: object
+      properties:
+        documentId:
+          type: string
+          format: uuid
+        documentVersion:
+          type: integer
+          format: int64
+        batchId:
+          type: string
+        appliedOperations:
+          type: array
+          items:
+            $ref: '#/components/schemas/EditorSaveAppliedOperationResponse'
+    EditorMoveResourceType:
+      type: string
+      enum:
+        - DOCUMENT
+        - BLOCK
+    EditorMoveOperationRequest:
+      type: object
+      required:
+        - resourceType
+        - resourceId
+      properties:
+        resourceType:
+          $ref: '#/components/schemas/EditorMoveResourceType'
+        resourceId:
+          type: string
+          format: uuid
+        targetParentId:
+          type: string
+          format: uuid
+          nullable: true
+        afterId:
+          type: string
+          format: uuid
+          nullable: true
+        beforeId:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+          format: int64
+          nullable: true
+          description: BLOCK 이동일 때 필수입니다.
+    EditorMoveResponse:
+      type: object
+      properties:
+        resourceType:
+          $ref: '#/components/schemas/EditorMoveResourceType'
+        resourceId:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+          format: int64
+          nullable: true
+        documentVersion:
+          type: integer
+          format: int64
+          nullable: true
+        sortKey:
+          type: string
+          nullable: true
+    VoidResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+          example: OK
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 요청 응답 성공
+        code:
+          type: integer
+          example: 200
+        data:
+          nullable: true
+    DocumentResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+          example: OK
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 요청 응답 성공
+        code:
+          type: integer
+          example: 200
+        data:
+          $ref: '#/components/schemas/DocumentResponse'
+    DocumentListResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+        success:
+          type: boolean
+        message:
+          type: string
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentResponse'
+    TrashDocumentListResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+        success:
+          type: boolean
+        message:
+          type: string
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrashDocumentResponse'
+    BlockListResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+        success:
+          type: boolean
+        message:
+          type: string
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BlockResponse'
+    BlockAttachmentResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+          example: CREATED
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 리소스 생성 성공
+        code:
+          type: integer
+          example: 201
+        data:
+          $ref: '#/components/schemas/BlockAttachmentResponse'
+    DocumentSnapshotResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+        success:
+          type: boolean
+        message:
+          type: string
+        code:
+          type: integer
+        data:
+          $ref: '#/components/schemas/DocumentSnapshotResponse'
+    EditorSaveResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+          example: OK
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 요청 응답 성공
+        code:
+          type: integer
+          example: 200
+        data:
+          $ref: '#/components/schemas/EditorSaveResponse'
+    EditorMoveResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+          example: OK
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: 요청 응답 성공
+        code:
+          type: integer
+          example: 200
+        data:
+          $ref: '#/components/schemas/EditorMoveResponse'
+    ErrorResponseEnvelope:
+      type: object
+      properties:
+        httpStatus:
+          type: string
+          example: FORBIDDEN
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: 요청을 수행할 권한이 없습니다.
+        code:
+          type: integer
+          example: 9003
+        data:
+          nullable: true

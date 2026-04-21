@@ -1,4 +1,5 @@
 dependencies {
     api "jakarta.persistence:jakarta.persistence-api:${rootProject.ext.resolvedJakartaPersistenceVersion}"
     api 'org.hibernate.orm:hibernate-core'
+    api 'org.springframework.data:spring-data-jpa'
 }

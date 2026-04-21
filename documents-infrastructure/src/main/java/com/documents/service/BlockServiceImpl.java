@@ -37,6 +37,7 @@ public class BlockServiceImpl implements BlockService {
     private final DocumentVersionUpdater documentVersionUpdater;
     private final TextNormalizer textNormalizer;
     private final OrderedSortKeyGenerator orderedSortKeyGenerator;
+    private final DocumentResourceBindingService documentResourceBindingService;
 
     @Override
     @Transactional(readOnly = true)
@@ -204,6 +205,7 @@ public class BlockServiceImpl implements BlockService {
         rootBlock.setUpdatedAt(deletedAt);
         rootBlock.setUpdatedBy(normalizedActorId);
         rootBlock.setVersion(version + 1);
+        documentResourceBindingService.scheduleAttachmentBindingsForPurge(blockIdsToDelete, normalizedActorId);
         if (DocumentVersionIncrementContext.shouldIncrement()) {
             incrementActiveDocumentVersion(rootBlock.getDocumentId(), normalizedActorId, deletedAt);
         }

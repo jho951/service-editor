@@ -32,10 +32,13 @@ public class EditorOperationOrchestratorImpl implements EditorOperationOrchestra
     private final EditorMoveResultMapper editorMoveResultMapper;
     private final DocumentVersionUpdater documentVersionUpdater;
     private final PersistenceContextManager persistenceContextManager;
+    private final DocumentAccessGuard documentAccessGuard;
+    private final BlockAccessGuard blockAccessGuard;
 
     @Override
     @Transactional
     public EditorSaveResult save(UUID documentId, EditorSaveCommand command, String actorId) {
+        documentAccessGuard.requireWritable(documentId, actorId);
         Document document = documentService.getById(documentId);
         EditorSaveContext context = new EditorSaveContext();
         List<EditorSaveAppliedOperationResult> appliedOperations = command.operations().stream()
@@ -64,6 +67,7 @@ public class EditorOperationOrchestratorImpl implements EditorOperationOrchestra
     }
 
     private EditorMoveResult moveDocument(EditorMoveCommand command, String actorId) {
+        documentAccessGuard.requireWritable(command.resourceId(), actorId);
         Document movedDocument = documentService.move(
                 command.resourceId(),
                 command.targetParentId(),
@@ -76,6 +80,7 @@ public class EditorOperationOrchestratorImpl implements EditorOperationOrchestra
     }
 
     private EditorMoveResult moveBlock(EditorMoveCommand command, String actorId) {
+        blockAccessGuard.requireWritable(command.resourceId(), actorId);
         Block block = blockService.getById(command.resourceId());
         UUID documentId = block.getDocumentId();
 

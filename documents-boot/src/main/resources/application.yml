@@ -16,6 +16,7 @@ spring:
 platform:
   governance:
     enabled: ${PLATFORM_GOVERNANCE_ENABLED:true}
+    service-role-preset: ${PLATFORM_GOVERNANCE_SERVICE_ROLE_PRESET:RESOURCE_SERVICE}
     audit:
       enabled: ${PLATFORM_GOVERNANCE_AUDIT_ENABLED:true}
       service-name: ${PLATFORM_GOVERNANCE_AUDIT_SERVICE_NAME:${spring.application.name}}
@@ -35,3 +36,67 @@ platform:
       production-profiles: ${PLATFORM_GOVERNANCE_OPERATIONAL_PRODUCTION_PROFILES:prod}
       require-policy-config-in-enforcing-mode: ${PLATFORM_GOVERNANCE_OPERATIONAL_REQUIRE_POLICY_CONFIG_IN_ENFORCING_MODE:false}
       require-fatal-handler-failures-in-production: ${PLATFORM_GOVERNANCE_OPERATIONAL_REQUIRE_FATAL_HANDLER_FAILURES_IN_PRODUCTION:true}
+  security:
+    enabled: ${PLATFORM_SECURITY_ENABLED:true}
+    service-role-preset: ${PLATFORM_SECURITY_SERVICE_ROLE_PRESET:API_SERVER}
+    boundary:
+      public-paths:
+        - /health
+        - /actuator/health
+        - /actuator/health/**
+        - /v3/api-docs/**
+        - /swagger-ui/**
+        - /swagger-ui.html
+        - /favicon.ico
+        - /error
+      protected-paths:
+        - /documents/**
+        - /blocks/**
+        - /editor-operations/**
+      admin-paths:
+        - /admin/**
+      internal-paths:
+        - /internal/**
+    auth:
+      enabled: ${PLATFORM_SECURITY_AUTH_ENABLED:true}
+      default-mode: HYBRID
+      internal-token-enabled: ${PLATFORM_SECURITY_INTERNAL_TOKEN_ENABLED:true}
+      jwt-secret: ${JWT_SECRET:${PLATFORM_SECURITY_JWT_SECRET:change-this-in-prod}}
+      jwt-issuer: ${PLATFORM_SECURITY_JWT_ISSUER:auth-service}
+      jwt-audience: ${PLATFORM_SECURITY_JWT_AUDIENCE:documents-app}
+      gateway-header:
+        enabled: ${PLATFORM_SECURITY_GATEWAY_HEADER_ENABLED:true}
+    ip-guard:
+      enabled: ${PLATFORM_SECURITY_IP_GUARD_ENABLED:false}
+    rate-limit:
+      enabled: ${PLATFORM_SECURITY_RATE_LIMIT_ENABLED:false}
+  resource:
+    enabled: ${PLATFORM_RESOURCE_ENABLED:true}
+    mode: ${PLATFORM_RESOURCE_MODE:local}
+    operational:
+      fail-fast-enabled: ${PLATFORM_RESOURCE_OPERATIONAL_FAIL_FAST_ENABLED:true}
+      production-profiles: ${PLATFORM_RESOURCE_OPERATIONAL_PRODUCTION_PROFILES:prod}
+      require-kind-policies-in-production: ${PLATFORM_RESOURCE_REQUIRE_KIND_POLICIES_IN_PRODUCTION:true}
+    kinds:
+      document-snapshot:
+        allowed-content-types: [application/json]
+        max-size: ${PLATFORM_RESOURCE_DOCUMENT_SNAPSHOT_MAX_SIZE:${PLATFORM_RESOURCE_DOCUMENT_MAX_SIZE:5MB}}
+        access-mode: OWNER_OR_ADMIN
+        delete-mode: SOFT
+        notification-mode: OUTBOX
+      editor-attachment:
+        allowed-content-types: [image/png, image/jpeg, image/webp, application/pdf]
+        max-size: ${PLATFORM_RESOURCE_ATTACHMENT_MAX_SIZE:20MB}
+        access-mode: OWNER_OR_ADMIN
+        delete-mode: SOFT
+        notification-mode: OUTBOX
+    storage:
+      root-directory: ${DOCUMENTS_RESOURCE_STORAGE_ROOT:${java.io.tmpdir}/documents-platform-resources}
+
+documents:
+  resource:
+    purge-grace-period: ${DOCUMENTS_RESOURCE_PURGE_GRACE_PERIOD:PT24H}
+    purge:
+      fixed-delay-ms: ${DOCUMENTS_RESOURCE_PURGE_FIXED_DELAY_MS:60000}
+    reconcile:
+      fixed-delay-ms: ${DOCUMENTS_RESOURCE_RECONCILE_FIXED_DELAY_MS:3600000}

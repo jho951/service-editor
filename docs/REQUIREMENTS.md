@@ -114,6 +114,10 @@
 - 문서 휴지통 이동
 - 문서 restore
 - 문서 부모 변경(계층 이동)
+- 문서 스냅샷 생성
+- 문서 스냅샷 메타데이터 조회
+- 문서 스냅샷 다운로드
+- 문서 스냅샷 삭제
 
 ## 4.2 블록(Block)
 - 특정 문서의 블록 전체 조회
@@ -122,6 +126,10 @@
 - 텍스트 블록 삭제
 - 텍스트 블록 이동
 - 텍스트 블록 재정렬
+- 블록 첨부파일 업로드
+- 블록 첨부파일 메타데이터 조회
+- 블록 첨부파일 다운로드
+- 블록 첨부파일 삭제
 
 ## 4.3 현재 지원 블록 타입
 - `TEXT`
@@ -156,7 +164,7 @@
 - presence
 - CRDT / OT
 - 검색 엔진 연동
-- 첨부 자산(asset) 저장
+- 이미지/파일 블록 타입과 본문 inline 첨부 객체
 
 ---
 
@@ -537,6 +545,27 @@ Block {
 4. 다른 사용자가 공개 상태를 `PRIVATE`에서 `PUBLIC`으로 바꿔도 문서 전체 상태가 바뀌므로 `Document.version`은 다시 `13`이 된다.
 5. 반대로 같은 공개 상태를 다시 요청하거나 실제 위치가 바뀌지 않는 block move처럼 no-op이면 `Document.version`은 유지된다.
 6. 프론트는 자신이 보관한 기준값과 최신 응답의 `Document.version`이 다르면 현재 화면을 stale 상태로 판단할 수 있어야 한다.
+
+## 8.12 블록 첨부파일
+### 요구사항
+- 사용자는 특정 블록 경로 아래에서 첨부파일을 업로드할 수 있어야 한다.
+- 첨부파일 저장, 메타데이터 관리, lifecycle event 발행은 `platform-resource`가 담당해야 한다.
+- 블록 서비스는 S3, 로컬 파일 시스템, 알림 발행기 같은 저장소 세부 구현을 직접 조립하지 않아야 한다.
+- 첨부파일 메타데이터 조회와 다운로드는 `blockId` 경로와 리소스 메타데이터의 소속 블록이 일치할 때만 성공해야 한다.
+- 다른 블록 경로로 같은 첨부파일을 조회하면 `404 Not Found`를 반환해야 한다.
+- 첨부파일 삭제 후에는 같은 사용자라도 재조회와 재다운로드가 되지 않아야 한다.
+- 리소스 업로드/삭제 lifecycle 감사는 `platform-resource-governance-bridge`를 통해 거버넌스로 전달되어야 한다.
+
+## 8.13 문서 스냅샷
+### 요구사항
+- 사용자는 특정 문서의 현재 상태를 JSON 스냅샷 blob으로 생성할 수 있어야 한다.
+- 문서 스냅샷 저장, 메타데이터 관리, lifecycle event 발행은 `platform-resource`가 담당해야 한다.
+- 문서 스냅샷은 문서 메타데이터와 현재 활성 블록 목록을 함께 포함해야 한다.
+- 문서 스냅샷 메타데이터에는 최소한 `documentId`, `documentVersion`이 포함되어야 한다.
+- 문서 스냅샷 조회와 다운로드는 경로의 `documentId`와 리소스 메타데이터의 소속 문서가 일치할 때만 성공해야 한다.
+- 다른 문서 경로로 같은 스냅샷을 조회하면 `404 Not Found`를 반환해야 한다.
+- 문서 스냅샷 삭제 후에는 같은 사용자라도 재조회와 재다운로드가 되지 않아야 한다.
+- 리소스 생성/삭제 lifecycle 감사는 `platform-resource-governance-bridge`를 통해 거버넌스로 전달되어야 한다.
 
 ---
 
@@ -1054,6 +1083,9 @@ TEXT 블록 생성.
 - 문자열 정규화, 포맷 변환, 직렬화/역직렬화, 정렬 키 포맷 계산처럼 재사용 가능한 기술성 로직은 별도 지원 컴포넌트로 분리해야 한다.
 - 현재 구조에서는 과도한 포트/어댑터 추상화보다, 기존 계층 구조를 유지한 채 모듈 내부 유틸/지원 클래스로 분리하는 단순한 설계를 우선한다.
 - Mapper는 입출력 모델 변환만 담당하고, JSON codec 등 파싱 세부사항은 별도 지원 객체에 위임해야 한다.
+- 문서와 블록의 감사 필드는 공통 auditable base entity에서 관리한다.
+- 감사 컬럼명은 `created_by`, `modified_by`, `deleted_at`을 사용한다.
+- API와 서비스 모델에서는 기존 `updatedBy` 표현을 유지하되, 저장 컬럼은 `modified_by`에 매핑한다.
 
 ## 15.4 테스트 배치 및 실행 원칙
 - 빠른 피드백을 위한 테스트 피라미드를 기본 전략으로 사용한다. 단위 테스트와 slice 테스트를 통합 테스트보다 더 많이 유지해야 한다.
@@ -1073,6 +1105,49 @@ TEXT 블록 생성.
 - `@Valid`, 경계값, 누락 필드, 잘못된 식별자 형식, 검색/필터 조건 분기, 정렬 조건, 예외 응답 구조를 빠른 테스트 우선으로 커버해야 한다.
 - 테스트 커버리지는 장기적으로 라인/브랜치 기준 `80%` 이상을 목표로 하되, 신규 기능은 변경 범위에 대해 우선적으로 높은 커버리지를 확보해야 한다.
 
+## 15.5 플랫폼 보안·거버넌스·리소스 운영 원칙
+- 실행 모듈은 `platform-governance` `2.0.1`, `platform-security` `2.0.3`, `platform-resource` `2.0.0` 조합을 기준으로 적용한다.
+- 실행 모듈은 `platform-governance-starter`, `platform-security-starter`, `platform-security-web`, `platform-resource-starter`를 함께 사용하고, API 모듈은 웹 계층에서 필요한 `platform-governance-api` 계약만 직접 의존한다.
+- 실행 모듈은 `platform-security-governance-bridge`와 `platform-resource-governance-bridge`를 함께 연결해 보안/리소스 판단과 거버넌스 감사 흐름을 통합한다.
+- `platform-security-governance-bridge`는 `1.0.1`, `platform-resource-governance-bridge`는 현재 가용한 `1.0.0` 기준으로 관리한다.
+- `document-service`는 문서와 블록 리소스를 소유하는 서비스이므로 플랫폼 거버넌스 역할을 `RESOURCE_SERVICE`로 두고, 플랫폼 보안 역할은 `API_SERVER`로 둔다.
+- `document-service`는 문서/블록 비즈니스 로직만 직접 구현하고, JWT 검증 체인 조립, 감사 로거 wiring, 파일 저장소 wiring, 리소스 lifecycle 감사 연결은 platform starter와 bridge에 맡겨야 한다.
+- 현재 서비스는 `user-123` 같은 문자열 사용자 식별자를 유지하므로, 실행 모듈은 `X-User-Id` 헤더를 Spring Security 인증 객체와 servlet principal로 연결하는 애플리케이션 bridge filter를 함께 둔다.
+- `@CurrentUserId`와 JPA auditing은 request attribute 우선, servlet principal 차선, `X-User-Id` 헤더 최후 순서로 현재 사용자 식별자를 해석한다.
+- 운영 프로필에서는 거버넌스 audit을 활성화하고, `service-name`, `environment`를 명시해야 한다.
+- 운영 프로필에서는 거버넌스 엔진을 strict 모드로 실행하고, violation handler 실패를 fatal로 처리해야 한다.
+- `platform.resource.mode`는 로컬 기본값을 `local`, 운영 기본값을 `production`으로 둔다.
+- 리소스 kind 정책은 `document-snapshot`, `editor-attachment` 두 종류를 기본값으로 관리한다.
+- 문서 자체 상태(`documents`, `blocks`, `blocks.content_json`)는 editor-service DB를 canonical source로 유지하고, 첨부파일, 에셋, export 결과물, snapshot 파일, import 원본 같은 외부 리소스만 `platform-resource`가 소유해야 한다.
+- 문서와 외부 리소스의 연결은 `document_resources` 참조 모델로 관리해야 하며, 문서 기준 연결은 필수, 블록 기준 연결은 선택으로 둔다.
+- `document_resources`는 live aggregate FK 테이블이 아니라 resource cleanup ledger로 다뤄야 하며, 문서/블록 FK cascade보다 정리 상태 추적을 우선해야 한다.
+- `document_resources`는 최소한 `resource_id`, `resource_kind`, `owner_user_id`, `usage_type`, `status`, `document_version`, `deleted_at`, `purge_at`, `last_error`, `repaired_at`을 관리해야 한다.
+- binding 상태는 `ACTIVE`, `TRASHED`, `PENDING_PURGE`, `PURGED`, `BROKEN` 기준으로 운영해야 한다.
+- 문서 스냅샷 API는 `document-snapshot` kind를 사용해 현재 문서 메타데이터와 활성 블록 목록을 JSON blob으로 보관해야 한다.
+- 문서 스냅샷 API는 `ResourceService` 공개 계약만 사용해 생성, 조회, 다운로드, 삭제를 수행하고, 문서 본문 저장 모델과 resource snapshot 모델을 분리해야 한다.
+- 문서 스냅샷 API는 public read에 열지 않고, 생성/조회/다운로드/삭제 전부 write 가능한 principal 기준으로만 허용해야 한다.
+- 블록 첨부파일 API는 `ResourceService` 공개 계약만 사용해 저장, 조회, 삭제를 수행하고, block 도메인과 resource 도메인의 경계를 분리해야 한다.
+- 문서를 휴지통으로 이동할 때는 연결된 attachment와 snapshot을 즉시 삭제하지 않고 유지해야 하며, 문서 복구 시 기존 연결을 그대로 사용할 수 있어야 한다.
+- 문서 휴지통 이동 시 binding은 `TRASHED`, 문서 복구 시 `ACTIVE`로 되돌려야 한다.
+- 문서 hard delete와 block delete는 resource를 즉시 hard purge하지 않고 `resourceService.delete(...)`로 soft delete 처리한 뒤 binding을 `PENDING_PURGE`로 전환하고 purge grace period를 예약해야 한다.
+- attachment와 snapshot cleanup은 block delete, document hard delete, trash 만료 후 purge 같은 영구 정리 경로에서만 수행해야 한다.
+- 문서/블록 읽기와 쓰기 경로는 `DocumentAccessGuard`, `BlockAccessGuard`를 통해 현재 요청자의 소유권과 공개 여부를 먼저 검증해야 한다.
+- 비공개 문서의 쓰기 권한은 owner 또는 admin만 허용하고, 읽기 권한은 owner 또는 admin만 허용한다. 공개 문서(`DocumentVisibility.PUBLIC`)는 읽기만 추가 허용한다.
+- 에디터 협업 write 경계는 `EditorOperationController` 아래 `save`, `move` endpoint로 유지하고, 각 경로는 접근 guard 검증 뒤 `EditorOperationOrchestrator`가 문서/블록 서비스 호출을 조율해야 한다.
+- resource owner는 현재 작업자(actor)가 아니라 문서 owner 기준으로 결정하고, resource principal은 현재 요청자의 `SecurityContext` identity와 role 기준으로 생성해야 한다.
+- 블록 첨부파일과 문서 스냅샷은 `platform-resource` 호출 전에 `document_resources` 활성 참조를 먼저 확인해 문서/블록 경로와 리소스 소속 관계를 검증해야 한다.
+- 현재 조합에서는 `platform-governance`, `platform-resource`, `platform-policy`가 `operationalProfileResolver` 타입을 나눠 가지므로, 실행 모듈은 세 계약을 함께 구현하는 공유 resolver bean을 직접 등록해 starter auto-configuration 충돌 없이 공통 런타임을 사용해야 한다.
+- resource lifecycle notification이 `OUTBOX`이면 실행 모듈은 `DocumentsResourceLifecycleRelay` 같은 relay 작업으로 pending outbox를 publisher로 전달하고, 성공/실패 상태를 갱신해야 한다.
+- 리소스 저장, `document_resources` 참조 저장, lifecycle 전달은 단일 XA 트랜잭션으로 보지 않고 로컬 DB 트랜잭션과 `OUTBOX` relay 기준으로 운영해야 한다.
+- 실행 모듈은 `DocumentsResourcePurgeScheduler`로 `PENDING_PURGE` binding을 실제 purge하고, `DocumentsResourceReconcileScheduler`로 binding과 catalog drift를 주기적으로 점검해야 한다.
+- 실행 모듈은 `resource-migration` 같은 전용 profile에서 `DocumentsResourceBackfillRunner`를 단발성으로 실행할 수 있어야 한다.
+- reconcile job은 catalog는 있는데 binding이 없는 managed resource를 안전한 경우에만 재생성하고, binding은 있는데 catalog가 없는 경우는 `BROKEN`으로 전환해 수동 점검 대상으로 남겨야 한다.
+- resource purge grace period는 문서 trash retention과 별도 설정으로 관리해야 한다.
+- dev/test 프로필은 JPA DDL 자동 생성으로 로컬 반영을 허용할 수 있지만, 운영 프로필은 `ddl-auto=none`과 `platform.resource.jdbc.initialize-schema=false`를 기준으로 기존 구조를 고려하지 않고 새 스키마로 바로 교체 적용해야 한다.
+- 운영 반영은 `document_resources`, `platform_resource_catalog`, `platform_resource_outbox`를 새 기준으로 직접 생성하는 방식으로 처리하고, kind rename, binding backfill, 레거시 데이터 이행 절차는 두지 않는다.
+- platform security가 인증/인가 실패를 반환할 때도 기존 API 계약을 유지하도록 `GlobalResponse` 공통 응답 포맷을 사용해야 한다.
+- 현재 서비스 로컬 정책 플러그인과 정책 설정 소스가 없으므로, 별도 정책 소스가 도입되기 전까지 `require-policy-config-in-enforcing-mode=false`를 유지한다.
+
 ---
 
 ## 16. 오픈 이슈
@@ -1084,7 +1159,7 @@ TEXT 블록 생성.
 3. 사용자 소셜 로그인 식별자 모델(`providerUserId`) 확정
 4. 향후 collaborative editing 도입 시 operations / snapshots / presence 모델 정의
 5. 검색 기능이 필요할 경우 별도 인덱싱 전략 수립
-6. 첨부 파일/이미지 업로드 도입 시 asset 모델 정의
+6. 이미지 블록/파일 블록 도입 시 본문 block 모델과 resource metadata 연결 방식 정의
 7. 링크, 멘션, inline code 등 추가 mark 타입의 schema 확장 정책 정의
 8. editor save conflict 응답에 최신 block `version`과 `content`를 직접 포함할지 여부
 

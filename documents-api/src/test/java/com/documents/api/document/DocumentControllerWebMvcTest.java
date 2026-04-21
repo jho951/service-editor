@@ -32,6 +32,7 @@ import com.documents.domain.DocumentVisibility;
 import com.documents.exception.BusinessErrorCode;
 import com.documents.exception.BusinessException;
 import com.documents.service.BlockService;
+import com.documents.service.DocumentAccessGuard;
 import com.documents.service.DocumentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -58,6 +59,9 @@ class DocumentControllerWebMvcTest {
 
 	@Mock
 	private DocumentService documentService;
+
+	@Mock
+	private DocumentAccessGuard documentAccessGuard;
 
 	private MockMvc mockMvc;
 
@@ -132,7 +136,8 @@ class DocumentControllerWebMvcTest {
 				blockService,
 				new BlockApiMapper(blockJsonCodec),
 				documentService,
-				new DocumentApiMapper(new DocumentJsonCodec(new ObjectMapper()))
+				new DocumentApiMapper(new DocumentJsonCodec(new ObjectMapper())),
+				documentAccessGuard
 			))
 				.setControllerAdvice(new GlobalExceptionHandler())
 				.setCustomArgumentResolvers(new CurrentUserIdArgumentResolver())
@@ -146,13 +151,15 @@ class DocumentControllerWebMvcTest {
 		UUID documentId = UUID.randomUUID();
 		UUID rootBlockId = UUID.randomUUID();
 		UUID childBlockId = UUID.randomUUID();
+        when(documentAccessGuard.requireReadable(documentId, ACTOR_ID))
+            .thenReturn(document(documentId, UUID.randomUUID(), null, ROOT_DOCUMENT_TITLE, ACTOR_ID, 0, "00000000000000000001", null, null));
 
 		when(blockService.getAllByDocumentId(documentId)).thenReturn(List.of(
 			block(rootBlockId, documentId, null, "000000000001000000000000", 0, ROOT_BLOCK_CONTENT_JSON),
 			block(childBlockId, documentId, rootBlockId, "000000000001I00000000000", 1, CHILD_BLOCK_CONTENT_JSON)
 		));
 
-		mockMvc.perform(get("/documents/{documentId}/blocks", documentId))
+		mockMvc.perform(get("/documents/{documentId}/blocks", documentId).header(USER_ID_HEADER, ACTOR_ID))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -381,14 +388,13 @@ class DocumentControllerWebMvcTest {
 	@DisplayName("성공_문서 단건 조회 요청에 대해 문서 응답을 반환한다")
 	void getDocumentReturnsEnvelope() throws Exception {
 		UUID documentId = UUID.randomUUID();
+        when(documentAccessGuard.requireReadable(documentId, ACTOR_ID))
+            .thenReturn(document(documentId, UUID.randomUUID(), null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 2,
+                "00000000000000000007",
+                ICON_DOC_JSON,
+                null));
 
-		when(documentService.getById(documentId))
-				.thenReturn(document(documentId, UUID.randomUUID(), null, PROJECT_OVERVIEW_TITLE, ACTOR_ID, 2,
-				"00000000000000000007",
-				ICON_DOC_JSON,
-				null));
-
-		mockMvc.perform(get("/documents/{documentId}", documentId))
+		mockMvc.perform(get("/documents/{documentId}", documentId).header(USER_ID_HEADER, ACTOR_ID))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.httpStatus").value("OK"))
 			.andExpect(jsonPath("$.success").value(true))
@@ -404,10 +410,10 @@ class DocumentControllerWebMvcTest {
 	@DisplayName("실패_존재하지 않는 문서 단건 조회는 리소스 없음 응답을 반환한다")
 	void getDocumentReturnsNotFoundWhenDocumentMissing() throws Exception {
 		UUID documentId = UUID.randomUUID();
-		when(documentService.getById(documentId))
+		when(documentAccessGuard.requireReadable(documentId, ACTOR_ID))
 			.thenThrow(new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
 
-		var result = mockMvc.perform(get("/documents/{documentId}", documentId));
+		var result = mockMvc.perform(get("/documents/{documentId}", documentId).header(USER_ID_HEADER, ACTOR_ID));
 
 		ApiResponseAssertions.assertErrorEnvelope(result, "NOT_FOUND", 9004, "요청한 문서를 찾을 수 없습니다.");
 	}

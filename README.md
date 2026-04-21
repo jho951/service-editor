@@ -4,8 +4,11 @@
 
 ## Contract Source
 
-- 공통 계약 레포: `https://github.com/jho951/contract`
-- 이 서비스의 코드 SoT: `Block-server` `dev`
+- 공통 계약 레포: `https://github.com/jho951/service-contract`
+- 계약 동기화 기준 파일: [contract.lock.yml](contract.lock.yml)
+- 계약 변경 절차: [contract-change-guideline.md](docs/guides/contract/contract-change-guideline.md)
+- 이 서비스의 코드 SoT: `editor-service` `dev`
+- PR에서는 `.github/workflows/contract-check.yml`이 lock 파일과 계약 영향 변경 여부를 검사합니다.
 - 인터페이스 변경 시 본 저장소 구현보다 계약 레포 변경을 먼저 반영합니다.
 
 ## 프로젝트 개요

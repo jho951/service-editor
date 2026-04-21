@@ -44,6 +44,9 @@ class DocumentServiceImplTest {
 	@Mock
 	private OrderedSortKeyGenerator orderedSortKeyGenerator;
 
+    @Mock
+    private DocumentResourceBindingService documentResourceBindingService;
+
 	@InjectMocks
 	private DocumentServiceImpl documentService;
 
@@ -450,12 +453,13 @@ class DocumentServiceImplTest {
 		UUID documentId = UUID.randomUUID();
 		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
 		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
+        when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
 
 		documentService.delete(documentId, " user-456 ");
 
 		verify(documentRepository).delete(targetDocument);
+        verify(documentResourceBindingService).scheduleDocumentBindingsForPurge(List.of(documentId), "user-456");
 		verifyNoInteractions(blockService);
-		verify(textNormalizer, never()).normalizeNullable(any());
 	}
 
 	@Test
@@ -493,10 +497,12 @@ class DocumentServiceImplTest {
 		UUID rootId = UUID.randomUUID();
 		Document rootDocument = document(rootId, UUID.randomUUID(), null, "루트 문서", "00000000000000000001");
 		when(documentRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootDocument));
+        when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
 		documentService.delete(rootId, ACTOR_ID);
 
 		verify(documentRepository).delete(rootDocument);
+        verify(documentResourceBindingService).scheduleDocumentBindingsForPurge(List.of(rootId), ACTOR_ID);
 		verify(documentRepository, never()).softDeleteActiveByIds(any(), any(), any());
 		verifyNoInteractions(blockService);
 	}

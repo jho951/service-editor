@@ -2,9 +2,28 @@ name: contract-check
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
+      - master
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CONTRACT_REPO: https://github.com/jho951/service-contract
+  SERVICE_NAME: editor-service
+  CONTRACT_IMPACT_REGEX: '(^documents-api/src/main/java/.*(Controller|Dto|Response|Error|Auth|Config|Audit).*\.java$)|(^documents-core/src/main/java/.*(Document|Block|Editor|Operation|Policy).*\.java$)|(^documents-boot/src/main/resources/.*\.(yml|yaml|properties)$)|(^docs/openapi/)|(^README\.md$)|(^contract\.lock\.yml$)'
 
 jobs:
-  contract-impact:
+  contract-lock:
+    name: Contract Lock
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -12,13 +31,55 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch base branch
-        run: git fetch origin ${{ github.base_ref }} --depth=1
-
-      - name: Run contract impact check
-        env:
-          SERVICE_NAME: block
+      - name: Validate contract lock
+        shell: bash
         run: |
-          curl -fsSL https://raw.githubusercontent.com/jho951/contract/main/scripts/contract-impact-check.sh -o /tmp/contract-impact-check.sh
-          chmod +x /tmp/contract-impact-check.sh
-          /tmp/contract-impact-check.sh "$SERVICE_NAME" "origin/${{ github.base_ref }}"
+          set -euo pipefail
+          test -f contract.lock.yml
+          grep -q "repo: ${CONTRACT_REPO}" contract.lock.yml
+          grep -q "name: ${SERVICE_NAME}" contract.lock.yml
+          grep -q "ref:" contract.lock.yml
+          grep -q "commit:" contract.lock.yml
+          grep -q "consumes:" contract.lock.yml
+          grep -q "contract_lock: true" contract.lock.yml
+          grep -q "ci:" contract.lock.yml
+          grep -q "cd:" contract.lock.yml
+
+      - name: Fetch contract source
+        shell: bash
+        run: |
+          set -euo pipefail
+          CONTRACT_REF="$(awk '/^[[:space:]]*ref:/ { print $2; exit }' contract.lock.yml)"
+          git clone --depth 1 --branch "$CONTRACT_REF" "$CONTRACT_REPO" .contract
+
+      - name: Verify consumed contract paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          awk '
+            /^[^[:space:]]/ { in_consumes = 0 }
+            /^[[:space:]]+consumes:/ { in_consumes = 1; next }
+            in_consumes && /^[[:space:]]+-[[:space:]]+/ {
+              sub(/^[[:space:]]+-[[:space:]]+/, "")
+              print
+            }
+          ' contract.lock.yml | while read -r path; do
+            case "$path" in
+              *"*"*) compgen -G ".contract/$path" > /dev/null ;;
+              *) test -e ".contract/$path" ;;
+            esac
+          done
+
+      - name: Detect contract impact
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" > changed-files.txt
+          if grep -Eq "${CONTRACT_IMPACT_REGEX}" changed-files.txt; then
+            if ! grep -qx "contract.lock.yml" changed-files.txt; then
+              echo "Contract-impacting files changed. Update contract.lock.yml or split contract changes first."
+              cat changed-files.txt
+              exit 1
+            fi
+          fi
