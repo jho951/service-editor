@@ -1,5 +1,5 @@
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT:8083}
 
 db:
   url: ${DB_URL_PROD:${DB_URL}}
