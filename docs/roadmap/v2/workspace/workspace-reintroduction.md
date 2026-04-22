@@ -9,7 +9,7 @@
 - 사용자 소유 문서와 Workspace 소속 문서 모델을 어떻게 분리할지 결정
 - `createdBy`와 문서 소유 필드(`ownerId` 또는 `workspaceId`) 분리 여부 검토
 - Workspace 생성/선택 화면과 로그인 직후 진입 UX 확정
-- Workspace 멤버십과 permission-service 연동 기준 확정
+- Workspace 멤버십과 authz-service 연동 기준 확정
 - 문서 단건/수정/삭제의 소유 검증과 권한 검증 책임 분리
 
 ## 운영 고려사항

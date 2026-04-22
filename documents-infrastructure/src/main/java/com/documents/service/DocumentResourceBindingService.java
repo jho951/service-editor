@@ -18,17 +18,12 @@ import io.github.jho951.platform.resource.api.ResourceStoreRequest;
 import io.github.jho951.platform.resource.api.ResourceService;
 import io.github.jho951.platform.resource.spi.ResourceCatalog;
 import io.github.jho951.platform.resource.spi.ResourceContentStore;
-import java.io.IOException;
-import java.io.StringReader;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -57,9 +52,7 @@ public class DocumentResourceBindingService {
     private final ResourceCatalog resourceCatalog;
     private final ResourceContentStore resourceContentStore;
     private final DocumentsResourcePrincipalFactory documentsResourcePrincipalFactory;
-    private final JdbcTemplate jdbcTemplate;
     private final Duration purgeGracePeriod;
-    private final String catalogTable;
 
     public DocumentResourceBindingService(
         DocumentResourceRepository documentResourceRepository,
@@ -67,18 +60,14 @@ public class DocumentResourceBindingService {
         ResourceCatalog resourceCatalog,
         ResourceContentStore resourceContentStore,
         DocumentsResourcePrincipalFactory documentsResourcePrincipalFactory,
-        JdbcTemplate jdbcTemplate,
-        @Value("${documents.resource.purge-grace-period:PT24H}") Duration purgeGracePeriod,
-        @Value("${platform.resource.jdbc.catalog-table:platform_resource_catalog}") String catalogTable
+        @Value("${documents.resource.purge-grace-period:PT24H}") Duration purgeGracePeriod
     ) {
         this.documentResourceRepository = documentResourceRepository;
         this.resourceService = resourceService;
         this.resourceCatalog = resourceCatalog;
         this.resourceContentStore = resourceContentStore;
         this.documentsResourcePrincipalFactory = documentsResourcePrincipalFactory;
-        this.jdbcTemplate = jdbcTemplate;
         this.purgeGracePeriod = purgeGracePeriod;
-        this.catalogTable = catalogTable;
     }
 
     @Transactional
@@ -231,27 +220,6 @@ public class DocumentResourceBindingService {
                 repairFromDescriptor(binding, descriptor.get(), now);
             }
         }
-
-        String sql = "select id, owner_id, kind, attributes, status from " + catalogTable
-            + " where kind in (?, ?)";
-
-        jdbcTemplate.query(sql, rs -> {
-            String resourceId = rs.getString("id");
-            if (documentResourceRepository.existsByResourceId(resourceId)) {
-                return;
-            }
-
-            Map<String, String> attributes = decodeAttributes(rs.getString("attributes"));
-            Optional<DocumentResource> recreatedBinding = recreateBinding(
-                resourceId,
-                rs.getString("kind"),
-                rs.getString("owner_id"),
-                rs.getString("status"),
-                attributes,
-                now
-            );
-            recreatedBinding.ifPresent(documentResourceRepository::save);
-        }, ATTACHMENT_KIND, SNAPSHOT_KIND);
     }
 
     private void saveBinding(DocumentResource binding) {
@@ -294,57 +262,6 @@ public class DocumentResourceBindingService {
         }
     }
 
-    private Optional<DocumentResource> recreateBinding(
-        String resourceId,
-        String kind,
-        String ownerUserId,
-        String resourceStatus,
-        Map<String, String> attributes,
-        LocalDateTime now
-    ) {
-        Optional<UUID> documentId = parseUuid(attributes.get("documentId"));
-        if (documentId.isEmpty()) {
-            return Optional.empty();
-        }
-
-        DocumentResourceUsageType usageType = resolveUsageType(kind);
-        if (usageType == null) {
-            return Optional.empty();
-        }
-
-        DocumentResourceStatus status = "DELETED".equalsIgnoreCase(resourceStatus)
-            ? DocumentResourceStatus.PENDING_PURGE
-            : DocumentResourceStatus.ACTIVE;
-
-        DocumentResource binding = DocumentResource.builder()
-            .id(UUID.randomUUID())
-            .documentId(documentId.get())
-            .blockId(parseUuid(attributes.get("blockId")).orElse(null))
-            .resourceId(resourceId)
-            .resourceKind(kind)
-            .ownerUserId(ownerUserId)
-            .usageType(usageType)
-            .documentVersion(parseLong(attributes.get("documentVersion")))
-            .status(status)
-            .purgeAt(status == DocumentResourceStatus.PENDING_PURGE ? now.plus(purgeGracePeriod) : null)
-            .deletedAt(status == DocumentResourceStatus.PENDING_PURGE ? now : null)
-            .createdBy(SYSTEM_ACTOR)
-            .updatedBy(SYSTEM_ACTOR)
-            .repairedAt(now)
-            .build();
-        return Optional.of(binding);
-    }
-
-    private DocumentResourceUsageType resolveUsageType(String kind) {
-        if (ATTACHMENT_KIND.equals(kind)) {
-            return DocumentResourceUsageType.BLOCK_ATTACHMENT;
-        }
-        if (SNAPSHOT_KIND.equals(kind)) {
-            return DocumentResourceUsageType.DOCUMENT_SNAPSHOT;
-        }
-        return null;
-    }
-
     private void markTrashed(DocumentResource binding, String actorId) {
         binding.setStatus(DocumentResourceStatus.TRASHED);
         binding.setUpdatedBy(normalizedActor(actorId));
@@ -376,48 +293,6 @@ public class DocumentResourceBindingService {
         binding.setRepairedAt(null);
         if (binding.getDeletedAt() == null && binding.getStatus() == DocumentResourceStatus.PENDING_PURGE) {
             binding.setDeletedAt(now);
-        }
-    }
-
-    private Map<String, String> decodeAttributes(String encodedAttributes) {
-        if (!StringUtils.hasText(encodedAttributes)) {
-            return Map.of();
-        }
-
-        try {
-            Properties properties = new Properties();
-            properties.load(new StringReader(encodedAttributes));
-            return properties.entrySet().stream()
-                .collect(java.util.stream.Collectors.toMap(
-                    entry -> entry.getKey().toString(),
-                    entry -> entry.getValue().toString()
-                ));
-        } catch (IOException ex) {
-            return Map.of();
-        }
-    }
-
-    private Optional<UUID> parseUuid(String rawValue) {
-        if (!StringUtils.hasText(rawValue)) {
-            return Optional.empty();
-        }
-
-        try {
-            return Optional.of(UUID.fromString(rawValue));
-        } catch (IllegalArgumentException ex) {
-            return Optional.empty();
-        }
-    }
-
-    private Long parseLong(String rawValue) {
-        if (!StringUtils.hasText(rawValue)) {
-            return null;
-        }
-
-        try {
-            return Long.parseLong(rawValue);
-        } catch (NumberFormatException ex) {
-            return null;
         }
     }
 

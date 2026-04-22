@@ -1,6 +1,6 @@
 spring:
   application:
-    name: documents-app
+    name: editor-service
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -9,7 +9,7 @@ platform:
   governance:
     service-role-preset: RESOURCE_SERVICE
     audit:
-      service-name: documents-app
+      service-name: editor-service
       environment: prod
     engine:
       strict: true

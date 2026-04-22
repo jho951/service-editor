@@ -29,9 +29,9 @@ services:
       secrets:
         - gh_token
         - github_actor
-    container_name: documents-app-prod
-    ports:
-      - "${EDITOR_SERVICE_HOST_BIND:?EDITOR_SERVICE_HOST_BIND is required}:${EDITOR_SERVICE_HOST_PORT:-8083}:8083"
+    container_name: editor-service-prod
+    expose:
+      - "8083"
     depends_on:
       mysql:
         condition: service_healthy

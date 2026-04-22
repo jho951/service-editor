@@ -6,7 +6,7 @@ info:
     editor-service가 현재 제공하는 HTTP API 문서입니다.
     문서 CRUD, editor operation, block attachment, document snapshot, admin block 보조 API를 하나의 OpenAPI 문서로 정리합니다.
 servers:
-  - url: http://documents-app:8083
+  - url: http://editor-service:8083
 tags:
   - name: Document
   - name: EditorOperation

@@ -31,7 +31,7 @@ dependencies {
 }
 
 bootJar {
-    archiveFileName = 'documents-app.jar'
+    archiveFileName = 'editor-service.jar'
 }
 
 jar {

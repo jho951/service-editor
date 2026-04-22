@@ -6,7 +6,6 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'io.github.jho951.platform:platform-resource-api'
     implementation 'io.github.jho951.platform:platform-resource-spi'
-    implementation 'io.github.jho951.platform:platform-resource-jdbc'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     testImplementation rootProject.ext.testLibraries.springBootTest

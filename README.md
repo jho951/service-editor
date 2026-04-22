@@ -1,4 +1,4 @@
-# document-service
+# editor-service
 
 문서와 블록 데이터를 관리하는 Spring Boot 기반 백엔드 서비스입니다. 현재 저장소는 Gradle 멀티모듈 구조로 정리되어 있으며, 문서(Document)와 블록(Block) CRUD를 확장해 나가는 기준 프로젝트입니다.
 
@@ -19,7 +19,7 @@
 
 ## 현재 사용되는 아키텍처
 
-이 저장소는 Gradle 멀티모듈 구조를 사용합니다.
+이 저장소는 `editor-service` Gradle 멀티모듈 구조를 사용합니다.
 
 - `documents-boot`: 실행 모듈, 환경 설정, 패키징
 - `documents-api`: Controller, 요청/응답 DTO, API 전용 예외/응답 코드, OpenAPI 설정

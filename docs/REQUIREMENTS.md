@@ -1,6 +1,6 @@
 # REQUIREMENT.md
 
-**서비스명:** document-service
+**서비스명:** editor-service
 **버전:** v1.0-draft
 **문서 목적:** 개발 착수용 요구사항 기준서
 **작성 기준:** 사용자 제공 요구사항 초안 + DB 설계 문서 + API 명세 초안
@@ -10,7 +10,7 @@
 - 현재 코드는 Spring Boot Gradle 멀티모듈 구조를 사용한다.
 - 실행 모듈은 `documents-boot`이다.
 - 웹 계층은 `documents-api`, 도메인 계약은 `documents-core`, JPA 기반 영속 구현은 `documents-infrastructure`에 위치한다.
-- 실행 애플리케이션 식별자는 `documents-app`, 로컬/도커 기본 데이터베이스 식별자는 `documentsdb`를 사용한다.
+- 실행 애플리케이션 식별자는 `editor-service`, 로컬/도커 기본 데이터베이스 식별자는 `documentsdb`를 사용한다.
 - 이번 구조 변경은 기능 요구사항 변경이 아니라 구현 구조 정리 목적이며, 기존 API 동작은 유지 대상으로 본다.
 - 영속 기술은 MyBatis 대신 Spring Data JPA를 기본 표준으로 사용한다.
 - Java 코드는 IntelliJ의 `Naver-coding-convention-v1.2` 프로젝트 포매터를 기준으로 작성하고 정렬한다.
@@ -20,7 +20,7 @@
 
 ## 1. 문서 개요
 
-`document-service`는 Notion 유사 문서 시스템에서 **문서 메타데이터와 문서 콘텐츠 블록 구조를 저장, 조회, 수정, 삭제**하는 서비스를 의미한다.
+`editor-service`는 Notion 유사 문서 시스템에서 **문서 메타데이터와 문서 콘텐츠 블록 구조를 저장, 조회, 수정, 삭제**하는 서비스를 의미한다.
 
 이 서비스는 다음 두 가지를 함께 소유한다.
 
@@ -58,7 +58,7 @@
 
 ## 3. 서비스 경계
 
-## 3.1 document-service가 소유하는 것
+## 3.1 editor-service가 소유하는 것
 - 사용자 소유 문서 메타데이터
 - 문서의 부모-자식 계층 구조
 - 문서 제목, 아이콘, 커버 등 기본 메타데이터
@@ -70,7 +70,7 @@
 - soft delete / restore 정책
 - 감사 추적에 필요한 작성자 / 수정자 정보 저장
 
-## 3.2 document-service가 소유하지 않는 것
+## 3.2 editor-service가 소유하지 않는 것
 - 로그인 / SSO
 - 사용자 계정 원장(master user profile)
 - 권한 정책의 최종 소유권
@@ -82,7 +82,7 @@
 
 ## 3.3 다른 서비스와의 관계
 - **auth-service**: 사용자 인증 및 identity 제공
-- **permission-service 또는 gateway**: 읽기/쓰기 권한 판단
+- **authz-service 또는 gateway-service**: 읽기/쓰기 권한 판단
 - **file-service**: 향후 첨부파일/이미지 블록 저장
 - **editor-collab-service**: 향후 실시간 협업 기능 분리 시 사용
 
@@ -349,7 +349,7 @@ Block {
 ## 7.3 사용자 참조 규칙
 1. 쓰기 작업은 인증된 사용자만 수행할 수 있다.
 2. 쓰기 작업에는 edit 권한이 필요하다.
-3. 비활성 사용자에 대한 처리 정책은 auth-service / permission-service 정책을 따른다.
+3. 비활성 사용자에 대한 처리 정책은 auth-service / authz-service 정책을 따른다.
 
 ---
 
@@ -1106,12 +1106,12 @@ TEXT 블록 생성.
 - 테스트 커버리지는 장기적으로 라인/브랜치 기준 `80%` 이상을 목표로 하되, 신규 기능은 변경 범위에 대해 우선적으로 높은 커버리지를 확보해야 한다.
 
 ## 15.5 플랫폼 보안·거버넌스·리소스 운영 원칙
-- 실행 모듈은 `platform-governance` `2.0.1`, `platform-security` `2.0.3`, `platform-resource` `2.0.0` 조합을 기준으로 적용한다.
+- 실행 모듈은 `platform-governance` `2.0.2`, `platform-security` `2.0.5`, `platform-resource` `2.0.2` 조합을 기준으로 적용한다.
 - 실행 모듈은 `platform-governance-starter`, `platform-security-starter`, `platform-security-web`, `platform-resource-starter`를 함께 사용하고, API 모듈은 웹 계층에서 필요한 `platform-governance-api` 계약만 직접 의존한다.
 - 실행 모듈은 `platform-security-governance-bridge`와 `platform-resource-governance-bridge`를 함께 연결해 보안/리소스 판단과 거버넌스 감사 흐름을 통합한다.
-- `platform-security-governance-bridge`는 `1.0.1`, `platform-resource-governance-bridge`는 현재 가용한 `1.0.0` 기준으로 관리한다.
-- `document-service`는 문서와 블록 리소스를 소유하는 서비스이므로 플랫폼 거버넌스 역할을 `RESOURCE_SERVICE`로 두고, 플랫폼 보안 역할은 `API_SERVER`로 둔다.
-- `document-service`는 문서/블록 비즈니스 로직만 직접 구현하고, JWT 검증 체인 조립, 감사 로거 wiring, 파일 저장소 wiring, 리소스 lifecycle 감사 연결은 platform starter와 bridge에 맡겨야 한다.
+- `platform-security-governance-bridge`와 `platform-resource-governance-bridge`는 `1.0.3` 기준으로 관리한다.
+- `editor-service`는 문서와 블록 리소스를 소유하는 서비스이므로 플랫폼 거버넌스 역할을 `RESOURCE_SERVICE`로 두고, 플랫폼 보안 역할은 `API_SERVER`로 둔다.
+- `editor-service`는 문서/블록 비즈니스 로직만 직접 구현하고, JWT 검증 체인 조립, 감사 로거 wiring, 파일 저장소 wiring, 리소스 lifecycle 감사 연결은 platform starter와 bridge에 맡겨야 한다.
 - 현재 서비스는 `user-123` 같은 문자열 사용자 식별자를 유지하므로, 실행 모듈은 `X-User-Id` 헤더를 Spring Security 인증 객체와 servlet principal로 연결하는 애플리케이션 bridge filter를 함께 둔다.
 - `@CurrentUserId`와 JPA auditing은 request attribute 우선, servlet principal 차선, `X-User-Id` 헤더 최후 순서로 현재 사용자 식별자를 해석한다.
 - 운영 프로필에서는 거버넌스 audit을 활성화하고, `service-name`, `environment`를 명시해야 한다.
@@ -1167,7 +1167,7 @@ TEXT 블록 생성.
 
 ## 17. 최종 요약
 
-`document-service`의 v1 핵심은 다음과 같다.
+`editor-service`의 v1 핵심은 다음과 같다.
 
 - 문서는 계층 구조를 가진다.
 - 문서 콘텐츠는 ordered block tree로 저장된다.
