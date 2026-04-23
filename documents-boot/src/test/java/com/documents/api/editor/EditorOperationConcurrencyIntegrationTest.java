@@ -700,7 +700,7 @@ class EditorOperationConcurrencyIntegrationTest {
         Block reloadedBlock = blockRepository.findByIdAndDeletedAtIsNull(block.getId()).orElseThrow();
         MvcResult retryResult = mockMvc.perform(post("/editor-operations/documents/{documentId}/save", document.getId())
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", "user-123")
                         .content(replaceContentRequest(
                                 "batch-retry",
                                 block.getId(),
@@ -803,7 +803,7 @@ class EditorOperationConcurrencyIntegrationTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         Future<MvcResult> future = executor.submit(() -> mockMvc.perform(post("/editor-operations/documents/{documentId}/save", documentId)
                         .contentType("application/json")
-                        .header("X-User-Id", "user-456")
+                        .header("X-User-Id", "user-123")
                         .content(requestBody))
                 .andReturn());
         executor.shutdown();
@@ -828,7 +828,7 @@ class EditorOperationConcurrencyIntegrationTest {
                         assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
                         return mockMvc.perform(post("/editor-operations/documents/{documentId}/save", documentId)
                                         .contentType("application/json")
-                                        .header("X-User-Id", "user-456")
+                                        .header("X-User-Id", "user-123")
                                         .content(requestBody))
                                 .andReturn();
                     })

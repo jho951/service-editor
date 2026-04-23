@@ -11,3 +11,14 @@ include 'documents-boot'
 include 'documents-api'
 include 'documents-core'
 include 'documents-infrastructure'
+
+def localPlatformRoots = [
+        file('../../platform/platform-governance'),
+        file('../../platform/platform-security'),
+        file('../../platform/platform-resource'),
+        file('../../platform/platform-integrations')
+]
+
+if (providers.gradleProperty('useLocalPlatform').map { it.toBoolean() }.orElse(false).get()) {
+    localPlatformRoots.findAll { it.exists() }.each { includeBuild(it) }
+}

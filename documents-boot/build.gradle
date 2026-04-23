@@ -3,26 +3,30 @@ plugins {
 }
 
 dependencies {
+    implementation platform("org.springframework.boot:spring-boot-dependencies:${rootProject.ext.resolvedSpringBootVersion}")
     implementation 'org.springframework.boot:spring-boot-starter'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'io.github.jho951:audit-log-api'
+    implementation platform("io.github.jho951.platform:platform-runtime-bom:3.0.0")
     implementation platform("io.github.jho951.platform:platform-governance-bom:${rootProject.ext.resolvedPlatformGovernanceVersion}")
     implementation platform("io.github.jho951.platform:platform-security-bom:${rootProject.ext.resolvedPlatformSecurityVersion}")
     implementation platform("io.github.jho951.platform:platform-resource-bom:${rootProject.ext.resolvedPlatformResourceVersion}")
     implementation 'io.github.jho951.platform:platform-governance-starter'
     implementation 'io.github.jho951.platform:platform-security-starter'
-    implementation 'io.github.jho951.platform:platform-security-web'
+    implementation 'io.github.jho951.platform:platform-security-web-api'
     implementation 'io.github.jho951.platform:platform-resource-starter'
     implementation 'io.github.jho951.platform:platform-resource-jdbc'
-    implementation "io.github.jho951.platform:platform-security-governance-bridge:${rootProject.ext.resolvedPlatformSecurityGovernanceBridgeVersion}"
-    implementation "io.github.jho951.platform:platform-resource-governance-bridge:${rootProject.ext.resolvedPlatformResourceGovernanceBridgeVersion}"
+    implementation "io.github.jho951.platform:platform-security-governance-bridge"
+    implementation "io.github.jho951.platform:platform-resource-governance-bridge"
     implementation 'io.github.jho951:rate-limiter-core:2.0.0'
     implementation 'io.github.jho951:rate-limiter-spi:2.0.0'
     implementation project(':documents-api')
     implementation project(':documents-infrastructure')
 
     runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+    runtimeOnly 'io.github.jho951.platform:platform-resource-support-local'
 
     testImplementation rootProject.ext.testLibraries.springBootTest
     testImplementation rootProject.ext.testLibraries.springWeb

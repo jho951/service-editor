@@ -14,13 +14,13 @@ ext {
     resolvedLombokVersion = (findProperty('lombok_version') ?: '1.18.38').toString()
     resolvedJunitJupiterVersion = (findProperty('junit_jupiter_version') ?: '5.12.2').toString()
     resolvedJunitPlatformVersion = (findProperty('junit_platform_version') ?: '1.12.2').toString()
-    resolvedPlatformGovernanceVersion = (findProperty('platform_governance_version') ?: '2.0.2').toString()
-    resolvedPlatformSecurityVersion = (findProperty('platform_security_version') ?: '2.0.5').toString()
-    resolvedPlatformResourceVersion = (findProperty('platform_resource_version') ?: '2.0.2').toString()
+    resolvedPlatformGovernanceVersion = (findProperty('platform_governance_version') ?: '3.0.0').toString()
+    resolvedPlatformSecurityVersion = (findProperty('platform_security_version') ?: '3.0.0').toString()
+    resolvedPlatformResourceVersion = (findProperty('platform_resource_version') ?: '3.0.0').toString()
     resolvedPlatformSecurityGovernanceBridgeVersion =
-        (findProperty('platform_security_governance_bridge_version') ?: '1.0.3').toString()
+        (findProperty('platform_security_governance_bridge_version') ?: '2.0.0').toString()
     resolvedPlatformResourceGovernanceBridgeVersion =
-        (findProperty('platform_resource_governance_bridge_version') ?: '1.0.3').toString()
+        (findProperty('platform_resource_governance_bridge_version') ?: '2.0.0').toString()
     runtimeEnvProperties = [
         DB_URL: 'db_url',
         DB_USERNAME: 'db_username',

@@ -2,9 +2,6 @@ package com.documents.boot;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.Principal;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 import com.documents.api.auth.GatewayAuthContext;
@@ -22,31 +19,25 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Configuration
-public class DocumentsPlatformSecurityBridgeConfiguration {
+public class DocumentsRequestContextConfiguration {
 
     private static final int FORBIDDEN_CODE = 9003;
     private static final int TOO_MANY_REQUESTS_CODE = 9018;
 
     @Bean
-    public DocumentsPlatformHeaderAuthenticationBridgeFilter documentsPlatformHeaderAuthenticationBridgeFilter() {
-        return new DocumentsPlatformHeaderAuthenticationBridgeFilter();
+    public DocumentsRequestContextFilter documentsRequestContextFilter() {
+        return new DocumentsRequestContextFilter();
     }
 
     @Bean
-    public FilterRegistrationBean<DocumentsPlatformHeaderAuthenticationBridgeFilter> documentsPlatformHeaderAuthenticationBridgeFilterRegistration(
-        DocumentsPlatformHeaderAuthenticationBridgeFilter filter
+    public FilterRegistrationBean<DocumentsRequestContextFilter> documentsRequestContextFilterRegistration(
+        DocumentsRequestContextFilter filter
     ) {
-        FilterRegistrationBean<DocumentsPlatformHeaderAuthenticationBridgeFilter> registration = new FilterRegistrationBean<>(filter);
+        FilterRegistrationBean<DocumentsRequestContextFilter> registration = new FilterRegistrationBean<>(filter);
         registration.setOrder(SecurityProperties.DEFAULT_FILTER_ORDER - 10);
         return registration;
     }
@@ -94,7 +85,7 @@ public class DocumentsPlatformSecurityBridgeConfiguration {
         };
     }
 
-    static final class DocumentsPlatformHeaderAuthenticationBridgeFilter extends OncePerRequestFilter {
+    static final class DocumentsRequestContextFilter extends OncePerRequestFilter {
 
         @Override
         protected void doFilterInternal(
@@ -110,54 +101,15 @@ public class DocumentsPlatformSecurityBridgeConfiguration {
             request.setAttribute(GatewayAuthContext.REQUEST_ID_ATTRIBUTE, requestId);
             response.setHeader(GatewayAuthContext.REQUEST_ID_HEADER, requestId);
 
-            String userId = normalize(request.getHeader(GatewayAuthContext.USER_ID_HEADER));
-            if (userId != null) {
-                request.setAttribute(GatewayAuthContext.REQUEST_USER_ID_ATTRIBUTE, userId);
+            String authenticatedUserId = normalize(request.getHeader(GatewayAuthContext.USER_ID_HEADER));
+            if (authenticatedUserId == null && request.getUserPrincipal() != null) {
+                authenticatedUserId = normalize(request.getUserPrincipal().getName());
+            }
+            if (authenticatedUserId != null) {
+                request.setAttribute(GatewayAuthContext.REQUEST_USER_ID_ATTRIBUTE, authenticatedUserId);
             }
 
-            Authentication previousAuthentication = SecurityContextHolder.getContext().getAuthentication();
-            boolean authenticationBridged = false;
-
-            if (previousAuthentication == null && userId != null) {
-                SecurityContext context = SecurityContextHolder.createEmptyContext();
-                context.setAuthentication(createAuthentication(request, userId));
-                SecurityContextHolder.setContext(context);
-                authenticationBridged = true;
-            }
-
-            try {
-                filterChain.doFilter(request, response);
-            } finally {
-                if (authenticationBridged) {
-                    SecurityContextHolder.clearContext();
-                }
-            }
-        }
-
-        private Authentication createAuthentication(HttpServletRequest request, String userId) {
-            UsernamePasswordAuthenticationToken authentication = UsernamePasswordAuthenticationToken.authenticated(
-                userId,
-                null,
-                authorities(request)
-            );
-            authentication.setDetails(request);
-            return authentication;
-        }
-
-        private List<GrantedAuthority> authorities(HttpServletRequest request) {
-            String userRoleHeader = normalize(request.getHeader(GatewayAuthContext.USER_ROLE_HEADER));
-            if (userRoleHeader == null) {
-                return List.of();
-            }
-
-            List<GrantedAuthority> authorities = new ArrayList<>();
-            for (String token : userRoleHeader.split(",")) {
-                String authority = normalize(token);
-                if (authority != null) {
-                    authorities.add(new SimpleGrantedAuthority(authority));
-                }
-            }
-            return List.copyOf(authorities);
+            filterChain.doFilter(request, response);
         }
 
         private String normalize(String value) {
