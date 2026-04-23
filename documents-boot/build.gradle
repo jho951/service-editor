@@ -9,7 +9,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'io.github.jho951:audit-log-api'
-    implementation platform("io.github.jho951.platform:platform-runtime-bom:3.0.0")
+    implementation platform("io.github.jho951.platform:platform-runtime-bom:3.0.1")
     implementation platform("io.github.jho951.platform:platform-governance-bom:${rootProject.ext.resolvedPlatformGovernanceVersion}")
     implementation platform("io.github.jho951.platform:platform-security-bom:${rootProject.ext.resolvedPlatformSecurityVersion}")
     implementation platform("io.github.jho951.platform:platform-resource-bom:${rootProject.ext.resolvedPlatformResourceVersion}")
