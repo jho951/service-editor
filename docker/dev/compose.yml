@@ -40,6 +40,9 @@ services:
       DB_USERNAME_DEV: ${DB_USERNAME_DEV:-documents}
       DB_PASSWORD_DEV: ${DB_PASSWORD_DEV:-documents}
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
+      PLATFORM_SECURITY_JWT_SECRET: ${PLATFORM_SECURITY_JWT_SECRET:-dev-internal-jwt-secret}
+      PLATFORM_SECURITY_JWT_ISSUER: ${PLATFORM_SECURITY_JWT_ISSUER:-api-gateway}
+      PLATFORM_SECURITY_JWT_AUDIENCE: ${PLATFORM_SECURITY_JWT_AUDIENCE:-internal-services}
       SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50}
     env_file:

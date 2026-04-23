@@ -24,6 +24,8 @@
   - 개인 학습용 로컬 문서와 개인 트러블슈팅 기록
 - [docs/guides/](https://github.com/jho951/editor-service/blob/dev/docs/guides/README.md)
   - 프론트/서버 구현 계약, 작업 순서, 체크리스트
+- [docs/runbook/troubleshooting.md](https://github.com/jho951/editor-service/blob/dev/docs/runbook/troubleshooting.md)
+  - Gateway 내부 JWT, 문서 API 401, 환경 설정 점검
 - [docs/guides/contract/contract-change-guideline.md](https://github.com/jho951/editor-service/blob/dev/docs/guides/contract/contract-change-guideline.md)
   - 구현 변경 후 service-contract, local 문서, contract.lock.yml 갱신 순서
 

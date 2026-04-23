@@ -66,9 +66,9 @@ platform:
       enabled: ${PLATFORM_SECURITY_AUTH_ENABLED:true}
       default-mode: HYBRID
       internal-token-enabled: ${PLATFORM_SECURITY_INTERNAL_TOKEN_ENABLED:false}
-      jwt-secret: ${JWT_SECRET:${PLATFORM_SECURITY_JWT_SECRET:change-this-in-prod}}
-      jwt-issuer: ${PLATFORM_SECURITY_JWT_ISSUER:auth-service}
-      jwt-audience: ${PLATFORM_SECURITY_JWT_AUDIENCE:editor-service}
+      jwt-secret: ${PLATFORM_SECURITY_JWT_SECRET:${JWT_SECRET:change-this-in-prod}}
+      jwt-issuer: ${PLATFORM_SECURITY_JWT_ISSUER:api-gateway}
+      jwt-audience: ${PLATFORM_SECURITY_JWT_AUDIENCE:internal-services}
       gateway-header:
         enabled: ${PLATFORM_SECURITY_GATEWAY_HEADER_ENABLED:true}
     ip-guard:
