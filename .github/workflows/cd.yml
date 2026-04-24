@@ -90,6 +90,8 @@ jobs:
             target="${{ inputs.deploy_environment }}"
           elif [ "${{ github.ref_type }}" = "tag" ]; then
             target="prod"
+          elif [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "master" ]; then
+            target="prod"
           else
             target="dev"
           fi
