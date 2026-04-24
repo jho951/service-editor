@@ -37,9 +37,9 @@ ci:
   contract_check: true
 
 cd:
-  profile: ecs-blue-green
-  target: ecs-fargate
-  strategy: codedeploy-blue-green
+  profile: ec2-compose
+  target: ec2
+  strategy: docker-compose
   environments:
     - dev
     - prod
