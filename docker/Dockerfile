@@ -7,7 +7,6 @@ COPY gradlew /workspace/gradlew
 COPY gradle /workspace/gradle
 COPY settings.gradle /workspace/settings.gradle
 COPY build.gradle /workspace/build.gradle
-COPY gradle.properties /workspace/gradle.properties
 COPY documents-boot /workspace/documents-boot
 COPY documents-api /workspace/documents-api
 COPY documents-core /workspace/documents-core
