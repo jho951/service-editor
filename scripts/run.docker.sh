@@ -19,7 +19,10 @@ case "$ACTION" in
 esac
 
 case "$ENV_NAME" in
-  dev|prod) COMPOSE_FILE="$PROJECT_ROOT/docker/$ENV_NAME/compose.yml" ;;
+  dev|prod)
+    COMPOSE_FILE="$PROJECT_ROOT/docker/$ENV_NAME/compose.yml"
+    BUILD_COMPOSE_FILE="$PROJECT_ROOT/docker/compose.build.yml"
+    ;;
   *) usage; exit 1 ;;
 esac
 
@@ -83,12 +86,45 @@ compose() {
   SERVICE_SHARED_NETWORK="$SHARED_NETWORK" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" "$@"
 }
 
+compose_dev_build() {
+  local env_file
+  env_file="$(resolve_env_file)"
+  if [[ -n "$env_file" ]]; then
+    SERVICE_SHARED_NETWORK="$SHARED_NETWORK" EDITOR_ENV_FILE="$env_file" \
+      docker compose --env-file "$env_file" -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" -f "$BUILD_COMPOSE_FILE" "$@"
+    return
+  fi
+
+  SERVICE_SHARED_NETWORK="$SHARED_NETWORK" docker compose -p "$COMPOSE_PROJECT_NAME" -f "$COMPOSE_FILE" -f "$BUILD_COMPOSE_FILE" "$@"
+}
+
 case "$ACTION" in
-  up) compose up -d --build "$@" ;;
+  up)
+    if [[ "$ENV_NAME" == "prod" ]]; then
+      compose pull "$@"
+      compose up -d "$@"
+    else
+      compose_dev_build up -d --build "$@"
+    fi
+    ;;
   down) compose down --remove-orphans "$@" ;;
-  build) compose build "$@" ;;
+  build)
+    if [[ "$ENV_NAME" == "prod" ]]; then
+      echo "prod profile is image-only; build is only supported for dev." >&2
+      exit 1
+    fi
+    compose_dev_build build "$@"
+    ;;
   logs) compose logs -f "$@" ;;
   ps) compose ps "$@" ;;
-  restart) compose down --remove-orphans && compose up -d --build "$@" ;;
+  restart)
+    compose down --remove-orphans
+    if [[ "$ENV_NAME" == "prod" ]]; then
+      compose pull "$@"
+      compose up -d "$@"
+    else
+      compose_dev_build up -d --build "$@"
+    fi
+    ;;
   nuke) compose down --remove-orphans -v "$@" ;;
 esac

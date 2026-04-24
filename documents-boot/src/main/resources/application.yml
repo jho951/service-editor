@@ -12,12 +12,32 @@ spring:
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
       timeout: ${REDIS_TIMEOUT_MS:1000ms}
+  jpa:
+    properties:
+      hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
   config:
     import:
       - classpath:application-server.yml
       - classpath:application-db.yml
       - classpath:application-auth.yml
       - classpath:application-docs.yml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  metrics:
+    tags:
+      service: ${spring.application.name}
+      env: ${SPRING_PROFILES_ACTIVE:local}
 
 platform:
   governance:
@@ -48,6 +68,7 @@ platform:
     boundary:
       public-paths:
         - /health
+        - /actuator/prometheus
         - /actuator/health
         - /actuator/health/**
         - /v3/api-docs/**

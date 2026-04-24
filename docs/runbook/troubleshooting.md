@@ -47,3 +47,26 @@
 
 - 세션 쿠키 문제와 내부 JWT 문제를 분리해서 확인합니다.
 - 먼저 Gateway 인증 성공 여부를 보고, 다음으로 Editor JWT 계약 일치를 확인합니다.
+
+## EC2 Compose와 ECS/Fargate 중 무엇을 쓸지
+
+editor-service는 두 방식을 모두 검토했습니다. 구현 이력과 대표 코드 조각은 service-contract의 `shared/deployment-topologies.md`에 남깁니다.
+
+`EC2 + Docker Compose`가 맞는 경우:
+
+- 문서 API와 MySQL, 파일 경로, exporter를 한 host에서 빠르게 묶어 검증해야 합니다.
+- 운영 단순성이 무중단보다 우선입니다.
+
+`ECS/Fargate + CodeDeploy`가 맞는 경우:
+
+- `/v1/documents/**`와 editor save API를 배포 중에도 끊으면 안 됩니다.
+- 새 task set의 health/readiness를 본 뒤 트래픽을 옮겨야 합니다.
+- rollback을 컨테이너 재기동이 아니라 task definition revision 기준으로 관리해야 합니다.
+
+현재 운영 기본값:
+
+- 현재 Free Tier 계정에서는 `단일 EC2 + docker compose`를 실제 배포 기본값으로 둡니다.
+- editor-service는 gateway 뒤 same-host compose network로 연결하고, 파일 저장 경로도 단일 host 기준으로 운영합니다.
+- 비용 제약이 해제되면 `ECS/Fargate + CodeDeploy blue/green`으로 승격합니다.
+- MySQL runtime은 애플리케이션과 분리하는 쪽을 우선합니다.
+- `docker/prod/compose.yml`은 로컬/임시 검증과 fallback reference로만 취급합니다.

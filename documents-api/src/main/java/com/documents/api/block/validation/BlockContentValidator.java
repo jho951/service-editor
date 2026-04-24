@@ -13,6 +13,12 @@ public class BlockContentValidator implements ConstraintValidator<ValidBlockCont
     private static final int SUPPORTED_SCHEMA_VERSION = 1;
     private static final int MAX_TEXT_LENGTH = 10000;
     private static final String TEXT_COLOR = "textColor";
+    private static final Set<String> SUPPORTED_BLOCK_TYPES = Set.of(
+            "paragraph",
+            "heading1",
+            "heading2",
+            "heading3"
+    );
     private static final Set<String> SUPPORTED_MARK_TYPES = Set.of(
             "bold",
             "italic",
@@ -21,7 +27,7 @@ public class BlockContentValidator implements ConstraintValidator<ValidBlockCont
             "strikethrough"
     );
     private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{6}$");
-    private static final Set<String> ALLOWED_CONTENT_FIELDS = Set.of("format", "schemaVersion", "segments");
+    private static final Set<String> ALLOWED_CONTENT_FIELDS = Set.of("format", "schemaVersion", "segments", "blockType");
     private static final Set<String> ALLOWED_SEGMENT_FIELDS = Set.of("text", "marks");
     private static final Set<String> ALLOWED_MARK_FIELDS = Set.of("type", "value");
 
@@ -40,12 +46,16 @@ public class BlockContentValidator implements ConstraintValidator<ValidBlockCont
         JsonNode formatNode = value.get("format");
         JsonNode schemaVersionNode = value.get("schemaVersion");
         JsonNode segmentsNode = value.get("segments");
+        JsonNode blockTypeNode = value.get("blockType");
 
         if (!hasText(formatNode) || !RICH_TEXT_FORMAT.equals(formatNode.textValue())) {
             return false;
         }
         if (schemaVersionNode == null || !schemaVersionNode.isInt()
                 || schemaVersionNode.intValue() != SUPPORTED_SCHEMA_VERSION) {
+            return false;
+        }
+        if (blockTypeNode != null && (!hasText(blockTypeNode) || !SUPPORTED_BLOCK_TYPES.contains(blockTypeNode.textValue()))) {
             return false;
         }
         if (segmentsNode == null || !segmentsNode.isArray() || segmentsNode.isEmpty()) {

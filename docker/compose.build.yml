@@ -1,0 +1,14 @@
+services:
+  editor-service:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+      secrets:
+        - gh_token
+        - github_actor
+
+secrets:
+  gh_token:
+    environment: GH_TOKEN
+  github_actor:
+    environment: GITHUB_ACTOR

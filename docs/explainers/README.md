@@ -13,13 +13,13 @@
 ## 무엇을 여기에 두지 않는가
 
 - 채택 전 전략 비교
-  - [docs/discussions/](https://github.com/jho951/Block-server/blob/dev/docs/discussions/README.md)
+  - [docs/discussions/](https://github.com/jho951/editor-service/blob/main/docs/discussions/README.md)
 - 채택된 공식 결정
-  - [docs/decisions/](https://github.com/jho951/Block-server/blob/dev/docs/decisions/README.md)
+  - [docs/decisions/](https://github.com/jho951/editor-service/blob/main/docs/decisions/README.md)
 - 개인 학습용 설명 문서와 개인 트러블슈팅 기록
-  - [docs/learn/](https://github.com/jho951/Block-server/blob/dev/docs/learn/README.md)
+  - [docs/learn/](https://github.com/jho951/editor-service/blob/main/docs/learn/README.md)
 - 구현 순서, 역할 분담, 체크리스트 중심 문서
-  - [docs/guides/](https://github.com/jho951/Block-server/blob/dev/docs/guides/README.md)
+  - [docs/guides/](https://github.com/jho951/editor-service/blob/main/docs/guides/README.md)
 
 ## 문서 작성 기준
 

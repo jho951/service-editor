@@ -139,9 +139,10 @@
 ## 4.4 TEXT 블록 규칙
 - `block.type`은 현재 `TEXT`만 허용한다.
 - `block.content`는 structured JSON object여야 한다.
-- `block.content`는 최소한 `format`, `schemaVersion`, `segments`를 포함해야 한다.
+- `block.content`는 최소한 `format`, `schemaVersion`, `segments`를 포함해야 하며 optional `blockType`을 추가할 수 있다.
+- `block.content.blockType` 허용값은 `paragraph`, `heading1`, `heading2`, `heading3`다. 값이 없으면 paragraph 기본형으로 본다.
 - 새 `TEXT` 블록의 기본 `content`는 `segments` 1개와 빈 `text`, 빈 `marks`를 가진 empty structured content다.
-- 각 segment는 `text`, `marks`를 포함해야 한다.
+- 각 segment는 `text`, `marks`만 포함해야 하며 block subtype은 `segment`가 아니라 `content.blockType`에 둔다.
 - v1 mark 타입은 `bold`, `italic`, `textColor`, `underline`, `strikethrough`만 허용한다.
 - `textColor`는 프론트가 바로 사용할 수 있는 `#RRGGBB` 형식 hex 문자열만 허용한다.
 - 링크, 멘션, inline code, 첨부 객체, 임의의 사용자 정의 mark는 v1에서 허용하지 않는다.
@@ -277,6 +278,7 @@ Block {
 {
   "format": "rich_text",
   "schemaVersion": 1,
+  "blockType": "paragraph",
   "segments": [
     {
       "text": "Hello ",
@@ -301,13 +303,16 @@ Block {
 ### 설명
 - `content.format`: 본문 표현 포맷. v1은 `rich_text`만 허용한다.
 - `content.schemaVersion`: content 스키마 버전. v1은 `1`로 시작한다.
+- `content.blockType`: optional rich-text subtype. 현재 허용값은 `paragraph`, `heading1`, `heading2`, `heading3`다. 값이 없으면 paragraph 기본형으로 본다.
 - `content.segments`: 순서가 보장되는 텍스트 조각 배열
 - `segment.text`: 실제 텍스트 조각
 - `segment.marks`: 해당 텍스트 조각에 적용된 mark 목록
+- `segment` 허용 필드는 `text`, `marks`뿐이다. `segment.type`이나 `segment.blockType`은 v1 범위에 없다.
 - `mark.type`: mark 종류. v1 허용값은 `bold`, `italic`, `textColor`, `underline`, `strikethrough`
 - `mark.value`: 값이 필요한 mark에서만 사용한다. v1에서는 `textColor`에만 사용한다.
+- 새 빈 블록은 `segments=[{"text":"","marks":[]}]` 한 개를 가진 empty content를 허용한다.
 - `Block.type`과 `content.format`은 같은 의미가 아니다.
-- `Block.type`은 블록 종류를 나타내고, `content.format`은 TEXT 블록 내부 본문 표현 포맷을 나타낸다.
+- `Block.type`은 블록 종류를 나타내고, `content.format`과 `content.blockType`은 TEXT 블록 내부 본문 표현 포맷/서브타입을 나타낸다.
 
 ---
 
@@ -602,9 +607,13 @@ Block {
 - `content`는 JSON object여야 함
 - `content.format`은 현재 `rich_text`만 허용
 - `content.schemaVersion`은 현재 `1`만 허용
+- `content.blockType`은 optional string이고 허용값은 `paragraph`, `heading1`, `heading2`, `heading3`
+- `content` 허용 필드는 `format`, `schemaVersion`, `segments`, `blockType`뿐임
 - `content.segments`는 배열이어야 하며 비어 있지 않아야 함
+- 단, 새 빈 블록은 `[ {"text":"","marks":[]} ]` 1개를 가진 형태를 허용
 - 각 `segment.text`는 문자열이어야 함
 - 각 `segment.marks`는 배열이어야 함
+- `segment` 허용 필드는 `text`, `marks`뿐임
 - 허용 mark 타입: `bold`, `italic`, `textColor`, `underline`, `strikethrough`
 - `textColor.value`는 `#RRGGBB` 형식이어야 함
 - 링크, 멘션, inline code, 기타 임의 mark는 v1에서 허용하지 않음
@@ -857,6 +866,7 @@ TEXT 블록 생성.
       "content": {
         "format": "rich_text",
         "schemaVersion": 1,
+        "blockType": "paragraph",
         "segments": [
           {
             "text": "수정된 ",

@@ -15,10 +15,10 @@
 
 관련 문서:
 
-- [REQUIREMENTS.md](https://github.com/jho951/editor-service/blob/dev/docs/REQUIREMENTS.md)
-- [ADR 021](https://github.com/jho951/editor-service/blob/dev/docs/decisions/021-adopt-editor-operation-controller-boundary.md)
-- [ADR 022](https://github.com/jho951/editor-service/blob/dev/docs/decisions/022-keep-document-canonical-state-in-db-and-link-external-resources.md)
-- [editor-save-model.md](https://github.com/jho951/editor-service/blob/dev/docs/explainers/editor-save-model.md)
+- [REQUIREMENTS.md](https://github.com/jho951/editor-service/blob/main/docs/REQUIREMENTS.md)
+- [ADR 021](https://github.com/jho951/editor-service/blob/main/docs/decisions/021-adopt-editor-operation-controller-boundary.md)
+- [ADR 022](https://github.com/jho951/editor-service/blob/main/docs/decisions/022-keep-document-canonical-state-in-db-and-link-external-resources.md)
+- [editor-save-model.md](https://github.com/jho951/editor-service/blob/main/docs/explainers/editor-save-model.md)
 
 ## 1. 현재 소유권 경계
 

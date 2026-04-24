@@ -23,13 +23,11 @@ services:
       - documents-private
 
   editor-service:
-    build:
-      context: ../..
-      dockerfile: docker/Dockerfile
-      secrets:
-        - gh_token
-        - github_actor
+    image: ${EDITOR_SERVICE_IMAGE:?EDITOR_SERVICE_IMAGE is required}
+    pull_policy: always
     container_name: editor-service-prod
+    ports:
+      - "${EDITOR_SERVICE_HOST_BIND:?EDITOR_SERVICE_HOST_BIND is required}:${EDITOR_SERVICE_HOST_PORT:-8083}:8083"
     expose:
       - "8083"
     depends_on:
@@ -70,12 +68,6 @@ services:
 volumes:
   mysql_data_prod:
   resource_data_prod:
-
-secrets:
-  gh_token:
-    environment: GH_TOKEN
-  github_actor:
-    environment: GITHUB_ACTOR
 
 networks:
   documents-private:

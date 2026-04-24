@@ -14,9 +14,9 @@
 
 관련 문서:
 
-- [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
-- [2026-03-18-block-save-api-review.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-18-block-save-api-review.md)
-- [012-adopt-structured-text-content-and-staged-concurrency-roadmap.md](https://github.com/jho951/Block-server/blob/dev/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
+- [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/editor-service/blob/main/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
+- [2026-03-18-block-save-api-review.md](https://github.com/jho951/editor-service/blob/main/docs/discussions/2026-03-18-block-save-api-review.md)
+- [012-adopt-structured-text-content-and-staged-concurrency-roadmap.md](https://github.com/jho951/editor-service/blob/main/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
 
 ---
 

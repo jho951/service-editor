@@ -1,7 +1,7 @@
 # AGENTS 가이드
 
 - 작업 성격에 맞게 `docs/`, `prompts/`를 함께 갱신한다.
-- `docs/` 하위 문서를 다룰 때는 항상 [docs/README.md](https://github.com/jho951/Block-server/blob/dev/docs/README.md)부터 읽고, 작업 경로까지 내려가는 동안 추가로 만나는 디렉토리 `README.md`를 순서대로 읽는다.
+- `docs/` 하위 문서를 다룰 때는 항상 [docs/README.md](https://github.com/jho951/editor-service/blob/main/docs/README.md)부터 읽고, 작업 경로까지 내려가는 동안 추가로 만나는 디렉토리 `README.md`를 순서대로 읽는다.
   - 예: `docs/discussions/...` 작업이면 `docs/README.md -> docs/discussions/README.md`
 - 검색이나 직접 경로로 `docs/`의 하위 문서를 먼저 찾았더라도, 내용을 반영하기 전에는 반드시 `AGENTS.md -> docs/README.md -> 경로상의 상위 README.md` 순서로 다시 확인한다.
 - 현재 유효한 제품 요구사항과 채택된 정책은 `docs/REQUIREMENTS.md`에 반영한다.

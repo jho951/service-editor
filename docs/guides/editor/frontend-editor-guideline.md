@@ -15,11 +15,11 @@
 
 관련 문서:
 
-- [editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
-- [editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-save-model.md)
-- [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
-- [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
-- [ADR 012](https://github.com/jho951/Block-server/blob/dev/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
+- [editor-guideline.md](https://github.com/jho951/editor-service/blob/main/docs/guides/editor/editor-guideline.md)
+- [editor-save-model.md](https://github.com/jho951/editor-service/blob/main/docs/explainers/editor-save-model.md)
+- [2026-03-20-editor-save-api-boundary-and-transaction-design.md](https://github.com/jho951/editor-service/blob/main/docs/discussions/2026-03-20-editor-save-api-boundary-and-transaction-design.md)
+- [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/editor-service/blob/main/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
+- [ADR 012](https://github.com/jho951/editor-service/blob/main/docs/decisions/012-adopt-structured-text-content-and-staged-concurrency-roadmap.md)
 
 현재 이 문서의 상세 범위는 document `save` endpoint가 중심이다.
 move는 `POST /editor-operations/move` 단일 endpoint를 기준으로 두고, 문서 이동과 블록 이동 모두 `EditorMoveOperationRequest`를 사용한다.

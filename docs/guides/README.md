@@ -14,11 +14,11 @@
 ## 무엇을 여기에 두지 않는가
 
 - 채택 전 전략 비교
-  - [docs/discussions/](https://github.com/jho951/editor-service/blob/dev/docs/discussions/README.md)
+  - [docs/discussions/](https://github.com/jho951/editor-service/blob/main/docs/discussions/README.md)
 - 채택된 공식 결정
-  - [docs/decisions/](https://github.com/jho951/editor-service/blob/dev/docs/decisions/README.md)
+  - [docs/decisions/](https://github.com/jho951/editor-service/blob/main/docs/decisions/README.md)
 - 핵심 구조 설명 자체가 중심인 문서
-  - [docs/explainers/](https://github.com/jho951/editor-service/blob/dev/docs/explainers/README.md)
+  - [docs/explainers/](https://github.com/jho951/editor-service/blob/main/docs/explainers/README.md)
 
 - [contract/contract-change-guideline.md](./contract/contract-change-guideline.md): 구현 변경 후 contract 원본과 service lock을 맞추는 절차
 

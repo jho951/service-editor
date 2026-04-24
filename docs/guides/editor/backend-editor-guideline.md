@@ -14,11 +14,11 @@
 
 관련 문서:
 
-- [editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/editor-guideline.md)
-- [editor-save-model.md](https://github.com/jho951/Block-server/blob/dev/docs/explainers/editor-save-model.md)
-- [frontend-editor-guideline.md](https://github.com/jho951/Block-server/blob/dev/docs/guides/editor/frontend-editor-guideline.md)
-- [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/Block-server/blob/dev/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
-- [ADR 014](https://github.com/jho951/Block-server/blob/dev/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
+- [editor-guideline.md](https://github.com/jho951/editor-service/blob/main/docs/guides/editor/editor-guideline.md)
+- [editor-save-model.md](https://github.com/jho951/editor-service/blob/main/docs/explainers/editor-save-model.md)
+- [frontend-editor-guideline.md](https://github.com/jho951/editor-service/blob/main/docs/guides/editor/frontend-editor-guideline.md)
+- [2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md](https://github.com/jho951/editor-service/blob/main/docs/discussions/2026-03-20-editor-transaction-dto-and-frontend-queue-spec.md)
+- [ADR 014](https://github.com/jho951/editor-service/blob/main/docs/decisions/014-adopt-transaction-centered-editor-save-model.md)
 
 현재 이 문서의 상세 범위는 document `save` endpoint가 중심이다.
 move는 `POST /editor-operations/move` 단일 endpoint를 사용하고, request DTO는 `EditorMoveOperationRequest`를 기준으로 받는다.

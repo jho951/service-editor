@@ -37,13 +37,13 @@ ci:
   contract_check: true
 
 cd:
-  profile: ec2-compose
-  target: ec2
-  strategy: docker-compose
+  profile: ecs-blue-green
+  target: ecs-fargate
+  strategy: codedeploy-blue-green
   environments:
     - dev
     - prod
-  image_registry: ghcr.io
+  image_registry: ecr
   deploy_on: protected_branch
   health_check: true
   smoke_test: true

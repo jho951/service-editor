@@ -1,3 +1,60 @@
-aws_region  = "ap-northeast-2"
-service_name = "editor-service"
-environment  = "dev"
+aws_region   = "ap-northeast-2"
+project_name = "msa"
+environment  = "prod"
+
+service_name         = "editor-service"
+service_runtime_name = "editor-service"
+service_role         = "resource-service"
+
+create_vpc = false
+
+existing_vpc_id             = "vpc-0123456789abcdef0"
+existing_public_subnet_ids  = ["subnet-0publica123456789", "subnet-0publicc123456789"]
+existing_private_subnet_ids = ["subnet-0appa1234567890", "subnet-0appc1234567890"]
+existing_vpc_cidr           = "10.0.0.0/16"
+
+alb_internal                         = true
+alb_ingress_source_security_group_ids = ["sg-0gatewayecs12345678"]
+private_dns_zone_id                  = "Z0123456789PRIVATE"
+private_dns_name                     = "editor.internal.platform.local"
+
+app_port      = 8083
+desired_count = 2
+task_cpu      = 512
+task_memory   = 1024
+
+health_check_path = "/actuator/health"
+
+image_tag = "latest"
+
+enable_mysql            = true
+mysql_database_name     = "documentsdb"
+mysql_username          = "documents"
+mysql_password          = "replace-with-a-long-random-password"
+mysql_url_env_name      = "DB_URL_PROD"
+mysql_username_env_name = "DB_USERNAME_PROD"
+mysql_password_env_name = "DB_PASSWORD_PROD"
+mysql_jdbc_query        = "?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul"
+
+app_env = {
+  REDIS_HOST = "redis.internal.platform.local"
+  REDIS_PORT = "6379"
+  REDIS_SSL  = "false"
+
+  PLATFORM_GOVERNANCE_ENABLED            = "true"
+  PLATFORM_GOVERNANCE_AUDIT_ENABLED      = "true"
+  PLATFORM_GOVERNANCE_SERVICE_ROLE_PRESET = "RESOURCE_SERVICE"
+  PLATFORM_SECURITY_SERVICE_ROLE_PRESET  = "API_SERVER"
+  PLATFORM_SECURITY_JWT_ISSUER           = "api-gateway"
+  PLATFORM_SECURITY_JWT_AUDIENCE         = "internal-services"
+  PLATFORM_RESOURCE_ENABLED              = "true"
+  PLATFORM_RESOURCE_MODE                 = "production"
+  DOCUMENTS_RESOURCE_STORAGE_ROOT        = "/var/lib/documents/resources"
+  SWAGGER_ENABLED                        = "false"
+}
+
+app_secret_env = {
+  JWT_SECRET               = "replace-with-a-long-random-jwt-secret"
+  PLATFORM_SECURITY_JWT_SECRET = "replace-with-editor-internal-jwt-secret"
+  REDIS_PASSWORD           = ""
+}

@@ -7,7 +7,7 @@
 - 공통 계약 레포: `https://github.com/jho951/service-contract`
 - 계약 동기화 기준 파일: [contract.lock.yml](contract.lock.yml)
 - 계약 변경 절차: [contract-change-guideline.md](docs/guides/contract/contract-change-guideline.md)
-- 이 서비스의 코드 SoT: `editor-service` `dev`
+- 이 서비스의 코드 SoT: `editor-service` `main`
 - PR에서는 `.github/workflows/contract-check.yml`이 lock 파일과 계약 영향 변경 여부를 검사합니다.
 - 인터페이스 변경 시 본 저장소 구현보다 계약 레포 변경을 먼저 반영합니다.
 
@@ -15,6 +15,8 @@
 
 - 문서 메타데이터와 문서 내부 블록 구조를 저장, 조회, 수정, 삭제하는 서비스를 제공합니다.
 - 현재는 문서 CRUD, 휴지통/복구, 블록 조회, 관리자 블록 보조 API, 에디터 save/move API가 구현된 상태입니다.
+- TEXT block 본문은 `rich_text` JSON을 사용하며, 현재 validator는 optional `content.blockType`으로 `paragraph`, `heading1`, `heading2`, `heading3`를 허용합니다.
+- `segment`는 여전히 `text`, `marks`만 허용합니다.
 - 데이터 저장은 MySQL, 애플리케이션 실행은 Spring Boot, 영속 계층은 Spring Data JPA를 사용합니다.
 
 ## 현재 사용되는 아키텍처
@@ -61,31 +63,31 @@
 
 ### Local 실행 스크립트
 
-로컬 실행은 `scripts/run-local.sh`를 사용합니다.
+로컬 실행은 `scripts/run.local.sh`를 기준으로 사용합니다.
 
 ```bash
 # 기본(dev)
-bash scripts/run-local.sh
+bash scripts/run.local.sh
 
 # prod 프로필로 실행
-bash scripts/run-local.sh prod
+bash scripts/run.local.sh prod
 ```
 
 ### Docker 실행 스크립트
 
-도커 실행은 `scripts/run-docker.sh`를 사용합니다.
+도커 실행은 `scripts/run.docker.sh`를 기준으로 사용합니다.
 
 기본 실행(인자 없음): `dev up`
 
 ```bash
 # dev 환경 전체 빌드/기동/로그
-bash scripts/run-docker.sh dev all
+bash scripts/run.docker.sh up dev
 
 # prod 환경 기동
-bash scripts/run-docker.sh prod up
+bash scripts/run.docker.sh up prod
 
 # 인자 없이 실행하면 dev up
-bash scripts/run-docker.sh
+bash scripts/run.docker.sh up dev
 ```
 
 지원 동작:
@@ -101,10 +103,19 @@ bash scripts/run-docker.sh
 
 환경별 compose 파일:
 
-- dev: `docker/docker-compose.dev.yml`
-- prod: `docker/docker-compose.prod.yml`
+- dev: `docker/dev/compose.yml`
+- prod: `docker/prod/compose.yml`
+- build only: `docker/compose.build.yml`
 
-참고: 기존 `docker/docker.sh`는 하위 호환용 래퍼로 유지되며 내부적으로 `scripts/run-docker.sh`를 호출합니다.
+참고: 기존 `scripts/run-local.sh`, `scripts/run-docker.sh`, `docker/docker.sh`는 하위 호환용 래퍼로 유지될 수 있고, canonical 스크립트는 `scripts/run.local.sh`, `scripts/run.docker.sh`입니다.
+
+### 배포 메모
+
+- 현재 운영 기본값은 `ECS/Fargate + CodeDeploy blue/green`입니다.
+- `docker/prod/compose.yml`은 `EDITOR_SERVICE_IMAGE`를 필수로 받고, 운영 배포에서는 CI/CD가 ECR에 push한 이미지만 pull합니다.
+- `GH_TOKEN`, `GITHUB_ACTOR`는 dev 또는 로컬 build에서만 필요합니다.
+- dev build 설정은 `docker/compose.build.yml`에만 두고, 실행용 compose에는 포함하지 않습니다.
+- EC2 compose 방식은 fallback reference로만 남기고, 무중단 배포가 필요한 표준 운영 배포 방식으로 취급하지 않습니다.
 
 ## 기술 스택
 
