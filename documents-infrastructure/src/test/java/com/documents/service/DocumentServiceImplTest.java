@@ -452,13 +452,33 @@ class DocumentServiceImplTest {
 	void deleteHardDeletesDocument() {
 		UUID documentId = UUID.randomUUID();
 		Document targetDocument = document(documentId, UUID.randomUUID(), null, "삭제 대상 문서", "00000000000000000001");
-		when(documentRepository.findByIdAndDeletedAtIsNull(documentId)).thenReturn(Optional.of(targetDocument));
+		when(documentRepository.findById(documentId)).thenReturn(Optional.of(targetDocument));
         when(textNormalizer.normalizeNullable(" user-456 ")).thenReturn("user-456");
 
 		documentService.delete(documentId, " user-456 ");
 
 		verify(documentRepository).delete(targetDocument);
-        verify(documentResourceBindingService).scheduleDocumentBindingsForPurge(List.of(documentId), "user-456");
+		verify(documentResourceBindingService).scheduleDocumentBindingsForPurge(List.of(documentId), "user-456");
+		verifyNoInteractions(blockService);
+	}
+
+	@Test
+	@DisplayName("성공_휴지통 문서 삭제 시 deleted 트리 기준으로 purge 대상을 계산한다")
+	void deleteHardDeletesTrashedDocument() {
+		UUID rootId = UUID.randomUUID();
+		UUID childId = UUID.randomUUID();
+		Document deletedRoot = deletedDocument(rootId, UUID.randomUUID(), null, "삭제 루트", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, UUID.randomUUID(), rootId, "삭제 자식", "00000000000000000002");
+		when(documentRepository.findById(rootId)).thenReturn(Optional.of(deletedRoot));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of(deletedChild));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(childId)).thenReturn(List.of());
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.delete(rootId, ACTOR_ID);
+
+		verify(documentRepository).delete(deletedRoot);
+		verify(documentResourceBindingService).scheduleDocumentBindingsForPurge(List.of(rootId, childId), ACTOR_ID);
+		verify(documentRepository, never()).findActiveChildrenByParentIdOrderBySortKey(any());
 		verifyNoInteractions(blockService);
 	}
 
@@ -496,13 +516,33 @@ class DocumentServiceImplTest {
 	void deleteUsesDocumentHardDeletePath() {
 		UUID rootId = UUID.randomUUID();
 		Document rootDocument = document(rootId, UUID.randomUUID(), null, "루트 문서", "00000000000000000001");
-		when(documentRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootDocument));
+		when(documentRepository.findById(rootId)).thenReturn(Optional.of(rootDocument));
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
 
 		documentService.delete(rootId, ACTOR_ID);
 
 		verify(documentRepository).delete(rootDocument);
         verify(documentResourceBindingService).scheduleDocumentBindingsForPurge(List.of(rootId), ACTOR_ID);
+		verify(documentRepository, never()).softDeleteActiveByIds(any(), any(), any());
+		verifyNoInteractions(blockService);
+	}
+
+	@Test
+	@DisplayName("성공_휴지통 문서 삭제는 deleted 트리 hard delete 경로를 사용한다")
+	void deleteUsesDeletedDocumentHardDeletePath() {
+		UUID rootId = UUID.randomUUID();
+		UUID childId = UUID.randomUUID();
+		Document deletedRoot = deletedDocument(rootId, UUID.randomUUID(), null, "삭제 루트", "00000000000000000001");
+		Document deletedChild = deletedDocument(childId, UUID.randomUUID(), rootId, "삭제 자식", "00000000000000000002");
+		when(documentRepository.findById(rootId)).thenReturn(Optional.of(deletedRoot));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of(deletedChild));
+		when(documentRepository.findDeletedChildrenByParentIdOrderBySortKey(childId)).thenReturn(List.of());
+		when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
+
+		documentService.delete(rootId, ACTOR_ID);
+
+		verify(documentRepository).delete(deletedRoot);
+		verify(documentResourceBindingService).scheduleDocumentBindingsForPurge(List.of(rootId, childId), ACTOR_ID);
 		verify(documentRepository, never()).softDeleteActiveByIds(any(), any(), any());
 		verifyNoInteractions(blockService);
 	}

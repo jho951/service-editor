@@ -285,6 +285,25 @@ class DocumentApiIntegrationTest {
 		assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId())).isEmpty();
 	}
 
+	@Test
+	@DisplayName("성공_휴지통 문서 삭제 API는 trash 문서도 물리 삭제한다")
+	void deleteTrashedDocumentRemovesDocumentAndBlocks() throws Exception {
+		Document document = saveDocument(USER_ID, null, "휴지통 삭제 대상", "00000000000000000001");
+		saveBlock(document.getId(), null, "루트 블록", "000000000001000000000000");
+
+		mockMvc.perform(patch("/documents/{documentId}/trash", document.getId())
+				.header(USER_ID_HEADER, USER_ID))
+			.andExpect(status().isOk());
+
+		mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+				.delete("/documents/{documentId}", document.getId())
+				.header(USER_ID_HEADER, USER_ID))
+			.andExpect(status().isOk());
+
+		assertThat(documentRepository.findById(document.getId())).isEmpty();
+		assertThat(blockRepository.findActiveByDocumentIdOrderBySortKey(document.getId())).isEmpty();
+	}
+
 	private void assertErrorEnvelope(ResultActions result, String httpStatus, int code, String message) throws Exception {
 		result.andExpect(status().is(org.springframework.http.HttpStatus.valueOf(httpStatus).value()))
 			.andExpect(jsonPath("$.httpStatus").value(httpStatus))

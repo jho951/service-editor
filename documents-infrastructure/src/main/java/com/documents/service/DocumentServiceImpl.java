@@ -142,14 +142,19 @@ public class DocumentServiceImpl implements DocumentService {
 	@Override
 	@Transactional
 	public void delete(UUID documentId, String actorId) {
-		Document document = findActiveDocument(documentId);
+		Document document = documentRepository.findById(documentId)
+			.orElseThrow(() -> new BusinessException(BusinessErrorCode.DOCUMENT_NOT_FOUND));
         String normalizedActorId = textNormalizer.normalizeNullable(actorId);
         if (normalizedActorId == null) {
             throw new BusinessException(BusinessErrorCode.INVALID_REQUEST);
         }
 
+        List<UUID> documentIdsToDelete = document.getDeletedAt() == null
+            ? collectActiveDocumentTreeIds(document)
+            : collectDeletedDocumentTreeIds(document);
+
         documentResourceBindingService.scheduleDocumentBindingsForPurge(
-            collectActiveDocumentTreeIds(document),
+            documentIdsToDelete,
             normalizedActorId
         );
 		documentRepository.delete(document);
