@@ -185,7 +185,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
-          ssh-keyscan -p "${DEPLOY_PORT}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+          DEPLOY_HOST_CLEAN="$(printf '%s' "${DEPLOY_HOST}" | tr -d '[:space:]')"
+          ssh-keyscan -p "${DEPLOY_PORT}" -H "${DEPLOY_HOST_CLEAN}" >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         if: ${{ env.HAS_EC2_DEPLOY_TARGET == 'true' }}
@@ -195,7 +196,8 @@ jobs:
           REGISTRY: ${{ needs.image.outputs.registry }}
         run: |
           set -euo pipefail
-          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+          DEPLOY_HOST_CLEAN="$(printf '%s' "${DEPLOY_HOST}" | tr -d '[:space:]')"
+          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST_CLEAN}" \
             "AWS_REGION='${AWS_REGION}' REGISTRY='${REGISTRY}' IMAGE_URI='${IMAGE_URI}' DEPLOY_BUNDLE_DIR='${DEPLOY_BUNDLE_DIR}' bash -se" <<'EOF'
           set -euo pipefail
           aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${REGISTRY}"
