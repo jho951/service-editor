@@ -1,7 +1,7 @@
 contract:
   repo: https://github.com/jho951/service-contract
   ref: main
-  commit: 12dc214ed7e0c9c2290add6972cd35be13634743
+  commit: 9fd9a6dd2d6487740fcddd6454407819cd77eca0
 
 service:
   name: editor-service
