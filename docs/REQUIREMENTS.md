@@ -1118,10 +1118,10 @@ TEXT 블록 생성.
 - 테스트 커버리지는 장기적으로 라인/브랜치 기준 `80%` 이상을 목표로 하되, 신규 기능은 변경 범위에 대해 우선적으로 높은 커버리지를 확보해야 한다.
 
 ## 15.5 플랫폼 보안·거버넌스·리소스 운영 원칙
-- 실행 모듈은 `platform-runtime-bom` `3.0.1`과 `platform-governance` `3.0.1`, `platform-security` `3.0.1`, `platform-resource` `3.0.1` 조합을 기준으로 적용한다.
+- 실행 모듈은 `platform-runtime-bom` `4.0.0`과 `platform-governance` `4.0.0`, `platform-security` `4.0.0`, `platform-resource` `4.0.0` 조합을 기준으로 적용한다.
 - 실행 모듈은 `platform-governance-starter`, `platform-security-starter`, `platform-security-web-api`, `platform-resource-starter`를 함께 사용하고, API 모듈은 웹 계층에서 필요한 `platform-governance-api` 계약만 직접 의존한다.
 - 실행 모듈은 `platform-security-governance-bridge`와 `platform-resource-governance-bridge`를 함께 연결해 보안/리소스 판단과 거버넌스 감사 흐름을 통합한다.
-- `platform-security-governance-bridge`와 `platform-resource-governance-bridge`는 `3.0.1` release train 기준으로 관리한다.
+- `platform-security-governance-bridge`와 `platform-resource-governance-bridge`는 `4.0.0` release train 기준으로 관리한다.
 - `editor-service`는 문서와 블록 리소스를 소유하는 서비스이므로 플랫폼 거버넌스 역할을 `RESOURCE_SERVICE`로 두고, 플랫폼 보안 역할은 `API_SERVER`로 둔다.
 - `editor-service`는 문서/블록 비즈니스 로직만 직접 구현하고, JWT 검증 체인 조립, 감사 로거 wiring, 파일 저장소 wiring, 리소스 lifecycle 감사 연결은 platform starter와 bridge에 맡겨야 한다.
 - 현재 서비스는 `user-123` 같은 문자열 사용자 식별자를 유지하므로, 실행 모듈은 platform security가 인증을 소유하고 애플리케이션은 `X-Request-Id`/`X-User-Id`를 request context로 정리하는 얇은 request-context filter만 둔다.

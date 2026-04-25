@@ -14,13 +14,13 @@ ext {
     resolvedLombokVersion = (findProperty('lombok_version') ?: '1.18.38').toString()
     resolvedJunitJupiterVersion = (findProperty('junit_jupiter_version') ?: '5.12.2').toString()
     resolvedJunitPlatformVersion = (findProperty('junit_platform_version') ?: '1.12.2').toString()
-    resolvedPlatformGovernanceVersion = (findProperty('platform_governance_version') ?: '3.0.1').toString()
-    resolvedPlatformSecurityVersion = (findProperty('platform_security_version') ?: '3.0.1').toString()
-    resolvedPlatformResourceVersion = (findProperty('platform_resource_version') ?: '3.0.1').toString()
+    resolvedPlatformGovernanceVersion = (findProperty('platform_governance_version') ?: '4.0.0').toString()
+    resolvedPlatformSecurityVersion = (findProperty('platform_security_version') ?: '4.0.0').toString()
+    resolvedPlatformResourceVersion = (findProperty('platform_resource_version') ?: '4.0.0').toString()
     resolvedPlatformSecurityGovernanceBridgeVersion =
-        (findProperty('platform_security_governance_bridge_version') ?: '2.0.0').toString()
+        (findProperty('platform_security_governance_bridge_version') ?: '4.0.0').toString()
     resolvedPlatformResourceGovernanceBridgeVersion =
-        (findProperty('platform_resource_governance_bridge_version') ?: '2.0.0').toString()
+        (findProperty('platform_resource_governance_bridge_version') ?: '4.0.0').toString()
     runtimeEnvProperties = [
         DB_URL: 'db_url',
         DB_USERNAME: 'db_username',
@@ -100,6 +100,7 @@ allprojects {
     version = rootProject.version
 
     repositories {
+        mavenLocal()
         mavenCentral()
         ['platform-governance', 'platform-security', 'platform-resource', 'platform-integrations'].each { repoName ->
             maven {
@@ -107,7 +108,7 @@ allprojects {
                 url = uri("https://maven.pkg.github.com/jho951/${repoName}")
                 credentials {
                     username = findProperty('githubPackagesUsername') ?: System.getenv('GITHUB_ACTOR')
-                    password = findProperty('githubPackagesToken') ?: findProperty('githubToken') ?: findProperty('ghToken') ?: System.getenv('GH_TOKEN') ?: System.getenv('GITHUB_TOKEN')
+                    password = findProperty('githubPackagesToken') ?: findProperty('githubToken') ?: findProperty('ghToken') ?: System.getenv('GH_PACKAGES_TOKEN') ?: System.getenv('GH_TOKEN') ?: System.getenv('GITHUB_TOKEN')
                 }
             }
         }
