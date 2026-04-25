@@ -37,6 +37,8 @@ env:
   CI_IMAGE_BUILD_COMMAND: |
     docker build \
       -f docker/Dockerfile \
+      --secret id=gh_token,env=GH_TOKEN \
+      --secret id=github_actor,env=GITHUB_ACTOR \
       -t "${IMAGE_URI}:ci-${GITHUB_SHA}" \
       .
   GITHUB_ACTOR: ${{ github.actor }}
