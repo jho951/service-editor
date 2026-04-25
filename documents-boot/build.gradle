@@ -16,12 +16,10 @@ dependencies {
     implementation 'io.github.jho951.platform:platform-security-starter'
     implementation 'io.github.jho951.platform:platform-security-web-api'
     implementation 'io.github.jho951.platform:platform-resource-starter'
-    implementation 'io.github.jho951.platform:platform-resource-adapter-filestorage'
     implementation 'io.github.jho951.platform:platform-resource-jdbc'
     implementation 'io.github.jho951.platform:platform-resource-support-local'
     implementation "io.github.jho951.platform:platform-security-governance-bridge"
     implementation "io.github.jho951.platform:platform-resource-governance-bridge"
-    implementation 'io.github.jho951:file-storage-core:2.0.0'
     implementation project(':documents-api')
     implementation project(':documents-infrastructure')
 
