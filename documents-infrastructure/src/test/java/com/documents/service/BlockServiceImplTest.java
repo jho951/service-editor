@@ -682,23 +682,27 @@ class BlockServiceImplTest {
 
         rootBlock.setVersion(0);
 
-        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
-                eq(List.of(rootId, childId, grandChildId)),
+        when(blockRepository.softDeleteRootByIdAndVersion(
                 eq(rootId),
                 eq(0),
                 eq(ACTOR_ID),
                 any(LocalDateTime.class)
-        )).thenReturn(3);
+        )).thenReturn(1);
 
         Block result = blockService.delete(rootId, 0, ACTOR_ID);
 
         ArgumentCaptor<LocalDateTime> deletedAtCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
-        verify(blockRepository).softDeleteActiveByIdsWithRootVersion(
-                eq(List.of(rootId, childId, grandChildId)),
+        verify(blockRepository).softDeleteRootByIdAndVersion(
                 eq(rootId),
                 eq(0),
                 eq(ACTOR_ID),
                 deletedAtCaptor.capture()
+        );
+        verify(blockRepository).softDeleteActiveDescendantsByIds(
+                eq(List.of(rootId, childId, grandChildId)),
+                eq(rootId),
+                eq(ACTOR_ID),
+                eq(deletedAtCaptor.getValue())
         );
         assertThat(result.getId()).isEqualTo(rootId);
         assertThat(result.getDeletedAt()).isEqualTo(deletedAtCaptor.getValue());
@@ -731,8 +735,7 @@ class BlockServiceImplTest {
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootBlock));
         when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of());
-        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
-                eq(List.of(rootId)),
+        when(blockRepository.softDeleteRootByIdAndVersion(
                 eq(rootId),
                 eq(0),
                 eq(ACTOR_ID),
@@ -848,8 +851,7 @@ class BlockServiceImplTest {
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootBlock));
         when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of());
-        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
-                eq(List.of(rootId)),
+        when(blockRepository.softDeleteRootByIdAndVersion(
                 eq(rootId),
                 eq(0),
                 eq(ACTOR_ID),
@@ -892,8 +894,7 @@ class BlockServiceImplTest {
         when(textNormalizer.normalizeNullable(ACTOR_ID)).thenReturn(ACTOR_ID);
         when(blockRepository.findByIdAndDeletedAtIsNull(rootId)).thenReturn(Optional.of(rootBlock));
         when(blockRepository.findActiveChildrenByParentIdOrderBySortKey(rootId)).thenReturn(List.of());
-        when(blockRepository.softDeleteActiveByIdsWithRootVersion(
-                eq(List.of(rootId)),
+        when(blockRepository.softDeleteRootByIdAndVersion(
                 eq(rootId),
                 eq(0),
                 eq(ACTOR_ID),

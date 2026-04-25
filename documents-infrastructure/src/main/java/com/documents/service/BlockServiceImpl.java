@@ -190,15 +190,23 @@ public class BlockServiceImpl implements BlockService {
 
         List<UUID> blockIdsToDelete = collectActiveDescendantBlockIdsForSoftDelete(rootBlock);
 
-        int deletedCount = blockRepository.softDeleteActiveByIdsWithRootVersion(
-                blockIdsToDelete,
+        int rootDeletedCount = blockRepository.softDeleteRootByIdAndVersion(
                 rootBlock.getId(),
                 version,
                 normalizedActorId,
                 deletedAt
         );
-        if (deletedCount == 0) {
+        if (rootDeletedCount == 0) {
             throw new BusinessException(BusinessErrorCode.CONFLICT);
+        }
+
+        if (blockIdsToDelete.size() > 1) {
+            blockRepository.softDeleteActiveDescendantsByIds(
+                    blockIdsToDelete,
+                    rootBlock.getId(),
+                    normalizedActorId,
+                    deletedAt
+            );
         }
 
         rootBlock.setDeletedAt(deletedAt);

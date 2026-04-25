@@ -1,0 +1,75 @@
+name: editor-service-ec2
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: documents-mysql-prod
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD_PROD:-root}
+      MYSQL_DATABASE: ${DB_NAME_PROD:-documentsdb}
+      MYSQL_USER: ${DB_USERNAME_PROD:-documents}
+      MYSQL_PASSWORD: ${DB_PASSWORD_PROD:-documents}
+      TZ: ${TZ:-Asia/Seoul}
+    volumes:
+      - mysql_data_prod:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-p${MYSQL_ROOT_PASSWORD_PROD:-root}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - documents-private
+
+  editor-service:
+    image: ${EDITOR_SERVICE_IMAGE:?EDITOR_SERVICE_IMAGE is required}
+    pull_policy: always
+    container_name: editor-service-prod
+    ports:
+      - "${EDITOR_SERVICE_HOST_BIND:-127.0.0.1}:${EDITOR_SERVICE_HOST_PORT:-8083}:8083"
+    expose:
+      - "8083"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - ./.env.production
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: ${SERVER_PORT:-8083}
+      DB_URL_PROD: ${DB_URL_PROD:-jdbc:mysql://mysql:3306/${DB_NAME_PROD:-documentsdb}?useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Seoul}
+      DB_USERNAME_PROD: ${DB_USERNAME_PROD:-documents}
+      DB_PASSWORD_PROD: ${DB_PASSWORD_PROD:-documents}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      PLATFORM_SECURITY_JWT_SECRET: ${PLATFORM_SECURITY_JWT_SECRET:?PLATFORM_SECURITY_JWT_SECRET is required}
+      PLATFORM_SECURITY_JWT_ISSUER: ${PLATFORM_SECURITY_JWT_ISSUER:-api-gateway}
+      PLATFORM_SECURITY_JWT_AUDIENCE: ${PLATFORM_SECURITY_JWT_AUDIENCE:-internal-services}
+      PLATFORM_GOVERNANCE_SERVICE_ROLE_PRESET: ${PLATFORM_GOVERNANCE_SERVICE_ROLE_PRESET:-RESOURCE_SERVICE}
+      PLATFORM_SECURITY_SERVICE_ROLE_PRESET: ${PLATFORM_SECURITY_SERVICE_ROLE_PRESET:-API_SERVER}
+      PLATFORM_RESOURCE_ENABLED: ${PLATFORM_RESOURCE_ENABLED:-true}
+      PLATFORM_RESOURCE_MODE: ${PLATFORM_RESOURCE_MODE:-production}
+      DOCUMENTS_RESOURCE_STORAGE_ROOT: ${DOCUMENTS_RESOURCE_STORAGE_ROOT:-/var/lib/documents/resources}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=50}
+    restart: always
+    networks:
+      documents-private: {}
+      service-shared:
+        aliases:
+          - documents-service
+          - editor-service
+    volumes:
+      - resource_data_prod:/var/lib/documents/resources
+
+volumes:
+  mysql_data_prod:
+  resource_data_prod:
+
+networks:
+  documents-private:
+    driver: bridge
+    internal: true
+  service-shared:
+    external: true
+    name: ${SERVICE_SHARED_NETWORK:-service-backbone-shared}

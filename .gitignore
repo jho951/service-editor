@@ -39,6 +39,7 @@ out/
 .env
 .env.*
 !.env.example
+!deploy/ec2/.env.production.example
 gradle.properties
 application-local.yml
 application-local.yaml
